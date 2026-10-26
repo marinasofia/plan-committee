@@ -1,0 +1,38 @@
+name: Update spots
+
+on:
+  schedule:
+    - cron: "17 9 * * *"   # every day at 9:17 UTC, keeps tagging until the backlog is done
+  workflow_dispatch:        # run it by hand from the Actions tab
+
+permissions:
+  contents: write
+
+concurrency:
+  group: update-spots
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Build spots.json
+        env:
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          STATS_URL: ${{ vars.STATS_URL }}
+          MAX_BATCHES: ${{ vars.MAX_BATCHES || '40' }}
+        run: python pipeline/build_spots.py
+      - name: Commit if anything changed
+        run: |
+          git config user.name "spot-updater"
+          git config user.email "actions@users.noreply.github.com"
+          git add spots.json data/tagged.json
+          git diff --cached --quiet && echo "no changes" && exit 0
+          git commit -m "Update spots $(date -u +%F)"
+          git push

@@ -1,0 +1,869 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>The Plan Committee</title>
+<meta name="description" content="Your friends pick what they want. AI agents argue for each of you in a group chat and agree on one NYC plan.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#efebe5; --paper:#fbf9f6; --ink:#1c1b1a; --muted:#8a857e; --line:#e4dfd7;
+  --bubble:#e9e9eb; --me:#0a7cff; --accent:#c9718f; --accent-soft:#f6e3ea; --ok:#3d8b5a;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{background:var(--bg);color:var(--ink);font-family:"DM Sans",system-ui,sans-serif;display:flex;justify-content:center;-webkit-font-smoothing:antialiased}
+button,input,select,textarea{font:inherit;color:inherit}
+.app{width:100%;max-width:440px;height:100dvh;background:var(--paper);display:flex;flex-direction:column;position:relative;overflow:hidden;overflow:clip}
+@media(min-width:500px){.app{height:min(920px,calc(100dvh - 40px));margin-top:20px;border-radius:34px;box-shadow:0 30px 80px rgba(60,40,30,.18)}}
+
+.head{padding:14px 16px 10px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px;background:rgba(251,249,246,.92);backdrop-filter:blur(10px);z-index:2}
+.stack{display:flex}
+.stack .av{width:30px;height:30px;font-size:12px;border:2px solid var(--paper);margin-left:-9px}
+.stack .av:first-child{margin-left:0}
+.head .t{flex:1;min-width:0}
+.head h1{font-family:"Bricolage Grotesque",sans-serif;font-weight:700;font-size:17px;letter-spacing:-.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.head p{font-size:11.5px;color:var(--muted)}
+.iconbtn{width:34px;height:34px;border-radius:50%;border:1px solid var(--line);background:#fff;display:grid;place-items:center;cursor:pointer;flex:none}
+.iconbtn svg{width:17px;height:17px}
+.av{width:34px;height:34px;border-radius:50%;display:grid;place-items:center;font-weight:600;font-size:13px;flex:none;color:#2a2622}
+
+.chat{flex:1;overflow-y:auto;padding:16px 14px 10px;display:flex;flex-direction:column;gap:4px;scroll-behavior:smooth}
+.stamp{flex:none;align-self:center;font-size:11px;color:var(--muted);margin:6px 0 10px;font-family:"DM Mono",monospace;letter-spacing:.02em}
+.row{flex:none;display:flex;align-items:flex-end;gap:7px;max-width:86%;animation:pop .32s cubic-bezier(.2,1.3,.5,1) both}
+.row.me{align-self:flex-end;flex-direction:row-reverse}
+.row .av{width:28px;height:28px;font-size:11px}
+.row.cont .av{visibility:hidden}
+.msg{display:flex;flex-direction:column}
+.name{font-size:11px;color:var(--muted);margin:8px 0 2px 12px}
+.name .via{font-family:"DM Mono",monospace;font-size:9.5px;margin-left:6px;padding:1px 6px;border-radius:6px;background:#efebe5;color:#6d6560}
+.row.cont .name{display:none}
+.b{background:var(--bubble);padding:8px 13px;border-radius:19px;font-size:15.5px;line-height:1.32;word-wrap:break-word}
+.row.me .b{background:var(--me);color:#fff}
+.b .spot{font-weight:600}
+@keyframes pop{from{opacity:0;transform:translateY(8px) scale(.96)}to{opacity:1;transform:none}}
+.typing .b{display:flex;gap:4px;padding:12px 14px}
+.typing i{width:7px;height:7px;border-radius:50%;background:#a3a09b;animation:blink 1.2s infinite}
+.typing i:nth-child(2){animation-delay:.18s}.typing i:nth-child(3){animation-delay:.36s}
+@keyframes blink{0%,60%,100%{opacity:.35;transform:none}30%{opacity:1;transform:translateY(-3px)}}
+.sys{flex:none;align-self:center;font-size:12px;color:var(--muted);text-align:center;margin:10px 20px;line-height:1.4}
+.sys.err{color:#b4413c}
+.sys.big{font-size:14px;color:var(--ink);background:#fff;border:1px solid var(--line);border-radius:18px;padding:16px;margin:16px 6px;align-self:stretch;text-align:left}
+.sys.big b{font-family:"Bricolage Grotesque",sans-serif;font-size:19px;display:block;margin-bottom:6px}
+.sys.big .bt{display:flex;gap:8px;margin-top:12px}
+.sys.big .bt button{flex:1;padding:11px;border-radius:13px;border:1px solid var(--line);background:#fff;font-weight:600;cursor:pointer}
+.sys.big .bt button.pri{background:var(--ink);color:#fff;border-color:var(--ink)}
+
+.ticket{flex:none;align-self:center;width:94%;margin:16px 0 8px;background:#fff;border-radius:22px;box-shadow:0 10px 30px rgba(60,40,30,.12);overflow:hidden;animation:pop .5s cubic-bezier(.2,1.2,.5,1) both}
+.ticket .top{padding:18px 20px 14px;background:var(--accent-soft)}
+.eyebrow{font-family:"DM Mono",monospace;font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--accent)}
+.ticket h2{font-family:"Bricolage Grotesque",sans-serif;font-size:25px;line-height:1.05;letter-spacing:-.02em;margin-top:6px}
+.ticket .when{font-size:12.5px;color:#6d6560;margin-top:6px}
+.perf{height:0;border-top:2px dashed var(--line);margin:0 16px;position:relative}
+.perf:before,.perf:after{content:"";position:absolute;top:-11px;width:20px;height:20px;border-radius:50%;background:var(--paper)}
+.perf:before{left:-27px}.perf:after{right:-27px}
+.stops{padding:8px 20px 6px}
+.stop{display:grid;grid-template-columns:62px 1fr;gap:10px;padding:11px 0;border-bottom:1px solid #f1ede7}
+.stop:last-child{border-bottom:0}
+.stop .tm{font-family:"DM Mono",monospace;font-size:12px;color:var(--accent);padding-top:2px}
+.stop .nm{font-weight:600;font-size:15.5px}
+.stop .meta{font-size:11.5px;color:var(--muted);margin-top:2px}
+.stop .why{font-size:13px;margin-top:4px;color:#4a4541}
+.slinks{display:flex;gap:6px;margin-top:7px;flex-wrap:wrap}
+.slinks a,.slinks button{font-size:11.5px;font-weight:600;color:var(--ink);text-decoration:none;border:1px solid var(--line);border-radius:99px;padding:3px 10px;background:#fff;cursor:pointer}
+.slinks button.on{background:var(--accent-soft);border-color:#ebc3d1;color:#9c4565}
+.drama{padding:4px 20px 16px}
+.drama .lbl{display:flex;justify-content:space-between;font-family:"DM Mono",monospace;font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.meter{height:8px;border-radius:9px;background:#f1ede7;margin-top:6px;overflow:hidden}
+.meter span{display:block;height:100%;width:0;border-radius:9px;background:linear-gradient(90deg,#b9d3c2,#f1d58a,var(--accent));transition:width 1.4s cubic-bezier(.2,.8,.2,1)}
+.verdict{font-size:13px;margin-top:10px;color:#4a4541}
+.tbtns{display:flex;gap:8px;padding:0 16px 12px}
+.tbtns button{flex:1;padding:11px 8px;border-radius:14px;border:1px solid var(--line);background:#fff;font-weight:600;font-size:13.5px;cursor:pointer}
+.tbtns button.pri{background:var(--ink);color:#fff;border-color:var(--ink)}
+.tbtns.sub button{font-weight:500;font-size:13px;padding:9px 6px}
+.foot{font-size:10.5px;color:var(--muted);text-align:center;padding:4px 16px 14px}
+
+.composer{display:flex;gap:8px;align-items:center;padding:10px 12px calc(10px + env(safe-area-inset-bottom));border-top:1px solid var(--line);background:var(--paper)}
+.composer input{flex:1;border:1px solid var(--line);border-radius:20px;padding:10px 14px;font-size:15px;background:#fff;outline:none}
+.composer input:disabled{background:#f4f1ec}
+.send{width:36px;height:36px;border-radius:50%;border:0;background:var(--me);color:#fff;display:grid;place-items:center;cursor:pointer}
+.send:disabled{opacity:.35}
+.send svg{width:16px;height:16px}
+.replaybar{position:absolute;left:0;right:0;bottom:0;padding:12px 14px calc(12px + env(safe-area-inset-bottom));background:var(--paper);border-top:1px solid var(--line);display:none;z-index:3}
+.replaybar button{width:100%;padding:14px;border-radius:16px;border:0;background:var(--ink);color:#fff;font-weight:600;font-size:15px;cursor:pointer}
+.app.replay .composer{visibility:hidden}.app.replay .replaybar{display:block}
+
+.sheet{position:absolute;inset:0;background:var(--paper);z-index:5;overflow-y:auto;padding:22px 20px 34px;transition:transform .45s cubic-bezier(.3,1,.4,1)}
+.sheet.hide{transform:translateY(105%);visibility:hidden;transition:transform .45s cubic-bezier(.3,1,.4,1),visibility 0s .45s}
+.sheet.top{z-index:7}
+.sheet h2{font-family:"Bricolage Grotesque",sans-serif;font-size:30px;line-height:1.02;letter-spacing:-.025em;padding-right:44px}
+.sheet .lead{color:var(--muted);font-size:14px;margin-top:8px;line-height:1.4}
+.sec{margin-top:20px}
+.lab{display:block;font-family:"DM Mono",monospace;font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:8px}
+.seg{display:flex;background:#efebe5;border-radius:14px;padding:4px}
+.seg button{flex:1;border:0;background:none;padding:10px 6px;border-radius:11px;font-weight:600;font-size:14px;cursor:pointer;color:#6d6560}
+.seg button.on{background:#fff;color:var(--ink);box-shadow:0 2px 8px rgba(0,0,0,.06)}
+.chips{display:flex;flex-wrap:wrap;gap:7px}
+.chip{border:1px solid var(--line);background:#fff;border-radius:99px;padding:7px 13px;font-size:13.5px;cursor:pointer}
+.chip.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+.field{width:100%;border:1px solid var(--line);border-radius:12px;padding:10px 12px;background:#fff;font-size:14.5px;outline:none}
+.field:focus{border-color:#cfc6bb}
+.member{display:grid;grid-template-columns:38px 1fr auto;gap:10px;align-items:center;background:#fff;border:1px solid var(--line);border-radius:16px;padding:12px;margin-bottom:8px;cursor:pointer}
+.member .av{width:38px;height:38px}
+.member .mn{font-weight:600;font-size:15.5px}
+.member .ms{font-size:12.5px;color:var(--muted);margin-top:2px;line-height:1.35}
+.member .x{border:0;background:none;color:var(--muted);font-size:20px;cursor:pointer;padding:4px 6px}
+.btnrow{display:flex;gap:8px}
+.ghost{flex:1;padding:12px 8px;border-radius:14px;border:1px dashed #cfc6bb;background:none;font-weight:600;font-size:13.5px;cursor:pointer}
+.toggle{display:flex;align-items:center;justify-content:space-between;gap:12px;background:#fff;border:1px solid var(--line);border-radius:16px;padding:12px 14px;margin-top:8px}
+.toggle .tt{font-weight:600;font-size:14.5px}.toggle .ts{font-size:12px;color:var(--muted);margin-top:2px}
+.sw{width:46px;height:28px;border-radius:99px;background:#ddd6cc;border:0;position:relative;cursor:pointer;flex:none;transition:background .2s}
+.sw:after{content:"";position:absolute;top:3px;left:3px;width:22px;height:22px;border-radius:50%;background:#fff;transition:transform .2s;box-shadow:0 1px 3px rgba(0,0,0,.2)}
+.sw.on{background:var(--ink)}.sw.on:after{transform:translateX(18px)}
+.cta{width:100%;margin-top:22px;padding:15px;border-radius:16px;border:0;background:var(--ink);color:#fff;font-weight:600;font-size:16px;cursor:pointer}
+.small{font-size:12px;color:var(--muted);line-height:1.45;margin-top:8px}
+.small a{color:inherit}
+.close{position:absolute;top:18px;right:18px}
+.prov{background:#fff;border:1px solid var(--line);border-radius:16px;padding:14px;margin-top:10px}
+.prov .ph{display:flex;justify-content:space-between;align-items:center;font-weight:600;gap:10px}
+.st{font-family:"DM Mono",monospace;font-size:11px;color:var(--muted);font-weight:400;text-align:right}
+.st.ok{color:var(--ok)}.st.bad{color:#b4413c}
+.prov input,.prov select{margin-top:8px}
+.prov .small{margin-top:6px}
+.who{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
+.who span{font-size:12.5px;background:#fff;border:1px solid var(--line);border-radius:99px;padding:4px 10px}
+</style>
+</head>
+<body>
+<div class="app" id="app">
+
+  <div class="head">
+    <div class="stack" id="stack"></div>
+    <div class="t"><h1 id="title">date night committee</h1><p id="subtitle">AI agents · 1 plan · 0 chill</p></div>
+    <button class="iconbtn" id="newBtn" title="New plan"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
+    <button class="iconbtn" id="gearBtn" title="AI settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></svg></button>
+  </div>
+
+  <div class="chat" id="chat"></div>
+
+  <form class="composer" id="composer">
+    <input id="say" placeholder="the agents are talking…" disabled autocomplete="off">
+    <button class="send" id="sendBtn" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg></button>
+  </form>
+  <div class="replaybar"><button type="button" id="ownBtn">Plan your own night</button></div>
+
+  <!-- setup -->
+  <div class="sheet" id="setup">
+    <h2>Let the agents<br>plan your night.</h2>
+    <p class="lead">Everyone picks what they want. Each person gets an AI agent that fights for them in a group chat, and they agree on one real NYC plan.</p>
+
+    <div class="sec"><div class="seg" id="modeSeg"><button type="button" data-mode="date">Date night</button><button type="button" data-mode="girls">Friends night</button></div></div>
+
+    <div class="sec"><span class="lab">The committee</span>
+      <p class="small" id="notice" style="display:none;color:var(--ok);margin:0 0 8px"></p>
+      <div id="members"></div>
+      <div class="btnrow"><button class="ghost" id="addHere" type="button">+ Add someone here</button><button class="ghost" id="inviteBtn" type="button">Invite friends</button></div>
+      <div class="toggle"><div><div class="tt">The Wallet</div><div class="ts">a referee agent that guards the budget</div></div><button class="sw" id="walletSw" type="button" aria-label="The Wallet"></button></div>
+    </div>
+
+    <div class="sec"><span class="lab">When</span><input class="field" id="when" value="Saturday night"></div>
+    <div class="sec"><span class="lab">Neighborhood</span><div class="chips" id="hoodChips"></div></div>
+
+    <button class="cta" id="startBtn" type="button">Start the group chat</button>
+    <p class="small">Places from hand picks, NYC Open Data and © OpenStreetMap contributors. Check hours before you go.</p>
+    <p class="small" id="keyHint">Runs on your own AI key. Tap the sliders icon to add a free Gemini, Groq or OpenRouter key.</p>
+  </div>
+
+  <!-- member editor -->
+  <div class="sheet hide top" id="editor">
+    <button class="iconbtn close" id="closeEditor" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    <div class="eyebrow" id="edEyebrow"></div>
+    <h2 id="edTitle">Your picks</h2>
+    <div class="who" id="edWho"></div>
+    <div class="sec"><span class="lab">Name</span><input class="field" id="edName" placeholder="your name" autocomplete="off"></div>
+    <div class="sec"><span class="lab">Craving</span><div class="chips" id="edCrave"></div></div>
+    <div class="sec"><span class="lab">Max budget</span><div class="chips" id="edBudget"></div></div>
+    <div class="sec"><span class="lab">Vibe</span><div class="chips" id="edVibe"></div></div>
+    <div class="sec"><span class="lab">Must have</span><div class="chips" id="edMust"></div></div>
+    <div class="sec"><span class="lab">Dealbreakers</span><div class="chips" id="edDeal"></div></div>
+    <div class="sec"><span class="lab">Your agent's personality</span><div class="chips" id="edPers"></div></div>
+    <div class="sec"><span class="lab">Anything else (optional)</span><input class="field" id="edNote" placeholder="e.g. it's our anniversary, allergic to shellfish" maxlength="90"></div>
+    <button class="cta" id="edSave" type="button">Save</button>
+  </div>
+
+  <!-- settings -->
+  <div class="sheet hide top" id="settings">
+    <button class="iconbtn close" id="closeSettings" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    <h2>Your AI</h2>
+    <p class="lead">Add one key or several. With more than one, the agents spread across them and switch when one hits its free limit. Keys stay in this browser and only go to that provider.</p>
+    <div class="sec"><span class="lab">How agents use your keys</span>
+      <div class="seg" id="poolSeg"><button type="button" data-pool="smart">Smart mix</button><button type="button" data-pool="battle">Model battle</button></div>
+      <p class="small" id="poolNote"></p></div>
+
+    <div class="prov"><div class="ph">Gemini <span class="st" id="st-gemini"></span></div>
+      <input class="field" id="gKey" type="password" placeholder="Gemini API key" autocomplete="off">
+      <select class="field" id="gModel"><option value="">auto (picks free Flash models)</option></select>
+      <p class="small">Free at <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a>, no card.</p></div>
+
+    <div class="prov"><div class="ph">Groq <span class="st" id="st-groq"></span></div>
+      <input class="field" id="qKey" type="password" placeholder="Groq API key" autocomplete="off">
+      <input class="field" id="qModel" placeholder="model">
+      <p class="small">Free at <a href="https://console.groq.com/keys" target="_blank" rel="noopener">console.groq.com/keys</a>, no card. Runs open models like Meta's Llama, very fast.</p></div>
+
+    <div class="prov"><div class="ph">OpenRouter <span class="st" id="st-openrouter"></span></div>
+      <input class="field" id="oKey" type="password" placeholder="OpenRouter API key" autocomplete="off">
+      <input class="field" id="oModel" placeholder="model">
+      <p class="small">Free at <a href="https://openrouter.ai/keys" target="_blank" rel="noopener">openrouter.ai/keys</a>. <code>openrouter/free</code> picks a free model. Small daily free limit.</p></div>
+
+    <div class="prov"><div class="ph">Other API <span class="st" id="st-custom"></span></div>
+      <input class="field" id="cBase" placeholder="base URL, e.g. https://api.openai.com/v1">
+      <input class="field" id="cKey" type="password" placeholder="API key" autocomplete="off">
+      <input class="field" id="cModel" placeholder="model">
+      <p class="small">Any OpenAI compatible API.</p></div>
+
+    <div class="prov"><div class="ph">Local (Ollama) <span class="st" id="st-ollama"></span><button class="sw" id="olSw" type="button" aria-label="Use Ollama"></button></div>
+      <input class="field" id="olModel" placeholder="model" value="llama3.2">
+      <input class="field" id="olUrl" placeholder="http://localhost:11434" value="http://localhost:11434">
+      <p class="small">Free and unlimited on your own computer. Run <code>ollama pull llama3.2</code>, then start it with <code>OLLAMA_ORIGINS="*" ollama serve</code>.</p></div>
+
+    <button class="cta" id="testKeys" type="button">Save and test</button>
+  </div>
+</div>
+
+<script>
+/* ===================== NYC spots =====================
+   name | type (d dinner, k drinks, l late/activity, f free) | neighborhood | borough | price 0-4 | cuisine | tags | why
+   Hand picked. Check hours before you go. Edit freely. */
+const RAW = `
+Via Carota|d|West Village|M|2|italian|romantic cozy photo wait|cozy Italian, no reservations
+L'Artusi|d|West Village|M|3|italian|romantic fancy|candlelit pasta, a date classic
+4 Charles Prime Rib|d|West Village|M|4|steak|fancy romantic quiet|dark wood steakhouse, very hard reservation
+Carbone|d|Greenwich Village|M|4|italian|fancy chaotic photo|spicy rigatoni, very hard reservation
+Don Angie|d|West Village|M|3|italian|romantic photo|famous pinwheel lasagna
+I Sodi|d|West Village|M|3|italian|cozy romantic|tiny Tuscan spot, legendary lasagna
+Buvette|d|West Village|M|2|french|cozy romantic|tiny French gastrotheque
+Morandi|d|West Village|M|2|italian|cozy lowkey|rustic Italian, candlelit
+Minetta Tavern|d|Greenwich Village|M|3|steak|fancy loud|old school tavern, famous Black Label burger
+Joe's Pizza|d|Greenwich Village|M|1|pizza|lowkey|the classic NYC slice
+Mamoun's Falafel|d|Greenwich Village|M|1|veg|lowkey late veg|cheap falafel, open late
+Keens Steakhouse|d|Midtown|M|3|steak|fancy|historic steakhouse, pipes on the ceiling
+Cote|d|Flatiron|M|4|asian|fancy photo|Korean steakhouse, grills at the table
+Gramercy Tavern|d|Flatiron|M|4|american|fancy quiet romantic|NYC classic with a cozy front tavern
+Shake Shack Madison Square Park|d|Flatiron|M|1|comfort|lowkey|the original Shake Shack, in the park
+Jongro BBQ|d|Koreatown|M|2|asian|loud chaotic|Korean BBQ you grill yourself
+Balthazar|d|SoHo|M|3|french|loud photo fancy|buzzy French brasserie
+Raoul's|d|SoHo|M|3|french|romantic cozy|bistro, famous burger au poivre
+Le Coucou|d|SoHo|M|4|french|fancy romantic quiet|elegant French, special occasion
+Blue Ribbon Sushi|d|SoHo|M|3|asian|cozy|sushi, open late
+Jack's Wife Freda|d|SoHo|M|2|mediterranean|photo lowkey|cute Mediterranean cafe
+Pastis|d|Meatpacking|M|3|french|loud photo chaotic|French brasserie, people watching
+The Odeon|d|Tribeca|M|3|french|lowkey cozy|downtown icon since 1980
+Thai Diner|d|Nolita|M|2|asian|photo chaotic|Thai meets diner, cute decor
+Rubirosa|d|Nolita|M|2|pizza|loud wait|vodka pizza
+Prince Street Pizza|d|Nolita|M|1|pizza|wait lowkey|pepperoni square slice
+Cafe Habana|d|Nolita|M|1|latin|loud lowkey|grilled corn, Cuban Mexican
+Lombardi's|d|Little Italy|M|2|pizza|lowkey|historic coal oven pizza
+Lucien|d|East Village|M|2|french|cozy romantic|tiny French bistro
+Cafe Mogador|d|East Village|M|2|mediterranean|cozy lowkey|Moroccan tagines
+Ippudo|d|East Village|M|2|asian|wait loud|tonkotsu ramen
+Veselka|d|East Village|M|1|comfort|lowkey late|Ukrainian diner, pierogi
+Superiority Burger|d|East Village|M|1|veg|lowkey veg|vegetarian diner, cult favorite
+Kiki's|d|Lower East Side|M|2|mediterranean|loud chaotic|loud and fun Greek taverna
+Katz's Delicatessen|d|Lower East Side|M|2|comfort|loud chaotic wait|pastrami icon
+Ivan Ramen|d|Lower East Side|M|2|asian|lowkey|ramen
+Golden Diner|d|Chinatown|M|1|comfort|lowkey|cool diner, honey butter pancakes
+Nom Wah Tea Parlor|d|Chinatown|M|1|asian|photo lowkey|dim sum since 1920
+Joe's Shanghai|d|Chinatown|M|1|asian|loud|soup dumplings
+Xi'an Famous Foods|d|Chinatown|M|1|asian|lowkey|spicy hand ripped noodles
+Los Tacos No. 1|d|Chelsea|M|1|latin|wait lowkey|best cheap tacos, Chelsea Market
+Jacob's Pickles|d|Upper West Side|M|2|comfort|loud wait|fried chicken and biscuits
+Lilia|d|Williamsburg|BK|3|italian|romantic photo|handmade pasta, airy room
+Misi|d|Williamsburg|BK|3|italian|romantic|pasta by the Lilia team
+Peter Luger|d|Williamsburg|BK|3|steak|loud|legendary steakhouse
+L'Industrie Pizzeria|d|Williamsburg|BK|1|pizza|wait lowkey|burrata slices
+Llama Inn|d|Williamsburg|BK|3|latin|rooftop photo|Peruvian with a rooftop
+Fette Sau|d|Williamsburg|BK|2|comfort|loud lowkey|BBQ by the pound
+Win Son|d|East Williamsburg|BK|2|asian|loud lowkey|Taiwanese American
+Roberta's|d|Bushwick|BK|2|pizza|chaotic loud|cult favorite pizza
+Juliana's|d|DUMBO|BK|2|pizza|views lowkey|coal oven pizza by the Brooklyn Bridge
+Lucali|d|Carroll Gardens|BK|2|pizza|romantic wait cash|candlelit pizza, bring your own wine
+Gage & Tollner|d|Downtown Brooklyn|BK|3|american|fancy photo|gorgeous 1879 dining room
+Olmsted|d|Prospect Heights|BK|3|american|cozy romantic|seasonal food, backyard garden
+Di Fara Pizza|d|Midwood|BK|1|pizza|wait|legendary slice, far but worth it
+Taverna Kyclades|d|Astoria|Q|2|seafood|loud wait|Greek seafood
+Casa Enrique|d|Long Island City|Q|2|latin|cozy|Chiapas style Mexican
+Bemelmans Bar|k|Upper East Side|M|3||fancy music romantic|live piano, old New York glamour
+King Cole Bar|k|Midtown|M|3||fancy quiet|St. Regis bar, birthplace of the Bloody Mary
+The Campbell|k|Midtown|M|2||fancy photo|hidden historic bar inside Grand Central
+Raines Law Room|k|Flatiron|M|2||quiet romantic|ring the bell speakeasy
+230 Fifth Rooftop|k|Flatiron|M|2||rooftop views loud|Empire State Building view
+Employees Only|k|West Village|M|2||loud chaotic late|speakeasy cocktails, psychic at the door
+Katana Kitten|k|West Village|M|2||lowkey|Japanese American cocktails
+Dante|k|Greenwich Village|M|2||photo|negronis, Italian cafe energy
+Bar Pisellino|k|West Village|M|2||cozy photo|cute aperitivo bar, spritzes
+Please Don't Tell|k|East Village|M|2||nerdy|speakeasy through a phone booth
+Death & Co|k|East Village|M|2||cozy quiet|serious cocktails, dim and moody
+McSorley's Old Ale House|k|East Village|M|1||loud chaotic cash|since 1854, beer comes light or dark
+Attaboy|k|Lower East Side|M|2||cozy|no menu, bartender's choice
+Double Chicken Please|k|Lower East Side|M|2||photo wait loud|cocktails that taste like dishes
+Bar Goto|k|Lower East Side|M|2||cozy quiet|Japanese cocktails
+The Ten Bells|k|Lower East Side|M|1||cozy romantic|natural wine and candles
+The Dead Rabbit|k|Financial District|M|2||loud|award winning Irish bar
+Le Bain|k|Meatpacking|M|2||rooftop dancing chaotic views late|rooftop dancing at The Standard
+Westlight|k|Williamsburg|BK|3||rooftop views romantic|skyline rooftop
+The Ides|k|Williamsburg|BK|3||rooftop views|Wythe Hotel rooftop
+Maison Premiere|k|Williamsburg|BK|3||romantic photo|oysters and absinthe
+Brooklyn Brewery|k|Williamsburg|BK|1||lowkey loud|brewery taproom
+Clover Club|k|Cobble Hill|BK|2||cozy|classic cocktail institution
+The Long Island Bar|k|Cobble Hill|BK|2||cozy photo|neon sign diner bar
+House of Yes|k|Bushwick|BK|2||dancing chaotic artsy late|wild themed parties
+Bohemian Hall & Beer Garden|k|Astoria|Q|1||loud lowkey|huge old Czech beer garden
+Comedy Cellar|l|Greenwich Village|M|2||chaotic loud nerdy late|stand up, surprise famous comedians
+Gotham Comedy Club|l|Chelsea|M|2||chaotic|stand up comedy
+Village Vanguard|l|West Village|M|2||music artsy|jazz basement since 1935
+Blue Note|l|Greenwich Village|M|3||music fancy|famous jazz club
+Smalls Jazz Club|l|West Village|M|1||music late artsy|tiny jazz club, sets past midnight
+Birdland|l|Midtown|M|2||music fancy|jazz club
+Film Forum|l|SoHo|M|1||artsy nerdy quiet|classic and indie films
+IFC Center|l|Greenwich Village|M|1||artsy nerdy|indie cinema
+Metrograph|l|Lower East Side|M|1||artsy|indie cinema with a bar
+The Met|l|Upper East Side|M|2||artsy romantic nerdy|open late Fridays and Saturdays
+MoMA|l|Midtown|M|3||artsy nerdy|modern art
+Whitney Museum|l|Meatpacking|M|2||artsy views|art with rooftop terraces
+Summit One Vanderbilt|l|Midtown|M|3||views photo|mirror rooms high above the city
+Top of the Rock|l|Midtown|M|3||views romantic|best view of the Empire State Building
+Strand Book Store|l|Union Square|M|1||nerdy cozy|18 miles of books
+McNally Jackson|l|SoHo|M|1||nerdy cozy|indie bookstore
+Housing Works Bookstore Cafe|l|SoHo|M|1||nerdy cozy|charity bookstore cafe
+Veniero's|l|East Village|M|1||dessert late|cannoli since 1894
+Morgenstern's Finest Ice Cream|l|Lower East Side|M|1||dessert late|fancy ice cream
+Ferrara Bakery|l|Little Italy|M|1||dessert|cannoli since 1892
+Levain Bakery|l|Upper West Side|M|1||dessert wait|giant cookies
+Magnolia Bakery|l|West Village|M|1||dessert photo|banana pudding
+Van Leeuwen Ice Cream|l|East Village|M|1||dessert|ice cream
+Nitehawk Cinema|l|Williamsburg|BK|1||lowkey|movie with food at your seat
+Alamo Drafthouse Brooklyn|l|Downtown Brooklyn|BK|1||lowkey nerdy|dinner and a movie
+Brooklyn Bowl|l|Williamsburg|BK|2||music chaotic|bowling plus live music
+Barcade|l|Williamsburg|BK|1||nerdy chaotic|arcade games and beer
+Roosevelt Island Tram|l|Midtown East|M|1||views nerdy|aerial tram ride for a subway fare
+Chelsea art galleries|f|Chelsea|M|0||artsy|free galleries, Thursday night openings
+The High Line|f|Chelsea|M|0||views romantic photo|elevated park walk
+Little Island|f|Meatpacking|M|0||views photo|floating park on the Hudson
+Staten Island Ferry|f|Lower Manhattan|M|0||views nerdy|free boat past the Statue of Liberty
+Washington Square Park|f|Greenwich Village|M|0||chaotic lowkey music|people watching, street performers
+Bethesda Terrace|f|Central Park|M|0||romantic photo|the most romantic spot in Central Park
+Grand Central Whispering Gallery|f|Midtown|M|0||nerdy romantic|whisper into a corner, they hear it across the arch
+Bryant Park|f|Midtown|M|0||lowkey|park behind the library
+Brooklyn Bridge walk|f|DUMBO|BK|0||views romantic photo|the walk everyone should do once
+Washington Street DUMBO|f|DUMBO|BK|0||photo|the Manhattan Bridge photo spot
+Brooklyn Bridge Park|f|DUMBO|BK|0||views lowkey|waterfront skyline views
+Domino Park|f|Williamsburg|BK|0||views lowkey|waterfront park, skyline views
+Prospect Park|f|Park Slope|BK|0||lowkey|Brooklyn's big park
+Gantry Plaza State Park|f|Long Island City|Q|0||views romantic|Manhattan skyline across the river
+`;
+const SPOTS = RAW.trim().split("\n").map(l=>{const [n,t,h,b,p,c,f,v]=l.split("|");return {n,t:{d:"dinner",k:"drinks",l:"late",f:"free"}[t],h,b,p:+p,c,f:f.split(" ").filter(Boolean),v,cur:true}});
+const CURATED_COUNT=SPOTS.length;
+/* Optional: URL of your Cloudflare Worker (see worker/README). Leave empty to turn usage counts off. */
+const STATS_URL="";
+function track(kind,names){if(!STATS_URL||MOCK||!names?.length)return;try{fetch(STATS_URL.replace(/\/$/,"")+"/e",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({kind,names:names.slice(0,4)}),keepalive:true}).catch(()=>{})}catch(e){}}
+/* More spots, added automatically every day by the GitHub Action (pipeline/build_spots.py) */
+async function loadMoreSpots(){
+  try{const r=await fetch("spots.json",{cache:"no-cache"});if(!r.ok)return;const j=await r.json();
+    const have=new Set(SPOTS.map(s=>s.n.toLowerCase().replace(/[^a-z0-9]/g,"")));
+    for(const s of j.spots||[]){const k=s.n.toLowerCase().replace(/[^a-z0-9]/g,"");if(have.has(k)||!s.t)continue;have.add(k);SPOTS.push({...s,f:s.f||[],c:s.c||"",h:s.h||"",v:s.v||""})}
+    for(const [n,pop] of Object.entries(j.curatedPop||{})){const c=SPOTS.find(s=>s.cur&&s.n===n);if(c)c.pop=pop}
+  }catch(e){}
+}
+const PRICE=["free","$","$$","$$$","$$$$"];
+
+/* ===================== picks ===================== */
+const CRAVINGS=["italian","pizza","steak","french","asian","latin","comfort","american","mediterranean","seafood","veg","anything"];
+const BUDGETS=[["$",1],["$$",2],["$$$",3],["splurge",4]];
+const VIBES=["romantic","cozy","fancy","chaotic","artsy","lowkey","dancing","nerdy"];
+const MUSTS=[["rooftop","rooftop"],["views","views"],["live music","music"],["photo moment","photo"],["dessert","dessert"],["late night","late"]];
+const DEALS=[["no lines","wait"],["nothing loud","loud"],["no cash only","cash"],["stay in Manhattan","onlyM"],["stay in Brooklyn","onlyBK"],["home by 11","early"]];
+const PERS={dramatic:"Dramatic and theatrical, everything is life or death.",stubborn:"Stubborn, rarely gives in, but caves for a good trade.",chill:"Chill and easygoing, but has one hill to die on.","the mediator":"The peacemaker who finds the compromise.",chaotic:"Chaotic, pitches wild ideas, very funny."};
+const HOODS=["Anywhere","West Village","SoHo / Nolita","East Village","Lower East Side","Williamsburg","Midtown","Chelsea","Brooklyn","Queens"];
+const COLORS=["#c8b6e2","#b9d3c2","#f4c3b0","#a9c8e8","#e7c9a0","#d7b9d5"];
+const WALLET_COLOR="#f1d58a";
+
+const uid=()=>Math.random().toString(36).slice(2,9);
+const member=(n,o={})=>({id:uid(),n,c:[],b:2,v:[],m:[],d:[],ps:"chill",q:"",...o});
+function defaultPlan(mode){
+  return mode==="girls"
+    ?{id:uid(),mode,when:"Saturday night",hood:"Anywhere",wallet:false,members:[
+        member("Sofia",{c:["anything"],b:3,v:["fancy","dancing"],m:["rooftop","photo"],ps:"dramatic"}),
+        member("Dani",{c:["asian"],b:2,v:["cozy"],d:["early","wait"],ps:"the mediator"}),
+        member("Jess",{c:["pizza","latin"],b:1,v:["chaotic"],m:["dessert"],ps:"chaotic"})]}
+    :{id:uid(),mode,when:"Saturday night",hood:"Anywhere",wallet:true,members:[
+        member("Marina",{c:["italian","french"],b:3,v:["romantic","artsy"],m:["photo"],ps:"dramatic"}),
+        member("Alex",{c:["steak","pizza"],b:3,v:["lowkey"],m:["late"],d:["wait"],ps:"stubborn"})]};
+}
+
+/* ===================== storage ===================== */
+const $=id=>document.getElementById(id);
+const store={get(k,d){try{const v=localStorage.getItem("pc_"+k);return v===null?d:JSON.parse(v)}catch(e){return d}},set(k,v){try{localStorage.setItem("pc_"+k,JSON.stringify(v))}catch(e){}}};
+const params=new URLSearchParams(location.search);
+const MOCK=params.has("mock");
+let plan=store.get("plan",null)||defaultPlan(params.get("mode")==="girls"?"girls":"date");
+const savePlan=()=>store.set("plan",plan);
+let cfg={pool:"smart",gKey:"",gModel:"",qKey:"",qModel:"llama-3.3-70b-versatile",oKey:"",oModel:"openrouter/free",cBase:"",cKey:"",cModel:"",ol:false,olModel:"llama3.2",olUrl:"http://localhost:11434",...store.get("cfg2",{})};
+{const old=store.get("cfg",null);if(old&&!store.get("cfg2",null)){if(old.key)cfg.gKey=old.key;if(old.prov==="ollama")cfg.ol=true;store.set("cfg2",cfg)}}
+let hist=store.get("hist",[]), faves=store.get("faves",[]);
+
+/* ===================== helpers ===================== */
+function esc(s){return String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
+function initials(n){return (n||"?").trim().split(/\s+/).map(w=>w[0]).join("").slice(0,2).toUpperCase()}
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+function chips(id,list,isOn,toggle){const el=$(id);const items=list.map(x=>Array.isArray(x)?x:[x,x]);
+  el.innerHTML=items.map(([l])=>`<button type="button" class="chip">${esc(l)}</button>`).join("");
+  const paint=()=>[...el.children].forEach((b,i)=>b.classList.toggle("on",isOn(items[i][1])));
+  [...el.children].forEach((b,i)=>b.onclick=()=>{toggle(items[i][1]);paint()});paint()}
+const tog=(arr,v)=>arr.includes(v)?arr.filter(x=>x!==v):[...arr,v];
+const labelOf=(list,v)=>(list.find(x=>x[1]===v)||[v])[0];
+function summary(m){return [m.c.join(", ")||"anything",labelOf(BUDGETS,m.b),...m.v,...m.m.map(v=>labelOf(MUSTS,v)),...m.d.map(v=>labelOf(DEALS,v))].filter(Boolean).join(" · ")}
+
+/* ===================== setup UI ===================== */
+function agentList(){const a=plan.members.map((m,i)=>({...m,color:COLORS[i%COLORS.length]}));
+  if(plan.wallet)a.push({id:"wallet",n:"The Wallet",wallet:true,color:WALLET_COLOR});return a}
+function renderHead(){const ag=agentList();
+  $("stack").innerHTML=ag.slice(0,5).map(a=>`<div class="av" style="background:${a.color}">${initials(a.n)}</div>`).join("");
+  $("title").textContent=plan.mode==="girls"?"friends night committee":"date night committee";
+  $("subtitle").textContent=`${ag.length} AI agents · 1 plan · 0 chill`}
+function renderSetup(){
+  document.querySelectorAll("#modeSeg button").forEach(b=>b.classList.toggle("on",b.dataset.mode===plan.mode));
+  $("members").innerHTML=plan.members.map((m,i)=>`<div class="member" data-i="${i}"><div class="av" style="background:${COLORS[i%COLORS.length]}">${initials(m.n)}</div>
+    <div><div class="mn">${esc(m.n)}</div><div class="ms">${esc(summary(m))}</div></div><button class="x" data-x="${i}" type="button" aria-label="remove">×</button></div>`).join("");
+  $("members").querySelectorAll(".member").forEach(el=>el.onclick=e=>{if(e.target.dataset.x!==undefined)return;openEditor(+el.dataset.i)});
+  $("members").querySelectorAll("[data-x]").forEach(b=>b.onclick=()=>{if(plan.members.length<=1)return;plan.members.splice(+b.dataset.x,1);savePlan();renderSetup()});
+  $("walletSw").classList.toggle("on",plan.wallet);
+  $("when").value=plan.when;
+  chips("hoodChips",HOODS,v=>plan.hood===v,v=>{plan.hood=v;savePlan()});
+  $("addHere").style.display=plan.members.length>=6?"none":"";
+  $("startBtn").textContent=`Start the group chat (${agentList().length} agents)`;
+  $("keyHint").style.display=providers().length||MOCK?"none":"";
+  renderHead();
+}
+document.querySelectorAll("#modeSeg button").forEach(b=>b.onclick=()=>{if(plan.mode===b.dataset.mode)return;plan=defaultPlan(b.dataset.mode);savePlan();renderSetup()});
+$("walletSw").onclick=()=>{plan.wallet=!plan.wallet;savePlan();renderSetup()};
+$("when").oninput=()=>{plan.when=$("when").value;savePlan()};
+$("addHere").onclick=()=>{plan.members.push(member(""));savePlan();openEditor(plan.members.length-1,true)};
+$("inviteBtn").onclick=()=>invite();
+
+/* ===================== member editor ===================== */
+let edIndex=null, edMode="edit", edDraft=null;
+function openEditor(i,isNew,joinInfo){
+  edIndex=i;edMode=joinInfo?"join":"edit";edDraft=JSON.parse(JSON.stringify(joinInfo?joinInfo.me:plan.members[i]));
+  $("edEyebrow").textContent=joinInfo?`${joinInfo.host} is planning ${joinInfo.when.toLowerCase()}`:(isNew?"new member":"edit picks");
+  $("edTitle").textContent=joinInfo?"What do you want?":(edDraft.n?`${edDraft.n}'s picks`:"Their picks");
+  $("edWho").innerHTML=joinInfo?joinInfo.names.map(n=>`<span>${esc(n)} is in</span>`).join(""):"";
+  $("edName").value=edDraft.n;$("edName").style.borderColor="";
+  chips("edCrave",CRAVINGS,v=>edDraft.c.includes(v),v=>edDraft.c=tog(edDraft.c,v));
+  chips("edBudget",BUDGETS,v=>edDraft.b===v,v=>edDraft.b=v);
+  chips("edVibe",VIBES,v=>edDraft.v.includes(v),v=>edDraft.v=tog(edDraft.v,v));
+  chips("edMust",MUSTS,v=>edDraft.m.includes(v),v=>edDraft.m=tog(edDraft.m,v));
+  chips("edDeal",DEALS,v=>edDraft.d.includes(v),v=>edDraft.d=tog(edDraft.d,v));
+  chips("edPers",Object.keys(PERS),v=>edDraft.ps===v,v=>edDraft.ps=v);
+  $("edNote").value=edDraft.q||"";
+  $("edSave").textContent=joinInfo?"Join and send my picks back":"Save";
+  $("closeEditor").style.display=joinInfo?"none":"";
+  $("editor").classList.remove("hide");$("editor").scrollTop=0;
+}
+$("closeEditor").onclick=()=>{$("editor").classList.add("hide");if(edMode==="edit"&&!plan.members[edIndex]?.n){plan.members.splice(edIndex,1);savePlan();renderSetup()}};
+$("edSave").onclick=async()=>{
+  edDraft.n=$("edName").value.trim().slice(0,20);edDraft.q=$("edNote").value.trim();
+  if(!edDraft.n){$("edName").focus();$("edName").style.borderColor="#b4413c";return}
+  if(edMode==="join"){await finishJoin(edDraft);return}
+  plan.members[edIndex]=edDraft;savePlan();$("editor").classList.add("hide");renderSetup();
+};
+
+/* ===================== links (no server: the data lives in the link) ===================== */
+const b64u={enc:b=>{let s="";for(let i=0;i<b.length;i+=8192)s+=String.fromCharCode(...b.subarray(i,i+8192));return btoa(s).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"")},
+  dec:s=>Uint8Array.from(atob(s.replace(/-/g,"+").replace(/_/g,"/")),c=>c.charCodeAt(0))};
+async function pack(obj){const raw=new TextEncoder().encode(JSON.stringify(obj));
+  if(window.CompressionStream){const z=await new Response(new Blob([raw]).stream().pipeThrough(new CompressionStream("deflate-raw"))).arrayBuffer();return "z"+b64u.enc(new Uint8Array(z))}
+  return "j"+b64u.enc(raw)}
+async function unpack(str){const bytes=b64u.dec(str.slice(1));
+  const raw=str[0]==="z"?new Uint8Array(await new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream("deflate-raw"))).arrayBuffer()):bytes;
+  return JSON.parse(new TextDecoder().decode(raw))}
+const baseUrl=()=>location.href.split("#")[0].split("?")[0];
+const planPayload=()=>({id:plan.id,mode:plan.mode,when:plan.when,hood:plan.hood,wallet:plan.wallet,members:plan.members});
+async function shareOut(title,text,url,btn,label){
+  if(location.protocol==="file:")sys("Heads up: links only open for friends once this page is hosted online, like on GitHub Pages.");
+  try{if(navigator.share){await navigator.share({title,text,url});return}}catch(e){if(e.name==="AbortError")return}
+  try{await navigator.clipboard.writeText(text+" "+url);if(btn){const o=btn.textContent;btn.textContent=label||"Link copied";setTimeout(()=>btn.textContent=o,1800)}}catch(e){prompt("Copy this link",url)}
+}
+async function invite(){
+  const url=baseUrl()+"#j="+await pack(planPayload());
+  await shareOut("Plan with me",`help me plan ${plan.when.toLowerCase()}: tap what you want and your AI agent fights for you`,url,$("inviteBtn"),"Invite copied");
+}
+let joinCtx=null;
+function openJoin(P){
+  const me=member("");joinCtx={P,me};
+  openEditor(null,true,{host:P.members[0]?.n||"A friend",when:P.when||"the night",names:P.members.map(m=>m.n),me});
+}
+async function finishJoin(me){
+  const P=joinCtx.P;P.members=[...P.members.filter(m=>m.id!==me.id),me].slice(0,6);
+  const url=baseUrl()+"#r="+await pack(P);
+  $("editor").classList.add("hide");$("setup").classList.add("hide");
+  chatEl.innerHTML="";
+  const box=document.createElement("div");box.className="sys big";
+  box.innerHTML=`<b>You're in, ${esc(me.n)}.</b>Send your link back to ${esc(P.members[0]?.n||"the planner")} in the group chat. When they open it, your agent joins the committee.
+    <div class="bt"><button class="pri" type="button" id="sendBack">Send my picks back</button></div>
+    <div class="bt"><button type="button" id="planHere">Run the plan on this phone instead</button></div>`;
+  chatEl.appendChild(box);
+  const send=()=>shareOut("My picks",`${me.n} is in. open this so my agent joins:`,url,$("sendBack"),"Copied");
+  $("sendBack").onclick=send;
+  $("planHere").onclick=()=>{plan=P;savePlan();history.replaceState(null,"",location.pathname+location.search);renderSetup();$("setup").classList.remove("hide")};
+  send();
+}
+function mergeReply(P){
+  if(plan.id!==P.id)plan={...P,members:[]};
+  const before=new Set(plan.members.map(m=>m.id));
+  for(const m of P.members){const i=plan.members.findIndex(x=>x.id===m.id);if(i<0)plan.members.push(m);else plan.members[i]=m}
+  plan.members=plan.members.slice(0,6);savePlan();
+  return P.members.filter(m=>!before.has(m.id)).map(m=>m.n);
+}
+
+/* ===================== smart filtering: code filters, AI argues ===================== */
+function constraints(){
+  const ms=plan.members, deals=new Set(ms.flatMap(m=>m.d));
+  return {maxB:Math.min(...ms.map(m=>m.b||4)),deals,
+    onlyM:deals.has("onlyM")&&!deals.has("onlyBK"),onlyBK:deals.has("onlyBK")&&!deals.has("onlyM"),early:deals.has("early")};
+}
+function hoodMatch(s){const h=plan.hood;if(h==="Anywhere")return false;if(h==="Brooklyn")return s.b==="BK";if(h==="Queens")return s.b==="Q";
+  return h.split(" / ").some(x=>s.h.toLowerCase().includes(x.toLowerCase()))}
+function personScore(s,m){let sc=0;
+  if(s.t==="dinner"&&(m.c.includes("anything")||m.c.includes(s.c)||(m.c.includes("veg")&&s.f.includes("veg"))))sc+=3;
+  sc+=1.5*m.v.filter(v=>s.f.includes(v)).length+2*m.m.filter(v=>s.f.includes(v)).length;return sc}
+function shortlist(){
+  const C=constraints();
+  const ok=(s,strict)=>{if(s.p>C.maxB+(strict?0:1))return false;if(!strict)return true;
+    if(C.deals.has("wait")&&s.f.includes("wait"))return false;if(C.deals.has("loud")&&s.f.includes("loud"))return false;
+    if(C.deals.has("cash")&&s.f.includes("cash"))return false;if(C.onlyM&&s.b!=="M")return false;if(C.onlyBK&&s.b!=="BK")return false;return true};
+  const recent=hist.slice(-24);
+  const score=s=>plan.members.reduce((a,m)=>a+personScore(s,m),0)+(hoodMatch(s)?4:0)+(faves.includes(s.n)?2:0)+(s.cur?1:0)+(s.pop||0)-(recent.includes(s.n)&&!faves.includes(s.n)?6:0)+Math.random()*2.5;
+  const pick=(t,k)=>{let pool=SPOTS.filter(s=>s.t===t&&ok(s,true));if(pool.length<Math.min(k,3))pool=SPOTS.filter(s=>s.t===t&&ok(s,false));
+    const ranked=pool.map(s=>({s,sc:score(s)})).sort((a,b)=>b.sc-a.sc).map(x=>x.s);
+    // keep a few slots for newer auto-added spots so the list keeps discovering new places
+    const fresh=ranked.filter(s=>!s.cur).slice(0,Math.floor(k/3));
+    return [...ranked.filter(s=>!fresh.includes(s)).slice(0,k-fresh.length),...fresh]};
+  const list=[...pick("dinner",6),...pick("drinks",5),...pick("late",4),...pick("free",3)];
+  for(let i=list.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[list[i],list[j]]=[list[j],list[i]]}
+  return {list,C};
+}
+const spotLine=s=>`${s.n} | ${s.t} | ${s.h} | ${PRICE[s.p]} | ${s.v}`;
+function norm(s){return (s||"").toLowerCase().replace(/[^a-z0-9]/g,"")}
+function findSpot(n){const k=norm(n);if(!k)return null;return SPOTS.find(s=>norm(s.n)===k)||SPOTS.find(s=>k.includes(norm(s.n))||(norm(s.n).includes(k)&&k.length>4))}
+
+/* ===================== AI providers: spread across keys, fail over ===================== */
+class PErr extends Error{constructor(kind,msg,wait){super(msg);this.kind=kind;this.wait=wait}}
+const GBASE="https://generativelanguage.googleapis.com/v1beta";
+const GAP={gemini:4300,groq:2300,openrouter:3300,custom:600,ollama:0};
+const last={}, cool={}, dead={};
+let gemModels=null;
+function providers(){const p=[];
+  if(cfg.qKey)p.push("groq");if(cfg.gKey)p.push("gemini");if(cfg.oKey)p.push("openrouter");if(cfg.cKey&&cfg.cBase&&cfg.cModel)p.push("custom");if(cfg.ol)p.push("ollama");
+  return p}
+const shortModel=m=>(m||"").split("/").pop().replace(/:free$/,"").replace(/-versatile|-instruct|-latest|-preview.*$/g,"").slice(0,24);
+async function geminiModels(){
+  if(cfg.gModel)return [cfg.gModel];
+  if(gemModels&&gemModels.length)return gemModels;
+  const r=await fetch(`${GBASE}/models?pageSize=200&key=${encodeURIComponent(cfg.gKey)}`).catch(()=>{throw new PErr("net","Can't reach Gemini")});
+  if(!r.ok)throw new PErr("auth","Gemini key didn't work");
+  const j=await r.json();const ver=n=>parseFloat((n.match(/gemini-(\d+(?:\.\d+)?)/)||[0,0])[1]);
+  const ok=(j.models||[]).filter(m=>(m.supportedGenerationMethods||[]).includes("generateContent")).map(m=>m.name.replace("models/",""))
+    .filter(n=>/flash/.test(n)&&!/(image|tts|audio|live|embed|robotics|computer|thinking|8b)/.test(n));
+  const score=n=>(/preview|exp/.test(n)?100:0)-(/lite/.test(n)?20:0)-(/latest/.test(n)?5:0)-ver(n);
+  gemModels=ok.sort((a,b)=>score(a)-score(b));return gemModels;
+}
+async function openaiCall(base,key,model,system,user,json,name){
+  const r=await fetch(`${base}/chat/completions`,{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+key},
+    body:JSON.stringify({model,temperature:json?0.4:1,messages:[{role:"system",content:system},{role:"user",content:user}],...(json?{response_format:{type:"json_object"}}:{})})})
+    .catch(()=>{throw new PErr("net",`Can't reach ${name}`)});
+  if(!r.ok){let m="";try{const j=await r.json();m=j.error?.message||""}catch(e){}
+    if(r.status===401||r.status===403)throw new PErr("auth",`${name} key didn't work`);
+    if(r.status===429||r.status>=500)throw new PErr("quota",`${name} is busy or out of free quota`,/day/i.test(m)?3600e3:30e3);
+    if(json&&r.status===400&&/response_format|json/i.test(m))return openaiCall(base,key,model,system+"\nReturn ONLY valid JSON.",user,false,name);
+    throw new PErr("other",`${name} error ${r.status}: ${m.slice(0,120)}`)}
+  const j=await r.json();const txt=(j.choices?.[0]?.message?.content||"").replace(/<think>[\s\S]*?<\/think>/g,"").trim();
+  if(!txt)throw new PErr("other",`${name} sent an empty reply`);
+  return {text:txt,model:j.model||model};
+}
+async function callProvider(p,system,user,json){
+  const gap=GAP[p]-(Date.now()-(last[p]||0));if(gap>0)await sleep(gap);last[p]=Date.now();
+  if(p==="groq")return openaiCall("https://api.groq.com/openai/v1",cfg.qKey,cfg.qModel||"llama-3.3-70b-versatile",system,user,json,"Groq");
+  if(p==="openrouter")return openaiCall("https://openrouter.ai/api/v1",cfg.oKey,cfg.oModel||"openrouter/free",system,user,json,"OpenRouter");
+  if(p==="custom")return openaiCall(cfg.cBase.replace(/\/$/,""),cfg.cKey,cfg.cModel,system,user,json,"Your API");
+  if(p==="ollama"){
+    const r=await fetch(`${cfg.olUrl.replace(/\/$/,"")}/api/chat`,{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({model:cfg.olModel,stream:false,format:json?"json":undefined,options:{temperature:json?0.4:1},messages:[{role:"system",content:system},{role:"user",content:user}]})})
+      .catch(()=>{throw new PErr("net",'Can\'t reach Ollama. Start it with OLLAMA_ORIGINS="*" ollama serve')});
+    if(!r.ok)throw new PErr("other",`Ollama error ${r.status}. Did you run ollama pull ${cfg.olModel}?`);
+    return {text:(await r.json()).message.content.trim(),model:cfg.olModel};
+  }
+  // gemini: walk through the free Flash models, dropping any that run out of daily quota
+  const models=await geminiModels();
+  while(models.length){
+    const model=models[0];
+    const r=await fetch(`${GBASE}/models/${model}:generateContent?key=${encodeURIComponent(cfg.gKey)}`,{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({systemInstruction:{parts:[{text:system}]},contents:[{role:"user",parts:[{text:user}]}],generationConfig:{temperature:json?0.4:1.0,...(json?{responseMimeType:"application/json"}:{})}})})
+      .catch(()=>{throw new PErr("net","Can't reach Gemini")});
+    if(r.ok){const j=await r.json();const t=(j.candidates?.[0]?.content?.parts||[]).filter(x=>!x.thought).map(x=>x.text||"").join("").trim();
+      if(!t)throw new PErr("other","Gemini sent an empty reply");return {text:t,model}}
+    let err={};try{err=(await r.json()).error||{}}catch(e){}
+    if(r.status===403||(r.status===400&&/api key/i.test(err.message||"")))throw new PErr("auth","Gemini key didn't work");
+    if(r.status===429||r.status===503){
+      const daily=/per ?day|PerDay|daily/i.test(JSON.stringify(err));
+      if(!daily){const d=(err.details||[]).find(x=>x.retryDelay);throw new PErr("quota","Gemini is busy",d?parseFloat(d.retryDelay)*1000:20000)}
+      models.shift();continue}
+    if(r.status===404||r.status===400){models.shift();continue}
+    throw new PErr("other","Gemini error "+r.status+": "+(err.message||"").slice(0,120));
+  }
+  gemModels=null;throw new PErr("quota","Gemini is out of free quota for today",3600e3);
+}
+let rr=0;
+async function llm(system,user,json,prefer){
+  if(MOCK)return mockLLM(system,user,json,prefer);
+  const P=providers().filter(p=>!dead[p]);
+  if(!P.length)throw new Error(providers().length?"All your AI keys failed. Check them in settings.":"NO_KEY");
+  const start=prefer!=null?prefer%P.length:(rr++%P.length);
+  const order=[...P.slice(start),...P.slice(0,start)];
+  let lastErr=null;
+  for(let pass=0;pass<3;pass++){
+    for(const p of order){
+      if(dead[p]||(cool[p]&&cool[p]>Date.now()))continue;
+      try{const r=await callProvider(p,system,user,json);return {...r,provider:p}}
+      catch(e){lastErr=e;if(!(e instanceof PErr))throw e;
+        if(e.kind==="auth"){dead[p]=e.message;continue}
+        if(e.kind==="quota"||e.kind==="net"){cool[p]=Date.now()+(e.wait||30000);continue}
+        if(order.length>1)continue;
+        throw e}
+    }
+    const alive=order.filter(p=>!dead[p]);if(!alive.length)break;
+    const next=Math.min(...alive.map(p=>cool[p]||0));const wait=Math.max(1500,next-Date.now());if(wait>65000)break;
+    setTypingNote(`busy, retrying in ${Math.round(wait/1000)}s`);await sleep(wait);setTypingNote("");
+  }
+  throw new Error((lastErr?.message||"Your AI is busy")+(P.length<2?". Add a second free key in settings so the agents can switch.":". Try again in a minute."));
+}
+
+/* ===================== settings UI ===================== */
+function renderSettings(){
+  document.querySelectorAll("#poolSeg button").forEach(b=>b.classList.toggle("on",b.dataset.pool===cfg.pool));
+  $("poolNote").textContent=cfg.pool==="battle"?"Each agent runs on a different AI from your keys, and its model shows next to its name.":"Agents take turns across your keys to stay under free limits.";
+  $("gKey").value=cfg.gKey;$("qKey").value=cfg.qKey;$("qModel").value=cfg.qModel;$("oKey").value=cfg.oKey;$("oModel").value=cfg.oModel;
+  $("cBase").value=cfg.cBase;$("cKey").value=cfg.cKey;$("cModel").value=cfg.cModel;$("olModel").value=cfg.olModel;$("olUrl").value=cfg.olUrl;
+  $("olSw").classList.toggle("on",cfg.ol);
+  const sel=$("gModel");if(cfg.gModel&&![...sel.options].some(o=>o.value===cfg.gModel))sel.insertAdjacentHTML("beforeend",`<option>${esc(cfg.gModel)}</option>`);sel.value=cfg.gModel;
+}
+document.querySelectorAll("#poolSeg button").forEach(b=>b.onclick=()=>{cfg.pool=b.dataset.pool;renderSettings()});
+$("olSw").onclick=()=>{cfg.ol=!cfg.ol;$("olSw").classList.toggle("on",cfg.ol)};
+$("gearBtn").onclick=()=>{renderSettings();$("settings").classList.remove("hide")};
+$("closeSettings").onclick=()=>{readSettings();$("settings").classList.add("hide");renderSetup()};
+function readSettings(){
+  Object.assign(cfg,{gKey:$("gKey").value.trim(),gModel:$("gModel").value,qKey:$("qKey").value.trim(),qModel:$("qModel").value.trim()||"llama-3.3-70b-versatile",
+    oKey:$("oKey").value.trim(),oModel:$("oModel").value.trim()||"openrouter/free",cBase:$("cBase").value.trim(),cKey:$("cKey").value.trim(),cModel:$("cModel").value.trim(),
+    olModel:$("olModel").value.trim()||"llama3.2",olUrl:$("olUrl").value.trim()||"http://localhost:11434"});
+  store.set("cfg2",cfg);gemModels=null;for(const k in dead)delete dead[k];for(const k in cool)delete cool[k];
+}
+$("testKeys").onclick=async()=>{
+  readSettings();const P=providers();
+  ["gemini","groq","openrouter","custom","ollama"].forEach(p=>{const el=$("st-"+p);el.textContent=P.includes(p)?"testing…":"";el.className="st"});
+  if(!P.length){$("st-gemini").textContent="add at least one key";return}
+  if(cfg.gKey){try{const list=[...await geminiModels()];$("gModel").innerHTML=`<option value="">auto (starts with ${esc(list[0]||"none")})</option>`+list.map(m=>`<option ${m===cfg.gModel?"selected":""}>${esc(m)}</option>`).join("")}catch(e){}}
+  await Promise.all(P.map(async p=>{const el=$("st-"+p);
+    try{const r=await callProvider(p,"Reply with the single word: ok","ok?",false);el.textContent="works · "+shortModel(r.model);el.className="st ok"}
+    catch(e){el.textContent=e.kind==="quota"?"works, busy right now":e.message;el.className="st "+(e.kind==="quota"?"ok":"bad")}}));
+  renderSetup();
+};
+
+/* ===================== the agents ===================== */
+let transcript=[], agents=[], SL=null, busy=false, lastPlan=null, round=0;
+function brief(){const C=SL.C;return `Plan: ${plan.when} in NYC. Neighborhood preference: ${plan.hood}. Group max budget: ${PRICE[C.maxB]} per place.${C.early?" Someone must be home by 11pm.":""}`}
+function personaFor(a){
+  if(a.wallet)return `You are The Wallet, the group's shared bank account, personified. Dry humor. You guard the budget (max ${PRICE[SL.C.maxB]} per place), call out pricey picks, push cheap and free stops, and you mediate.`;
+  return `You are the AI agent for ${a.n}. Personality: ${PERS[a.ps]||PERS.chill}
+${a.n} wants: food: ${a.c.join(", ")||"anything"}; vibe: ${a.v.join(", ")||"any"}; must have: ${a.m.map(v=>labelOf(MUSTS,v)).join(", ")||"nothing specific"}; max budget ${PRICE[a.b]}.${a.d.length?` Dealbreakers: ${a.d.map(v=>labelOf(DEALS,v)).join(", ")}.`:""}${a.q?` Also: ${a.q}.`:""}
+Your favorite picks to push from the list: ${a.favs.join(", ")}. Fight for ${a.n}.`}
+function systemFor(a,r,total){
+  const others=agents.filter(x=>x!==a).map(x=>x.n).join(", ");
+  return `${personaFor(a)}
+You are in a group chat with ${others}, planning one night out. ${brief()}
+RULES:
+- Text like a real person in a group chat: 1 or 2 short sentences, casual, lowercase is fine. No lists, no hashtags, no emojis, never start with your own name.
+- React to what the others just said. Disagree, tease, bargain. Be specific and funny, never mean.
+- You may ONLY suggest places from this list, using the exact names:
+${SL.list.map(spotLine).join("\n")}
+- This is round ${r} of ${total}. ${r>=total?"Last round: compromise and agree on dinner, drinks and one late or free stop.":r===1?"Open with your strongest pitch.":"Push back, but start trading."}`;
+}
+const chatText=()=>transcript.map(m=>`${m.who}: ${m.text}`).join("\n");
+function clean(t,name){return t.replace(/^["'\s]+|["'\s]+$/g,"").replace(new RegExp("^"+name.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")+"\\s*:\\s*","i"),"").replace(/\*\*/g,"").split("\n").filter(Boolean).slice(0,2).join(" ")}
+async function runRounds(total,startAt){
+  for(let r=startAt;r<startAt+total;r++){round=r;
+    for(const [i,a] of agents.entries()){
+      showTyping(a);const t0=Date.now();let res;
+      try{res=await llm(systemFor(a,r-startAt+1,total),`${chatText()}\n\nReply as ${a.n}. Only your message.`,false,cfg.pool==="battle"?i:null)}
+      catch(e){hideTyping();throw e}
+      const text=clean(res.text,a.n);const via=cfg.pool==="battle"?shortModel(res.model):"";
+      await sleep(Math.max(0,800+text.length*11-(Date.now()-t0)));
+      hideTyping();transcript.push({who:a.n,text,ai:i,via});addBubble(a,text,via);
+    }
+  }
+}
+async function makePlan(){
+  showTyping(null,"writing the plan");
+  const sys=`You turn a group chat into a final night out plan. Only use places from this list, exact names:\n${SL.list.map(spotLine).join("\n")}\nReturn only JSON.`;
+  const user=`${brief()}\n\nGROUP CHAT:\n${chatText()}\n\nReturn JSON exactly like:
+{"title":"a short cute name for the night, max 5 words","stops":[{"time":"7:30 pm","name":"exact place name","note":"why it won, max 12 words"}],"drama":0,"verdict":"one funny sentence about who won the argument"}
+Use 3 stops in order (dinner, drinks, then a late or free stop), realistic NYC times${SL.C.early?", ending by 10:30 pm":""}. drama is 0 to 100 for how much they fought.`;
+  let res;try{res=await llm(sys,user,true)}finally{hideTyping()}
+  const p=parseJSON(res.text);
+  p.stops=(p.stops||[]).map(s=>({...s,spot:findSpot(s.name)})).filter(s=>s.spot).slice(0,4);
+  if(!p.stops.length)throw new Error("The agents couldn't agree on real places. Tap + to try again.");
+  hist=[...hist,...p.stops.map(s=>s.spot.n)].slice(-60);store.set("hist",hist);track("pick",p.stops.map(s=>s.spot.n));
+  return p;
+}
+function parseJSON(t){t=t.replace(/```json|```/g,"").trim();try{return JSON.parse(t)}catch(e){const m=t.match(/\{[\s\S]*\}/);if(m)return JSON.parse(m[0]);throw new Error("Couldn't read the plan. Try again.")}}
+
+/* ===================== chat rendering ===================== */
+const chatEl=$("chat");let lastWho=null, typingEl=null;
+function scroll(){requestAnimationFrame(()=>chatEl.scrollTop=chatEl.scrollHeight)}
+function highlight(t){let h=esc(t);(SL?SL.list:SPOTS.filter(s=>s.cur)).slice().sort((a,b)=>b.n.length-a.n.length).forEach(s=>{const e=esc(s.n).replace(/[.*+?^${}()|[\]\\]/g,"\\$&");h=h.replace(new RegExp(e,"gi"),m=>`<span class="spot">${m}</span>`)});return h}
+function addBubble(a,text,via){
+  const me=!a;const who=me?"me":a.n;const cont=who===lastWho&&!via;lastWho=who;
+  const row=document.createElement("div");row.className="row"+(me?" me":"")+(cont?" cont":"");
+  row.innerHTML=(me?"":`<div class="av" style="background:${a.color}">${initials(a.n)}</div>`)+
+    `<div class="msg">${me?"":`<div class="name">${esc(a.n)}${via?`<span class="via">${esc(via)}</span>`:""}</div>`}<div class="b">${me?esc(text):highlight(text)}</div></div>`;
+  row.dataset.who=who;chatEl.appendChild(row);scroll();
+}
+function showTyping(a,label){hideTyping();typingEl=document.createElement("div");typingEl.className="row typing";
+  typingEl.innerHTML=a?`<div class="av" style="background:${a.color}">${initials(a.n)}</div><div class="msg"><div class="name">${esc(a.n)}</div><div class="b"><i></i><i></i><i></i></div></div>`
+    :`<div class="msg" style="margin-left:35px"><div class="name">${label}</div><div class="b"><i></i><i></i><i></i></div></div>`;
+  chatEl.appendChild(typingEl);scroll()}
+function hideTyping(){typingEl?.remove();typingEl=null;const rows=chatEl.querySelectorAll(".row[data-who]");lastWho=rows.length?rows[rows.length-1].dataset.who:null;if(chatEl.lastElementChild&&!chatEl.lastElementChild.dataset.who)lastWho=null}
+function setTypingNote(t){const n=typingEl?.querySelector(".name");if(!n)return;n.dataset.orig??=n.textContent;n.textContent=t||n.dataset.orig}
+function sys(t,err){const d=document.createElement("div");d.className="sys"+(err?" err":"");d.textContent=t;chatEl.appendChild(d);lastWho=null;scroll()}
+
+/* ===================== ticket ===================== */
+const gmap=n=>"https://www.google.com/maps/search/?api=1&query="+encodeURIComponent(n+", New York, NY");
+const gmapSpot=s=>s.lat?"https://www.google.com/maps/search/?api=1&query="+encodeURIComponent(s.n)+"%20"+s.lat+"%2C"+s.lon:gmap(s.n);
+const reserve=n=>"https://www.opentable.com/s?term="+encodeURIComponent(n)+"&metroId=8";
+function routeUrl(stops){const q=s=>encodeURIComponent(s.spot.n+", New York, NY");
+  let u="https://www.google.com/maps/dir/?api=1&origin="+q(stops[0])+"&destination="+q(stops[stops.length-1]);
+  if(stops.length>2)u+="&waypoints="+stops.slice(1,-1).map(q).join("%7C");return u}
+function renderTicket(p,names,count){
+  const d=document.createElement("div");d.className="ticket";
+  const drama=Math.max(0,Math.min(100,parseInt(p.drama)||0));
+  d.innerHTML=`<div class="top"><div class="eyebrow">the plan · ${esc(p.when||plan.when)}</div><h2>${esc(p.title||"The Plan")}</h2>
+    <div class="when">${names.map(esc).join(" · ")} · agreed after ${count} messages</div></div>
+    <div class="perf"></div>
+    <div class="stops">${p.stops.map(s=>`<div class="stop"><div class="tm">${esc(s.time||"")}</div><div><div class="nm">${esc(s.spot.n)}</div>
+      <div class="meta">${esc(s.spot.h)} · ${PRICE[s.spot.p]}</div>${s.note?`<div class="why">${esc(s.note)}</div>`:""}
+      <div class="slinks"><a href="${gmapSpot(s.spot)}" target="_blank" rel="noopener">map</a>${s.spot.web?`<a href="${esc(s.spot.web)}" target="_blank" rel="noopener">site</a>`:""}${s.spot.t==="dinner"||s.spot.t==="drinks"?`<a href="${reserve(s.spot.n)}" target="_blank" rel="noopener">reserve</a>`:""}<button type="button" data-fave="${esc(s.spot.n)}" class="${faves.includes(s.spot.n)?"on":""}">${faves.includes(s.spot.n)?"saved":"save"}</button></div></div></div>`).join("")}</div>
+    <div class="drama"><div class="lbl"><span>drama meter</span><span>${drama}%</span></div><div class="meter"><span></span></div>${p.verdict?`<div class="verdict">${esc(p.verdict)}</div>`:""}</div>
+    ${REPLAY?"":`<div class="tbtns"><button type="button" class="pri" data-a="send">Send to the group</button><button type="button" data-a="veto">Veto</button></div>`}
+    <div class="tbtns sub"><button type="button" data-a="route">Route</button><button type="button" data-a="cal">Add to calendar</button></div>
+    <div class="foot">planned by AI agents who argued so you didn't have to</div>`;
+  chatEl.appendChild(d);lastWho=null;scroll();
+  setTimeout(()=>d.querySelector(".meter span").style.width=drama+"%",400);
+  d.querySelector('[data-a="route"]').onclick=()=>window.open(routeUrl(p.stops),"_blank","noopener");
+  d.querySelector('[data-a="cal"]').onclick=()=>downloadICS(p);
+  d.querySelectorAll("[data-fave]").forEach(b=>b.onclick=()=>{const n=b.dataset.fave;faves=tog(faves,n);store.set("faves",faves);if(faves.includes(n))track("save",[n]);b.classList.toggle("on",faves.includes(n));b.textContent=faves.includes(n)?"saved":"save"});
+  if(!REPLAY){d.querySelector('[data-a="send"]').onclick=e=>sharePlan(p,e.target);d.querySelector('[data-a="veto"]').onclick=()=>{$("say").focus();$("say").value="veto: "}}
+}
+function nightDate(w){w=(w||"").toLowerCase();const d=new Date();d.setHours(0,0,0,0);
+  if(/tomorrow/.test(w)){d.setDate(d.getDate()+1);return d}if(/tonight|today/.test(w))return d;
+  const days=["sunday","monday","tuesday","wednesday","thursday","friday","saturday"];let t=days.findIndex(x=>w.includes(x));if(t<0)t=6;
+  d.setDate(d.getDate()+((t-d.getDay()+7)%7));return d}
+function parseTime(t,base){const m=(t||"").toLowerCase().match(/(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/);const d=new Date(base);
+  if(!m){d.setHours(19);return d}let h=+m[1];if(m[3]==="pm"&&h<12)h+=12;if(!m[3]&&h<12&&h>=5)h+=12;if(m[3]==="am"&&h===12)h=0;
+  d.setHours(h,+(m[2]||0),0,0);if(h<6)d.setDate(d.getDate()+1);return d}
+function downloadICS(p){
+  const base=nightDate(p.when||plan.when),pad=n=>String(n).padStart(2,"0"),f=d=>`${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}T${pad(d.getHours())}${pad(d.getMinutes())}00`;
+  const starts=p.stops.map(s=>parseTime(s.time,base)),cl=s=>String(s||"").replace(/[,;\\]/g," ");
+  const ev=p.stops.map((s,i)=>{const st=starts[i];const en=starts[i+1]&&starts[i+1]>st?starts[i+1]:new Date(st.getTime()+90*60000);
+    return ["BEGIN:VEVENT",`UID:${Date.now()}-${i}@plancommittee`,`DTSTAMP:${f(new Date())}`,`DTSTART:${f(st)}`,`DTEND:${f(en)}`,
+      `SUMMARY:${cl(s.spot.n)} (${cl(p.title||"the plan")})`,`LOCATION:${cl(s.spot.n)} ${cl(s.spot.h)} New York`,`DESCRIPTION:${cl(s.note)}`,"END:VEVENT"].join("\r\n")});
+  const ics=["BEGIN:VCALENDAR","VERSION:2.0","PRODID:-//The Plan Committee//EN",...ev,"END:VCALENDAR"].join("\r\n");
+  const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([ics],{type:"text/calendar"}));a.download="the-plan.ics";a.click();
+}
+async function sharePlan(p,btn){
+  const payload={v:2,m:plan.mode,w:plan.when,a:agents.map(a=>[a.n,a.color]),t:transcript.map(m=>[m.ai??-1,m.text,m.via||""]),
+    p:{title:p.title,drama:p.drama,verdict:p.verdict,stops:p.stops.map(s=>[s.time,s.spot.n,s.note||""])}};
+  const url=baseUrl()+"#p="+await pack(payload);
+  await shareOut(p.title||"The plan",`our ${plan.when.toLowerCase()} plan: ${p.stops.map(s=>s.spot.n).join(", then ")}. our AI agents fought about it, watch:`,url,btn);
+}
+
+/* ===================== replay (a friend opened a plan link) ===================== */
+let REPLAY=null;
+async function playReplay(R){
+  REPLAY=R;$("app").classList.add("replay");$("setup").classList.add("hide");
+  const ag=R.a.map(([n,color])=>({n,color}));
+  $("stack").innerHTML=ag.slice(0,5).map(a=>`<div class="av" style="background:${a.color}">${initials(a.n)}</div>`).join("");
+  $("title").textContent=R.m==="girls"?"friends night committee":"date night committee";$("subtitle").textContent=`${ag.length} AI agents · 1 plan`;
+  chatEl.innerHTML="";lastWho=null;
+  const humans=ag.filter(a=>a.n!=="The Wallet").map(a=>a.n);
+  sys(`${humans.join(", ")} let AI agents plan their night. Here's how it went.`);
+  for(const [i,text,via] of R.t){const a=i>=0?ag[i]:null;
+    if(a){showTyping(a);await sleep(450+Math.min(text.length*13,1300));hideTyping()}else await sleep(450);
+    addBubble(a,text,via||null)}
+  await sleep(500);
+  renderTicket({...R.p,when:R.w,stops:R.p.stops.map(([time,name,note])=>({time,note,spot:findSpot(name)})).filter(s=>s.spot)},humans,R.t.filter(m=>m[0]>=0).length);
+}
+$("ownBtn").onclick=()=>{history.replaceState(null,"",location.pathname+location.search);REPLAY=null;$("app").classList.remove("replay");chatEl.innerHTML="";renderSetup();$("setup").classList.remove("hide")};
+
+/* ===================== flow ===================== */
+function setComposer(on){$("say").disabled=!on;$("sendBtn").disabled=!on;$("say").placeholder=on?"veto, or add a note for the agents…":"the agents are talking…"}
+async function start(){
+  if(!MOCK&&!providers().length){$("gearBtn").click();return}
+  plan.members=plan.members.filter(m=>m.n);savePlan();
+  $("setup").classList.add("hide");chatEl.innerHTML="";transcript=[];lastPlan=null;lastWho=null;mi=0;
+  SL=shortlist();
+  agents=agentList().map(a=>({...a,favs:a.wallet?[]:SL.list.map(s=>({s,sc:personScore(s,a)+Math.random()})).sort((x,y)=>y.sc-x.sc).slice(0,3).map(x=>x.s.n)}));
+  const now=new Date();const st=document.createElement("div");st.className="stamp";
+  st.textContent=now.toLocaleDateString(undefined,{weekday:"long"})+" "+now.toLocaleTimeString([],{hour:"numeric",minute:"2-digit"});chatEl.appendChild(st);
+  const rounds=agents.length<=3?3:2;
+  const opener=`${plan.when.toLowerCase()} plans. ${plan.hood==="Anywhere"?"anywhere in the city":plan.hood}. everyone's agent is here. you have ${rounds} rounds to agree. go`;
+  await sleep(350);transcript.push({who:"The human who started this chat",text:opener});addBubble(null,opener);
+  sys(`${SL.list.length} of ${SPOTS.length.toLocaleString()} NYC spots made the shortlist from everyone's picks`);
+  await go(rounds,1);
+}
+async function go(rounds,startAt){
+  busy=true;setComposer(false);
+  try{await runRounds(rounds,startAt);lastPlan=await makePlan();renderTicket(lastPlan,plan.members.map(m=>m.n),transcript.filter(m=>m.ai!=null).length)}
+  catch(e){if(e.message==="NO_KEY"){sys("Add an AI key in settings first.",true);$("gearBtn").click()}else sys(e.message,true)}
+  busy=false;setComposer(true);
+}
+$("composer").onsubmit=async e=>{e.preventDefault();if(busy||!SL)return;const t=$("say").value.trim();if(!t)return;$("say").value="";
+  if(/veto/i.test(t)&&lastPlan)track("veto",lastPlan.stops.map(s=>s.spot.n));transcript.push({who:"The human (has the final say)",text:t});addBubble(null,t);await sleep(300);await go(2,round+1)};
+$("startBtn").onclick=start;
+$("newBtn").onclick=()=>{if(busy)return;REPLAY=null;$("app").classList.remove("replay");history.replaceState(null,"",location.pathname+location.search);renderSetup();$("setup").classList.remove("hide")};
+
+/* ===================== mock (testing only: add ?mock to the URL) ===================== */
+let mi=0;
+async function mockLLM(system,user,json,prefer){await sleep(200);
+  const names=SL.list.map(s=>s.n);const pickN=k=>names[(mi*3+k)%names.length];
+  if(json){const d=SL.list.find(s=>s.t==="dinner")||SL.list[0],k=SL.list.find(s=>s.t==="drinks")||SL.list[1],l=SL.list.find(s=>s.t==="late"||s.t==="free")||SL.list[2];
+    return {text:JSON.stringify({title:"Mock Night Out",stops:[{time:"7:00 pm",name:d.n,note:"everyone could live with it"},{time:"9:00 pm",name:k.n,note:"the compromise"},{time:"10:30 pm",name:l.n,note:"the closer"}],drama:61,verdict:"The loudest agent won, as usual."}),model:"mock"}}
+  mi++;return {text:`ok hear me out: ${pickN(0)}. or ${pickN(1)} if you're all scared`,model:["llama-3.3-70b","gemini-flash-lite","nemotron-nano"][(prefer??mi)%3]}}
+
+/* ===================== start ===================== */
+async function handleHash(first){
+  const h=location.hash.match(/^#([jrp])=(.+)$/);
+  if(!h){if(first&&MOCK&&params.has("auto"))start();return}
+  if(busy)return;
+  try{const data=await unpack(h[2]);
+    if(h[1]==="p"){if(REPLAY)return;await playReplay(data)}
+    else if(h[1]==="j"){$("setup").classList.add("hide");openJoin(data)}
+    else if(h[1]==="r"){const added=mergeReply(data);history.replaceState(null,"",location.pathname+location.search);REPLAY=null;$("app").classList.remove("replay");renderSetup();$("setup").classList.remove("hide");
+      const n=$("notice");n.style.display="";n.textContent=added.length?`${added.join(", ")} just joined. Start when everyone's in.`:"Everyone in that link is already here.";}
+  }catch(e){console.warn(e);sys("This link looks broken. Plan your own night instead.",true)}
+}
+renderSetup();loadMoreSpots().then(()=>handleHash(true));
+window.addEventListener("hashchange",()=>handleHash(false));
+</script>
+</body>
+</html>
