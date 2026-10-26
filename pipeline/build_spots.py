@@ -258,17 +258,21 @@ class OutOfQuota(Exception):
     pass
 
 
+_dead = set()
+
+
 def ai_call(prompt):
     errors = []
-    if os.environ.get("GROQ_API_KEY"):
+    for name, fn in (("GROQ_API_KEY", groq), ("GEMINI_API_KEY", gemini)):
+        if not os.environ.get(name) or name in _dead:
+            continue
         try:
-            return groq(prompt)
+            return fn(prompt)
         except OutOfQuota as e:
             errors.append(str(e))
-    if os.environ.get("GEMINI_API_KEY"):
-        try:
-            return gemini(prompt)
-        except OutOfQuota as e:
+        except RuntimeError as e:  # bad key or model gone: skip this provider for the rest of the run
+            log("AI provider error, switching:", e)
+            _dead.add(name)
             errors.append(str(e))
     raise OutOfQuota("; ".join(errors) or "no AI key set (add GROQ_API_KEY or GEMINI_API_KEY as a repo secret)")
 
@@ -285,8 +289,27 @@ def post(url, body, headers):
         raise RuntimeError(f"{url.split('/')[2]} {e.code}: {msg}")
 
 
+_groq_model = None
+
+
 def groq(prompt):
-    model = os.environ.get("GROQ_MODEL", "llama-3.3-70b-versatile")
+    global _groq_model
+    if not _groq_model:
+        # Groq retires models often, so pick the biggest current chat model instead of hardcoding one
+        _groq_model = os.environ.get("GROQ_MODEL")
+        if not _groq_model:
+            try:
+                j = get_json("https://api.groq.com/openai/v1/models", headers={"Authorization": "Bearer " + os.environ["GROQ_API_KEY"]}, tries=2)
+            except Exception as e:
+                raise RuntimeError(f"api.groq.com model list: {e}")
+            names = [m["id"] for m in j.get("data", []) if m.get("active", True)
+                     and not re.search(r"whisper|tts|guard|embed|compound|playai|orpheus|safeguard|vision", m["id"])]
+            names.sort(key=lambda n: -max([int(x) for x in re.findall(r"(\d+)b\b", n)] or [0]))
+            if not names:
+                raise RuntimeError("no Groq chat model found")
+            _groq_model = names[0]
+            log("groq model:", _groq_model)
+    model = _groq_model
     for attempt in range(3):
         try:
             j = post("https://api.groq.com/openai/v1/chat/completions",
@@ -310,7 +333,10 @@ def gemini(prompt):
     if not _gem_model:
         _gem_model = os.environ.get("GEMINI_MODEL")
         if not _gem_model:
-            j = get_json("https://generativelanguage.googleapis.com/v1beta/models?pageSize=200", headers={"x-goog-api-key": key})
+            try:
+                j = get_json("https://generativelanguage.googleapis.com/v1beta/models?pageSize=200", headers={"x-goog-api-key": key}, tries=2)
+            except Exception as e:
+                raise RuntimeError(f"gemini model list: {e}")
             names = [m["name"].split("/")[-1] for m in j.get("models", [])
                      if "generateContent" in m.get("supportedGenerationMethods", []) and "flash" in m["name"]
                      and not re.search(r"image|tts|audio|live|embed|preview|exp|thinking", m["name"])]
