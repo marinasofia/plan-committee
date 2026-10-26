@@ -184,7 +184,42 @@ def fetch_osm():
     return out
 
 
-def build_candidates(insp, osm, curated):
+NTA_URL = "https://data.cityofnewyork.us/resource/9nt8-h7nd.geojson?$limit=1000"
+
+
+def fetch_neighborhoods():
+    """NYC's official neighborhood shapes (2020 Neighborhood Tabulation Areas). Returns locate(lat, lon) -> (boro, hood)."""
+    areas = []
+    for f in get_json(NTA_URL).get("features", []):
+        p, g = f.get("properties") or {}, f.get("geometry") or {}
+        polys = g.get("coordinates", []) if g.get("type") == "MultiPolygon" else [g.get("coordinates", [])]
+        rings = [ring for poly in polys for ring in poly]
+        if not rings:
+            continue
+        xs, ys = [x for r in rings for x, y in r], [y for r in rings for x, y in r]
+        # "SoHo-Little Italy-Hudson Square" -> "SoHo"
+        areas.append((BORO.get(p.get("boroname"), ""), (p.get("ntaname") or "").split("-")[0].strip(),
+                      (min(xs), min(ys), max(xs), max(ys)), rings))
+    log(f"neighborhoods: {len(areas)} areas")
+
+    def inside(x, y, rings):  # even-odd rule over all rings, so holes work too
+        hit = False
+        for ring in rings:
+            for (x1, y1), (x2, y2) in zip(ring, ring[1:] + ring[:1]):
+                if (y1 > y) != (y2 > y) and x < x1 + (y - y1) * (x2 - x1) / (y2 - y1):
+                    hit = not hit
+        return hit
+
+    def locate(lat, lon):
+        for boro, hood, (x0, y0, x1, y1), rings in areas:
+            if x0 <= lon <= x1 and y0 <= lat <= y1 and inside(lon, lat, rings):
+                return boro, hood
+        return "", ""
+    locate.count = len(areas)
+    return locate
+
+
+def build_candidates(insp, osm, curated, locate):
     cur = {norm(n) for n in curated}
     # grid index of OSM places for fast nearby lookups
     grid = {}
@@ -210,20 +245,8 @@ def build_candidates(insp, osm, curated):
         if not match or not (match["website"] or match["hours"]):
             continue  # not notable enough to show up on OpenStreetMap with details
         used_osm.add(match["id"])
-        cands[r["id"]] = {**r, "kind": match["kind"], "website": match["website"], "rooftop": match["rooftop"],
+        cands[r["id"]] = {**r, "hood": locate(r["lat"], r["lon"])[1], "kind": match["kind"], "website": match["website"], "rooftop": match["rooftop"],
                           "music": match["music"], "osm": match["id"]}
-    # borough of an OpenStreetMap place = borough of an inspected restaurant within 250 m. The OSM box also
-    # covers New Jersey and the Bronx, which have no restaurants in our inspection data, so those stay "".
-    rgrid = {}
-    for r in insp:
-        rgrid.setdefault((round(r["lat"], 2), round(r["lon"], 2)), []).append(r)
-
-    def boro_at(lat, lon):
-        near = [r for dy in (-0.01, 0, 0.01) for dx in (-0.01, 0, 0.01)
-                for r in rgrid.get((round(lat + dy, 2), round(lon + dx, 2)), [])]
-        best = min(near, key=lambda r: km((lat, lon), (r["lat"], r["lon"])), default=None)
-        return best["boro"] if best and km((lat, lon), (best["lat"], best["lon"])) < 0.25 else ""
-
     # bars, venues, museums, parks: OpenStreetMap only (bars are not all in the inspection data)
     for o in osm:
         if o["id"] in used_osm or o["kind"] in ("restaurant", "cafe", "ice_cream"):
@@ -232,10 +255,10 @@ def build_candidates(insp, osm, curated):
             continue
         if o["kind"] in ("bar", "pub", "biergarten", "nightclub") and not (o["website"] or o["hours"]):
             continue
-        boro = boro_at(o["lat"], o["lon"])
-        if not boro and o["kind"] not in ("park", "garden", "viewpoint", "museum"):
-            continue  # big parks and museums can sit far from any restaurant, everything else is outside our boroughs
-        cands[o["id"]] = {**o, "boro": boro, "addr": ""}
+        boro, hood = locate(o["lat"], o["lon"])
+        if not boro:
+            continue  # New Jersey, the Bronx, Long Island: the OSM box is a rectangle
+        cands[o["id"]] = {**o, "boro": boro, "hood": hood, "addr": ""}
     log(f"candidates: {len(cands)} notable places after filters")
     return cands
 
@@ -244,13 +267,13 @@ def build_candidates(insp, osm, curated):
 PROMPT = """You tag New York City places for a date night and friends night planning app.
 For each place, decide from your own knowledge. If you do not actually recognize the specific place, return known:false. Never guess vibes for places you don't know.
 Return JSON: {"items":[{"id":"...","known":true,"type":"dinner|drinks|late|free|skip","price":0,"cuisine":"...","tags":["..."],"why":"max 8 words","hood":"neighborhood name","boro":"M|BK|Q|other"}]}
-type: dinner = restaurant good for a night out, drinks = bar, late = activity or dessert or venue, free = free activity like a park or viewpoint, skip = not good for a night out (takeout spot, office cafeteria, generic deli).
+type: dinner = restaurant good for a night out, drinks = bar, late = activity or dessert or venue, free = costs nothing to get in, like a park, viewpoint or free museum (paid museums, tours and cinemas are late), skip = not good for a night out (takeout spot, office cafeteria, generic deli).
 price: 0 free, 1 $, 2 $$, 3 $$$, 4 $$$$ per person.
 cuisine (dinner only, else ""): one of %s
 tags: any that clearly apply, from: %s
 hood: the NYC neighborhood, like West Village, Williamsburg, Astoria. boro: M Manhattan, BK Brooklyn, Q Queens, other for anywhere else.
-Use the coordinates to tell same named places apart and to get the neighborhood right. Places outside Manhattan, Brooklyn and Queens (New Jersey, the Bronx) are boro other.
-PLACES (id | name | kind | cuisine hint | address | borough | lat,lon):
+If the place has closed for good or moved out of that neighborhood, return known:false. Same named places in different neighborhoods are different places.
+PLACES (id | name | kind | cuisine hint | address | borough | neighborhood):
 """
 
 
@@ -376,7 +399,7 @@ def clean_tag(item, cand):
     price = max(0, min(4, int(price))) if str(price).isdigit() else 2
     if t == "free":
         price = 0
-    return {"n": cand["name"], "t": t, "h": (item.get("hood") or "")[:30], "b": boro, "p": price,
+    return {"n": cand["name"], "t": t, "h": (cand.get("hood") or item.get("hood") or "")[:30], "b": boro, "p": price,
             "c": item.get("cuisine") if t == "dinner" and item.get("cuisine") in CUISINES else "", "f": tags,
             "v": (item.get("why") or "")[:70], "lat": round(cand["lat"], 5), "lon": round(cand["lon"], 5),
             "web": cand.get("website", "")[:120] if re.match(r"https?://", cand.get("website", ""), re.I) else ""}
@@ -396,7 +419,7 @@ def tag_new(cands, cache):
         batch = todo[b * BATCH_SIZE:(b + 1) * BATCH_SIZE]
         if not batch:
             break
-        lines = "\n".join(f"{c['id']} | {c['name']} | {c.get('kind', '')} | {c.get('cuisine', '')} | {c.get('addr', '')} | {c.get('boro', '')} | {c['lat']:.4f},{c['lon']:.4f}" for c in batch)
+        lines = "\n".join(f"{c['id']} | {c['name']} | {c.get('kind', '')} | {c.get('cuisine', '')} | {c.get('addr', '')} | {c.get('boro', '')} | {c.get('hood', '')}" for c in batch)
         try:
             items = parse_items(ai_call(PROMPT % (", ".join(CUISINES), ", ".join(TAGS)) + lines))
         except OutOfQuota as e:
@@ -448,10 +471,10 @@ def curated_names():
 def main():
     cache = json.loads(CACHE.read_text()) if CACHE.exists() else {}
     curated = curated_names()
-    insp, osm = fetch_inspections(), fetch_osm()
-    if len(insp) < 1000 or len(osm) < 1000:
-        sys.exit(f"source data looks incomplete (inspections {len(insp)}, osm {len(osm)}); keeping the old spots.json")
-    cands = build_candidates(insp, osm, curated)
+    insp, osm, locate = fetch_inspections(), fetch_osm(), fetch_neighborhoods()
+    if len(insp) < 1000 or len(osm) < 1000 or locate.count < 150:
+        sys.exit(f"source data looks incomplete (inspections {len(insp)}, osm {len(osm)}, neighborhoods {locate.count}); keeping the old spots.json")
+    cands = build_candidates(insp, osm, curated, locate)
     tag_new(cands, cache)
     save_cache(cache)
 
@@ -464,7 +487,7 @@ def main():
         if k in seen:
             continue
         seen.add(k)
-        live.append({**c, "pop": popularity(stats, c["n"])})
+        live.append({**c, "h": cands[cid].get("hood") or c["h"], "pop": popularity(stats, c["n"])})  # official neighborhood beats the AI's guess
     cur_pop = {n: popularity(stats, n) for n in curated if popularity(stats, n)}
     live.sort(key=lambda s: (s["t"], s["n"]))
     OUT.write_text(json.dumps({"updated": dt.date.today().isoformat(), "count": len(live), "spots": live,
