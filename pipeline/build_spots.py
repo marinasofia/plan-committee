@@ -310,7 +310,7 @@ def gemini(prompt):
     if not _gem_model:
         _gem_model = os.environ.get("GEMINI_MODEL")
         if not _gem_model:
-            j = get_json("https://generativelanguage.googleapis.com/v1beta/models?pageSize=200&key=" + key)
+            j = get_json("https://generativelanguage.googleapis.com/v1beta/models?pageSize=200", headers={"x-goog-api-key": key})
             names = [m["name"].split("/")[-1] for m in j.get("models", [])
                      if "generateContent" in m.get("supportedGenerationMethods", []) and "flash" in m["name"]
                      and not re.search(r"image|tts|audio|live|embed|preview|exp|thinking", m["name"])]
@@ -319,9 +319,9 @@ def gemini(prompt):
                 raise OutOfQuota("no free Gemini flash model found")
             _gem_model = names[0]
             log("gemini model:", _gem_model)
-    j = post(f"https://generativelanguage.googleapis.com/v1beta/models/{_gem_model}:generateContent?key={key}",
+    j = post(f"https://generativelanguage.googleapis.com/v1beta/models/{_gem_model}:generateContent",
              {"contents": [{"role": "user", "parts": [{"text": prompt}]}],
-              "generationConfig": {"temperature": 0.2, "responseMimeType": "application/json"}}, {})
+              "generationConfig": {"temperature": 0.2, "responseMimeType": "application/json"}}, {"x-goog-api-key": key})
     time.sleep(5)
     return "".join(p.get("text", "") for p in j["candidates"][0]["content"]["parts"] if not p.get("thought"))
 
@@ -353,7 +353,7 @@ def clean_tag(item, cand):
     return {"n": cand["name"], "t": t, "h": (item.get("hood") or "")[:30], "b": boro, "p": price,
             "c": item.get("cuisine") if t == "dinner" and item.get("cuisine") in CUISINES else "", "f": tags,
             "v": (item.get("why") or "")[:70], "lat": round(cand["lat"], 5), "lon": round(cand["lon"], 5),
-            "web": cand.get("website", "")[:120]}
+            "web": cand.get("website", "")[:120] if re.match(r"https?://", cand.get("website", ""), re.I) else ""}
 
 
 def tag_new(cands, cache):

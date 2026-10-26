@@ -1,0 +1,14 @@
+# Gitleaks config: the built-in rules plus anything this repo needs.
+[extend]
+useDefault = true
+
+# Add a rule for a provider gitleaks does not know yet:
+# [[rules]]
+# id = "example-provider-key"
+# description = "Example provider API key"
+# regex = '''exk_[A-Za-z0-9]{32}'''
+
+# Allow a known false positive by path, never by disabling a rule:
+# [[allowlists]]
+# description = "Synthetic fixture with fake card numbers"
+# paths = ['''tests/fixtures/fake_cards\.json$''']
