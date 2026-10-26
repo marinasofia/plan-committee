@@ -416,7 +416,10 @@ let hist=store.get("hist",[]), faves=store.get("faves",[]);
 
 /* ===================== helpers ===================== */
 function esc(s){return String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
-function initials(n){return (n||"?").trim().split(/\s+/).map(w=>w[0]).join("").slice(0,2).toUpperCase()}
+function initials(n){return esc((n||"?").trim().split(/\s+/).map(w=>w[0]).join("").slice(0,2).toUpperCase())}
+/* links and colors can come from share links or OpenStreetMap, so only allow safe values into HTML */
+function safeUrl(u){return /^https?:\/\//i.test(u||"")?esc(u):""}
+function safeColor(c,i){return /^#[0-9a-f]{3,8}$/i.test(c||"")?c:COLORS[i%COLORS.length]}
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 function chips(id,list,isOn,toggle){const el=$(id);const items=list.map(x=>Array.isArray(x)?x:[x,x]);
   el.innerHTML=items.map(([l])=>`<button type="button" class="chip">${esc(l)}</button>`).join("");
@@ -762,7 +765,7 @@ function renderTicket(p,names,count){
     <div class="perf"></div>
     <div class="stops">${p.stops.map(s=>`<div class="stop"><div class="tm">${esc(s.time||"")}</div><div><div class="nm">${esc(s.spot.n)}</div>
       <div class="meta">${esc(s.spot.h)} · ${PRICE[s.spot.p]}</div>${s.note?`<div class="why">${esc(s.note)}</div>`:""}
-      <div class="slinks"><a href="${gmapSpot(s.spot)}" target="_blank" rel="noopener">map</a>${s.spot.web?`<a href="${esc(s.spot.web)}" target="_blank" rel="noopener">site</a>`:""}${s.spot.t==="dinner"||s.spot.t==="drinks"?`<a href="${reserve(s.spot.n)}" target="_blank" rel="noopener">reserve</a>`:""}<button type="button" data-fave="${esc(s.spot.n)}" class="${faves.includes(s.spot.n)?"on":""}">${faves.includes(s.spot.n)?"saved":"save"}</button></div></div></div>`).join("")}</div>
+      <div class="slinks"><a href="${gmapSpot(s.spot)}" target="_blank" rel="noopener">map</a>${safeUrl(s.spot.web)?`<a href="${safeUrl(s.spot.web)}" target="_blank" rel="noopener">site</a>`:""}${s.spot.t==="dinner"||s.spot.t==="drinks"?`<a href="${reserve(s.spot.n)}" target="_blank" rel="noopener">reserve</a>`:""}<button type="button" data-fave="${esc(s.spot.n)}" class="${faves.includes(s.spot.n)?"on":""}">${faves.includes(s.spot.n)?"saved":"save"}</button></div></div></div>`).join("")}</div>
     <div class="drama"><div class="lbl"><span>drama meter</span><span>${drama}%</span></div><div class="meter"><span></span></div>${p.verdict?`<div class="verdict">${esc(p.verdict)}</div>`:""}</div>
     ${REPLAY?"":`<div class="tbtns"><button type="button" class="pri" data-a="send">Send to the group</button><button type="button" data-a="veto">Veto</button></div>`}
     <div class="tbtns sub"><button type="button" data-a="route">Route</button><button type="button" data-a="cal">Add to calendar</button></div>
@@ -801,13 +804,13 @@ async function sharePlan(p,btn){
 let REPLAY=null;
 async function playReplay(R){
   REPLAY=R;$("app").classList.add("replay");$("setup").classList.add("hide");
-  const ag=R.a.map(([n,color])=>({n,color}));
+  const ag=R.a.map(([n,color],i)=>({n:String(n??""),color:safeColor(color,i)}));
   $("stack").innerHTML=ag.slice(0,5).map(a=>`<div class="av" style="background:${a.color}">${initials(a.n)}</div>`).join("");
   $("title").textContent=R.m==="girls"?"friends night committee":"date night committee";$("subtitle").textContent=`${ag.length} AI agents · 1 plan`;
   chatEl.innerHTML="";lastWho=null;
   const humans=ag.filter(a=>a.n!=="The Wallet").map(a=>a.n);
   sys(`${humans.join(", ")} let AI agents plan their night. Here's how it went.`);
-  for(const [i,text,via] of R.t){const a=i>=0?ag[i]:null;
+  for(let [i,text,via] of R.t){text=String(text??"");via=via?String(via):"";const a=i>=0?ag[i]:null;
     if(a){showTyping(a);await sleep(450+Math.min(text.length*13,1300));hideTyping()}else await sleep(450);
     addBubble(a,text,via||null)}
   await sleep(500);

@@ -6,7 +6,7 @@ on:
   workflow_dispatch:        # run it by hand from the Actions tab
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: update-spots
@@ -16,9 +16,13 @@ jobs:
   update:
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    permissions:
+      contents: write   # only to commit spots.json
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false   # no write token on disk while third party data is processed
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: "3.12"
       - name: Build spots.json
@@ -29,10 +33,12 @@ jobs:
           MAX_BATCHES: ${{ vars.MAX_BATCHES || '40' }}
         run: python pipeline/build_spots.py
       - name: Commit if anything changed
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           git config user.name "spot-updater"
           git config user.email "actions@users.noreply.github.com"
           git add spots.json data/tagged.json
           git diff --cached --quiet && echo "no changes" && exit 0
           git commit -m "Update spots $(date -u +%F)"
-          git push
+          git push "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" HEAD:${GITHUB_REF_NAME}

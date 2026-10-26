@@ -2,3 +2,16 @@ __pycache__/
 .DS_Store
 worker/.wrangler/
 node_modules/
+
+# Secrets and local data (security kit)
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.sqlite
+*.db
+secrets/
+.dev.vars
+.venv/

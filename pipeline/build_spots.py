@@ -18,6 +18,8 @@ Standard library only. Env vars: GROQ_API_KEY, GEMINI_API_KEY (either or both), 
 MAX_BATCHES (default 40 per run, to stay inside free daily limits), BATCH_SIZE (default 25).
 """
 import datetime as dt
+import gzip
+import http.client
 import json
 import math
 import os
@@ -51,7 +53,7 @@ CHAIN_WORDS = ["mcdonald", "burger king", "wendy's", "subway", "dunkin", "starbu
                "16 handles", "dos toros", "baskin", "carvel", "krispy kreme", "auntie anne", "cinnabon", "sbarro",
                "raising cane", "dig ", "fresh&co", "chopt", "maman", "paris baguette", "tous les jours", "wetzel",
                "nathan's famous", "the habit", "smashburger", "jamba", "playa bowls", "cold stone", "golden krust",
-               "crown fried", "kennedy fried", "great wall", "china wok"]
+               "crown fried", "kennedy fried", "great wall", "china wok", "dallas bbq", "bareburger", "sophie's cuban"]
 SKIP_CUISINES = ["donuts", "hotdogs", "juice", "smoothies", "bagels", "pretzels", "sandwiches", "chicken",
                  "fruits/vegetables", "nuts/confectionary", "soups", "salads", "not listed", "bottled beverages",
                  "hamburgers", "pancakes/waffles", "coffee/tea", "bakery products/desserts", "frozen desserts"]
@@ -62,10 +64,23 @@ def log(*a):
     print(*a, flush=True)
 
 
-def get_json(url, data=None, headers=None, timeout=180):
-    req = urllib.request.Request(url, data=data, headers={**UA, **(headers or {})})
-    with urllib.request.urlopen(req, timeout=timeout) as r:
-        return json.loads(r.read().decode("utf-8"))
+def get_json(url, data=None, headers=None, timeout=180, tries=4):
+    req = urllib.request.Request(url, data=data, headers={**UA, "Accept-Encoding": "gzip", **(headers or {})})
+    for attempt in range(tries):
+        try:
+            with urllib.request.urlopen(req, timeout=timeout) as r:
+                raw = r.read()
+                if r.headers.get("Content-Encoding") == "gzip":
+                    raw = gzip.decompress(raw)
+                return json.loads(raw.decode("utf-8"))
+        except urllib.error.HTTPError as e:
+            if e.code not in (429, 502, 503, 504) or attempt == tries - 1:
+                raise
+        except (OSError, EOFError, http.client.HTTPException, json.JSONDecodeError):  # dropped connection, cut off response
+            if attempt == tries - 1:
+                raise
+        log(f"  retrying {url.split('?')[0]} ({attempt + 1})")
+        time.sleep(30 * 2 ** attempt)  # Overpass asks for exponential backoff when busy
 
 
 def norm(s):
@@ -103,10 +118,17 @@ def fetch_inspections():
         "$select": "camis,dba,boro,building,street,zipcode,cuisine_description,latitude,longitude,max(inspection_date) as last",
         "$where": f"inspection_date > '{since}' AND boro in('Manhattan','Brooklyn','Queens')",
         "$group": "camis,dba,boro,building,street,zipcode,cuisine_description,latitude,longitude",
-        "$limit": "60000",
+        "$order": "camis",
+        "$limit": "1000",
     }
-    url = "https://data.cityofnewyork.us/resource/43nn-pn8j.json?" + urllib.parse.urlencode(params)
-    rows = get_json(url)
+    # page through it in small gzipped pages: big responses tend to get cut off mid download
+    rows = []
+    while True:
+        url = "https://data.cityofnewyork.us/resource/43nn-pn8j.json?" + urllib.parse.urlencode({**params, "$offset": len(rows)})
+        page = get_json(url)
+        rows += page
+        if len(page) < 1000:
+            break
     out = {}
     for r in rows:
         try:
@@ -136,6 +158,9 @@ out center tags;
 """
 
 
+OSM_KINDS = set(re.findall(r"[a-z_]+", "|".join(re.findall(r'~"\^\(([^)]*)\)\$"', OSM_QUERY))))
+
+
 def fetch_osm():
     data = urllib.parse.urlencode({"data": OSM_QUERY}).encode()
     j = get_json(OVERPASS, data=data, timeout=300)
@@ -148,7 +173,7 @@ def fetch_osm():
             continue
         if t.get("disused") or t.get("abandoned") or "disused:amenity" in t:
             continue
-        kind = t.get("amenity") or t.get("tourism") or t.get("leisure")
+        kind = next((t[k] for k in ("amenity", "tourism", "leisure") if t.get(k) in OSM_KINDS), "")
         out.append({
             "id": f"osm:{e['type'][0]}{e['id']}", "name": t["name"], "kind": kind, "lat": lat, "lon": lon,
             "cuisine": t.get("cuisine", ""), "website": t.get("website") or t.get("contact:website") or "",
@@ -187,15 +212,30 @@ def build_candidates(insp, osm, curated):
         used_osm.add(match["id"])
         cands[r["id"]] = {**r, "kind": match["kind"], "website": match["website"], "rooftop": match["rooftop"],
                           "music": match["music"], "osm": match["id"]}
+    # borough of an OpenStreetMap place = borough of an inspected restaurant within 250 m. The OSM box also
+    # covers New Jersey and the Bronx, which have no restaurants in our inspection data, so those stay "".
+    rgrid = {}
+    for r in insp:
+        rgrid.setdefault((round(r["lat"], 2), round(r["lon"], 2)), []).append(r)
+
+    def boro_at(lat, lon):
+        near = [r for dy in (-0.01, 0, 0.01) for dx in (-0.01, 0, 0.01)
+                for r in rgrid.get((round(lat + dy, 2), round(lon + dx, 2)), [])]
+        best = min(near, key=lambda r: km((lat, lon), (r["lat"], r["lon"])), default=None)
+        return best["boro"] if best and km((lat, lon), (best["lat"], best["lon"])) < 0.25 else ""
+
     # bars, venues, museums, parks: OpenStreetMap only (bars are not all in the inspection data)
     for o in osm:
         if o["id"] in used_osm or o["kind"] in ("restaurant", "cafe", "ice_cream"):
             continue
-        if is_chain(o["name"]) or norm(o["name"]) in cur:
+        if is_chain(o["name"]) or norm(o["name"]) in cur or re.search(r"playground|triangle", o["name"], re.I):
             continue
         if o["kind"] in ("bar", "pub", "biergarten", "nightclub") and not (o["website"] or o["hours"]):
             continue
-        cands[o["id"]] = {**o, "boro": "", "addr": ""}
+        boro = boro_at(o["lat"], o["lon"])
+        if not boro and o["kind"] not in ("park", "garden", "viewpoint", "museum"):
+            continue  # big parks and museums can sit far from any restaurant, everything else is outside our boroughs
+        cands[o["id"]] = {**o, "boro": boro, "addr": ""}
     log(f"candidates: {len(cands)} notable places after filters")
     return cands
 
@@ -209,7 +249,8 @@ price: 0 free, 1 $, 2 $$, 3 $$$, 4 $$$$ per person.
 cuisine (dinner only, else ""): one of %s
 tags: any that clearly apply, from: %s
 hood: the NYC neighborhood, like West Village, Williamsburg, Astoria. boro: M Manhattan, BK Brooklyn, Q Queens, other for anywhere else.
-PLACES (id | name | kind | cuisine hint | address | borough):
+Use the coordinates to tell same named places apart and to get the neighborhood right. Places outside Manhattan, Brooklyn and Queens (New Jersey, the Bronx) are boro other.
+PLACES (id | name | kind | cuisine hint | address | borough | lat,lon):
 """
 
 
@@ -269,7 +310,7 @@ def gemini(prompt):
     if not _gem_model:
         _gem_model = os.environ.get("GEMINI_MODEL")
         if not _gem_model:
-            j = get_json("https://generativelanguage.googleapis.com/v1beta/models?pageSize=200&key=" + key)
+            j = get_json("https://generativelanguage.googleapis.com/v1beta/models?pageSize=200", headers={"x-goog-api-key": key})
             names = [m["name"].split("/")[-1] for m in j.get("models", [])
                      if "generateContent" in m.get("supportedGenerationMethods", []) and "flash" in m["name"]
                      and not re.search(r"image|tts|audio|live|embed|preview|exp|thinking", m["name"])]
@@ -278,9 +319,9 @@ def gemini(prompt):
                 raise OutOfQuota("no free Gemini flash model found")
             _gem_model = names[0]
             log("gemini model:", _gem_model)
-    j = post(f"https://generativelanguage.googleapis.com/v1beta/models/{_gem_model}:generateContent?key={key}",
+    j = post(f"https://generativelanguage.googleapis.com/v1beta/models/{_gem_model}:generateContent",
              {"contents": [{"role": "user", "parts": [{"text": prompt}]}],
-              "generationConfig": {"temperature": 0.2, "responseMimeType": "application/json"}}, {})
+              "generationConfig": {"temperature": 0.2, "responseMimeType": "application/json"}}, {"x-goog-api-key": key})
     time.sleep(5)
     return "".join(p.get("text", "") for p in j["candidates"][0]["content"]["parts"] if not p.get("thought"))
 
@@ -312,7 +353,7 @@ def clean_tag(item, cand):
     return {"n": cand["name"], "t": t, "h": (item.get("hood") or "")[:30], "b": boro, "p": price,
             "c": item.get("cuisine") if t == "dinner" and item.get("cuisine") in CUISINES else "", "f": tags,
             "v": (item.get("why") or "")[:70], "lat": round(cand["lat"], 5), "lon": round(cand["lon"], 5),
-            "web": cand.get("website", "")[:120]}
+            "web": cand.get("website", "")[:120] if re.match(r"https?://", cand.get("website", ""), re.I) else ""}
 
 
 def tag_new(cands, cache):
@@ -329,7 +370,7 @@ def tag_new(cands, cache):
         batch = todo[b * BATCH_SIZE:(b + 1) * BATCH_SIZE]
         if not batch:
             break
-        lines = "\n".join(f"{c['id']} | {c['name']} | {c.get('kind', '')} | {c.get('cuisine', '')} | {c.get('addr', '')} | {c.get('boro', '')}" for c in batch)
+        lines = "\n".join(f"{c['id']} | {c['name']} | {c.get('kind', '')} | {c.get('cuisine', '')} | {c.get('addr', '')} | {c.get('boro', '')} | {c['lat']:.4f},{c['lon']:.4f}" for c in batch)
         try:
             items = parse_items(ai_call(PROMPT % (", ".join(CUISINES), ", ".join(TAGS)) + lines))
         except OutOfQuota as e:
