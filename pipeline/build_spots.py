@@ -33,6 +33,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 CACHE = ROOT / "data" / "tagged.json"
+BLOCKLIST = ROOT / "data" / "blocklist.txt"
 OUT = ROOT / "spots.json"
 INDEX = ROOT / "index.html"
 
@@ -197,8 +198,8 @@ def fetch_neighborhoods():
         if not rings:
             continue
         xs, ys = [x for r in rings for x, y in r], [y for r in rings for x, y in r]
-        # "SoHo-Little Italy-Hudson Square" -> "SoHo"
-        areas.append((BORO.get(p.get("boroname"), ""), (p.get("ntaname") or "").split("-")[0].strip(),
+        # "SoHo-Little Italy-Hudson Square" -> "SoHo", "Upper West Side (Central)" -> "Upper West Side"
+        areas.append((BORO.get(p.get("boroname"), ""), re.sub(r"\s*\(.*", "", (p.get("ntaname") or "").split("-")[0]).strip(),
                       (min(xs), min(ys), max(xs), max(ys)), rings))
     log(f"neighborhoods: {len(areas)} areas")
 
@@ -220,7 +221,9 @@ def fetch_neighborhoods():
 
 
 def build_candidates(insp, osm, curated, locate):
-    cur = {norm(n) for n in curated}
+    # curated spots are already in index.html; blocklisted ones closed but are still on OpenStreetMap
+    blocked = BLOCKLIST.read_text(encoding="utf-8").splitlines() if BLOCKLIST.exists() else []
+    cur = {norm(n) for n in curated + [b for b in blocked if b.strip() and not b.startswith("#")]}
     # grid index of OSM places for fast nearby lookups
     grid = {}
     for o in osm:
