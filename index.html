@@ -134,6 +134,8 @@ button,input,select,textarea{font:inherit;color:inherit}
 .prov input,.prov select{margin-top:8px}
 .prov .small{margin-top:6px}
 .who{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
+.qk{text-align:center;text-decoration:none;color:var(--ink);border-style:solid;background:#fff;line-height:1.3}
+.qk .small{display:block;margin-top:2px;font-weight:400}
 .who span{font-size:12.5px;background:#fff;border:1px solid var(--line);border-radius:99px;padding:4px 10px}
 </style>
 </head>
@@ -174,7 +176,7 @@ button,input,select,textarea{font:inherit;color:inherit}
 
     <button class="cta" id="startBtn" type="button">Start the group chat</button>
     <p class="small">Places from hand picks, NYC Open Data and © OpenStreetMap contributors. Check hours before you go.</p>
-    <p class="small" id="keyHint">Runs on your own AI key. Tap the sliders icon to add a free Gemini, Groq or OpenRouter key.</p>
+    <p class="small" id="keyHint">Runs on a free Gemini or Groq key. You'll get one in about a minute when you start.</p>
   </div>
 
   <!-- member editor -->
@@ -210,7 +212,7 @@ button,input,select,textarea{font:inherit;color:inherit}
 
     <div class="prov"><div class="ph">Groq <span class="st" id="st-groq"></span></div>
       <input class="field" id="qKey" type="password" placeholder="Groq API key" autocomplete="off">
-      <input class="field" id="qModel" placeholder="model">
+      <input class="field" id="qModel" placeholder="model (empty = auto, picks the biggest free one)">
       <p class="small">Free at <a href="https://console.groq.com/keys" target="_blank" rel="noopener">console.groq.com/keys</a>, no card. Runs open models like Meta's Llama, very fast.</p></div>
 
     <div class="prov"><div class="ph">OpenRouter <span class="st" id="st-openrouter"></span></div>
@@ -230,6 +232,22 @@ button,input,select,textarea{font:inherit;color:inherit}
       <p class="small">Free and unlimited on your own computer. Run <code>ollama pull llama3.2</code>, then start it with <code>OLLAMA_ORIGINS="*" ollama serve</code>.</p></div>
 
     <button class="cta" id="testKeys" type="button">Save and test</button>
+  </div>
+
+  <!-- quick key: the one minute path for people with no key yet -->
+  <div class="sheet hide top" id="quickKey">
+    <button class="iconbtn close" id="closeQuick" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    <h2>Get your free AI key.</h2>
+    <p class="lead">Takes about a minute, no card. Only the planner needs one: friends who join by link don't.</p>
+    <div class="sec"><span class="lab">1. Pick one and sign in</span>
+      <div class="btnrow"><a class="ghost qk" href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">Gemini<br><span class="small">sign in with Google</span></a>
+        <a class="ghost qk" href="https://console.groq.com/keys" target="_blank" rel="noopener">Groq<br><span class="small">fastest replies</span></a></div></div>
+    <div class="sec"><span class="lab">2. Tap "Create API key" and copy it</span></div>
+    <div class="sec"><span class="lab">3. Paste it here</span>
+      <input class="field" id="qkInput" type="password" placeholder="paste your key" autocomplete="off" spellcheck="false">
+      <p class="small" id="qkStatus">It stays in this browser and only goes to Google or Groq.</p></div>
+    <button class="cta" id="qkGo" type="button">Start the group chat</button>
+    <p class="small"><a href="#" id="qkMore">More options (OpenRouter, Ollama, other APIs)</a></p>
   </div>
 </div>
 
@@ -410,7 +428,8 @@ const params=new URLSearchParams(location.search);
 const MOCK=params.has("mock");
 let plan=store.get("plan",null)||defaultPlan(params.get("mode")==="girls"?"girls":"date");
 const savePlan=()=>store.set("plan",plan);
-let cfg={pool:"smart",gKey:"",gModel:"",qKey:"",qModel:"llama-3.3-70b-versatile",oKey:"",oModel:"openrouter/free",cBase:"",cKey:"",cModel:"",ol:false,olModel:"llama3.2",olUrl:"http://localhost:11434",...store.get("cfg2",{})};
+let cfg={pool:"smart",gKey:"",gModel:"",qKey:"",qModel:"",oKey:"",oModel:"openrouter/free",cBase:"",cKey:"",cModel:"",ol:false,olModel:"llama3.2",olUrl:"http://localhost:11434",...store.get("cfg2",{})};
+if(cfg.qModel==="llama-3.3-70b-versatile")cfg.qModel="";  /* retired by Groq */
 {const old=store.get("cfg",null);if(old&&!store.get("cfg2",null)){if(old.key)cfg.gKey=old.key;if(old.prov==="ollama")cfg.ol=true;store.set("cfg2",cfg)}}
 let hist=store.get("hist",[]), faves=store.get("faves",[]);
 
@@ -583,6 +602,19 @@ async function geminiModels(){
   const score=n=>(/preview|exp/.test(n)?100:0)-(/lite/.test(n)?20:0)-(/latest/.test(n)?5:0)-ver(n);
   gemModels=ok.sort((a,b)=>score(a)-score(b));return gemModels;
 }
+/* Groq retires models often, so pick the biggest current chat model instead of hardcoding one */
+let groqPick=null;
+async function groqModel(){
+  if(groqPick)return groqPick;
+  const r=await fetch("https://api.groq.com/openai/v1/models",{headers:{"Authorization":"Bearer "+cfg.qKey}}).catch(()=>{throw new PErr("net","Can't reach Groq")});
+  if(r.status===401||r.status===403)throw new PErr("auth","Groq key didn't work");
+  if(!r.ok)throw new PErr("quota","Groq is busy",30e3);
+  const size=n=>Math.max(0,...(n.match(/(\d+)b\b/g)||[]).map(x=>parseInt(x)));
+  const ids=((await r.json()).data||[]).filter(m=>m.active!==false).map(m=>m.id)
+    .filter(n=>!/whisper|tts|guard|embed|compound|playai|orpheus|safeguard|vision/.test(n)).sort((a,b)=>size(b)-size(a));
+  if(!ids.length)throw new PErr("other","Groq has no chat model available");
+  return groqPick=ids[0];
+}
 async function openaiCall(base,key,model,system,user,json,name){
   const r=await fetch(`${base}/chat/completions`,{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+key},
     body:JSON.stringify({model,temperature:json?0.4:1,messages:[{role:"system",content:system},{role:"user",content:user}],...(json?{response_format:{type:"json_object"}}:{})})})
@@ -598,7 +630,7 @@ async function openaiCall(base,key,model,system,user,json,name){
 }
 async function callProvider(p,system,user,json){
   const gap=GAP[p]-(Date.now()-(last[p]||0));if(gap>0)await sleep(gap);last[p]=Date.now();
-  if(p==="groq")return openaiCall("https://api.groq.com/openai/v1",cfg.qKey,cfg.qModel||"llama-3.3-70b-versatile",system,user,json,"Groq");
+  if(p==="groq")return openaiCall("https://api.groq.com/openai/v1",cfg.qKey,cfg.qModel||await groqModel(),system,user,json,"Groq");
   if(p==="openrouter")return openaiCall("https://openrouter.ai/api/v1",cfg.oKey,cfg.oModel||"openrouter/free",system,user,json,"OpenRouter");
   if(p==="custom")return openaiCall(cfg.cBase.replace(/\/$/,""),cfg.cKey,cfg.cModel,system,user,json,"Your API");
   if(p==="ollama"){
@@ -667,10 +699,10 @@ $("olSw").onclick=()=>{cfg.ol=!cfg.ol;$("olSw").classList.toggle("on",cfg.ol)};
 $("gearBtn").onclick=()=>{renderSettings();$("settings").classList.remove("hide")};
 $("closeSettings").onclick=()=>{readSettings();$("settings").classList.add("hide");renderSetup()};
 function readSettings(){
-  Object.assign(cfg,{gKey:$("gKey").value.trim(),gModel:$("gModel").value,qKey:$("qKey").value.trim(),qModel:$("qModel").value.trim()||"llama-3.3-70b-versatile",
+  Object.assign(cfg,{gKey:$("gKey").value.trim(),gModel:$("gModel").value,qKey:$("qKey").value.trim(),qModel:$("qModel").value.trim(),
     oKey:$("oKey").value.trim(),oModel:$("oModel").value.trim()||"openrouter/free",cBase:$("cBase").value.trim(),cKey:$("cKey").value.trim(),cModel:$("cModel").value.trim(),
     olModel:$("olModel").value.trim()||"llama3.2",olUrl:$("olUrl").value.trim()||"http://localhost:11434"});
-  store.set("cfg2",cfg);gemModels=null;for(const k in dead)delete dead[k];for(const k in cool)delete cool[k];
+  store.set("cfg2",cfg);gemModels=null;groqPick=null;for(const k in dead)delete dead[k];for(const k in cool)delete cool[k];
 }
 $("testKeys").onclick=async()=>{
   readSettings();const P=providers();
@@ -682,6 +714,30 @@ $("testKeys").onclick=async()=>{
     catch(e){el.textContent=e.kind==="quota"?"works, busy right now":e.message;el.className="st "+(e.kind==="quota"?"ok":"bad")}}));
   renderSetup();
 };
+
+/* quick key: paste any key, we work out whose it is */
+const KEY_TYPES=[[/^AIza[\w-]{30,}$/,"gemini","gKey","Gemini"],[/^gsk_\w{20,}$/,"groq","qKey","Groq"],[/^sk-or-[\w-]{20,}$/,"openrouter","oKey","OpenRouter"]];
+function openQuickKey(){$("qkInput").value="";qkSay("It stays in this browser and only goes to Google or Groq.");$("quickKey").classList.remove("hide")}
+function qkSay(t,cls){const el=$("qkStatus");el.textContent=t;el.style.color=cls==="bad"?"#b4413c":cls==="ok"?"var(--ok)":""}
+$("closeQuick").onclick=()=>$("quickKey").classList.add("hide");
+$("qkMore").onclick=e=>{e.preventDefault();$("quickKey").classList.add("hide");$("gearBtn").click()};
+let qkBusy=false;
+async function quickKeyGo(){
+  if(qkBusy)return;
+  const k=$("qkInput").value.trim().replace(/\s+/g,"");
+  if(!k){qkSay("Paste your key first.","bad");return}
+  const t=KEY_TYPES.find(([re])=>re.test(k));
+  if(!t){qkSay("That doesn't look like a Gemini (AIza…) or Groq (gsk_…) key. Copy it again.","bad");return}
+  const [,p,field,name]=t;
+  qkBusy=true;$("qkGo").disabled=true;qkSay(`Checking your ${name} key…`);
+  const prev=cfg[field];cfg[field]=k;gemModels=null;groqPick=null;delete dead[p];delete cool[p];
+  try{await callProvider(p,"Reply with the single word: ok","ok?",false)}
+  catch(e){if(e.kind!=="quota"){cfg[field]=prev;qkSay(e.kind==="auth"?`${name} didn't accept that key. Copy it again.`:e.message,"bad");qkBusy=false;$("qkGo").disabled=false;return}}
+  store.set("cfg2",cfg);qkSay(`${name} key works.`,"ok");qkBusy=false;$("qkGo").disabled=false;
+  $("quickKey").classList.add("hide");renderSetup();start();
+}
+$("qkGo").onclick=quickKeyGo;
+$("qkInput").addEventListener("paste",()=>setTimeout(quickKeyGo,50));
 
 /* ===================== the agents ===================== */
 let transcript=[], agents=[], SL=null, busy=false, lastPlan=null, round=0;
@@ -821,7 +877,7 @@ $("ownBtn").onclick=()=>{history.replaceState(null,"",location.pathname+location
 /* ===================== flow ===================== */
 function setComposer(on){$("say").disabled=!on;$("sendBtn").disabled=!on;$("say").placeholder=on?"veto, or add a note for the agents…":"the agents are talking…"}
 async function start(){
-  if(!MOCK&&!providers().length){$("gearBtn").click();return}
+  if(!MOCK&&!providers().length){openQuickKey();return}
   plan.members=plan.members.filter(m=>m.n);savePlan();
   $("setup").classList.add("hide");chatEl.innerHTML="";transcript=[];lastPlan=null;lastWho=null;mi=0;
   SL=shortlist();
