@@ -34,6 +34,8 @@ jobs:
           persist-credentials: false
       - name: Check the CSP hash matches the inline script
         run: python3 tools/csp.py --check
+      - name: Check every city pack loads
+        run: python3 -c "import sys; sys.path.insert(0, 'pipeline'); import build_spots as b; print([c['id'] for c in b.load_cities()])"
 
   dependencies:
     # Dependency review is free on public repos only.

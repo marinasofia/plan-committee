@@ -27,6 +27,7 @@ If you like it, a ⭐ helps other people find it.
 
 * **Date night or friends night.** Add your people, or send an invite link to the group chat so everyone picks on their own phone. Friends never need a key or an account.
 * **Agents with personalities.** Dramatic, stubborn, chill, the mediator, chaotic. An optional Wallet agent guards the budget.
+* **Any city.** New York and London so far. Each city is one folder in [`cities/`](cities), so adding yours is one pull request ([how](CONTRIBUTING.md)).
 * **Real places only.** 125 hand picked spots, plus thousands more from NYC Open Data and OpenStreetMap, refreshed every day. Closed restaurants drop out on their own.
 * **A plan you can use.** Map, website, reserve (straight to Resy or OpenTable when we know the page), add to calendar, share the whole argument as a replay link.
 * **Your AI, your key.** Bring a free Gemini or Groq key (one minute, no card). It stays on your device and goes only to the AI you picked.
@@ -38,7 +39,7 @@ If you like it, a ⭐ helps other people find it.
 
 * **No server, no build step.** The whole app is [`index.html`](index.html). Open it in a browser and it runs.
 * **No database.** Plans, picks and invites live in the link itself (after the `#`, which never reaches any server) and in your browser.
-* **The spot list grows by itself.** A daily GitHub Action ([`pipeline/build_spots.py`](pipeline/build_spots.py)) pulls fresh data, filters out chains and takeout spots, and has a free AI tag new places by vibe, price and cuisine. Places the AI doesn't recognize are skipped, so it never makes up vibes. Neighborhoods come from NYC's official map, not the AI.
+* **The spot list grows by itself.** For every city, a daily GitHub Action ([`pipeline/build_spots.py`](pipeline/build_spots.py)) pulls fresh data, filters out chains and takeout spots, and has a free AI tag new places by vibe, price and cuisine. Places the AI doesn't recognize are skipped, so it never makes up vibes. Neighborhoods come from NYC's official map, not the AI.
 * **Locked down.** A hash based Content Security Policy, a service worker that never touches AI calls, and a security scan on every pull request. See [SECURITY.md](SECURITY.md).
 
 ## Run it yourself
@@ -79,4 +80,4 @@ New spots, better agent banter, other cities, bug fixes: all welcome. Start with
 
 * Code: [MIT](LICENSE).
 * Restaurant data: NYC Open Data (DOHMH Restaurant Inspection Results) and Neighborhood Tabulation Areas.
-* Place data: © OpenStreetMap contributors, available under the [Open Database License](https://opendatacommons.org/licenses/odbl/). `spots.json` and `data/tagged.json` are derived from it and are shared under the ODbL too.
+* Place data: © OpenStreetMap contributors, available under the [Open Database License](https://opendatacommons.org/licenses/odbl/). `cities/*/spots.json` and `data/tagged.json` are derived from it and are shared under the ODbL too.

@@ -34,8 +34,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 CACHE = ROOT / "data" / "tagged.json"
 BLOCKLIST = ROOT / "data" / "blocklist.txt"
-OUT = ROOT / "spots.json"
-INDEX = ROOT / "index.html"
+CITIES = ROOT / "cities"
 
 MAX_BATCHES = int(os.environ.get("MAX_BATCHES", "40"))
 BATCH_SIZE = int(os.environ.get("BATCH_SIZE", "25"))
@@ -101,9 +100,10 @@ def nice_name(s):
     return re.sub(r"'S\b", "'s", out)
 
 
-def is_chain(name):
+def is_chain(name, place=None):
+    """Known chain words, or an OSM brand tag (works in every city, no list to maintain)."""
     n = name.lower()
-    return any(c in n for c in CHAIN_WORDS)
+    return bool(place and place.get("chain")) or any(c in n for c in CHAIN_WORDS)
 
 
 def km(a, b):
@@ -151,9 +151,9 @@ OVERPASS = "https://overpass-api.de/api/interpreter"
 OSM_QUERY = """
 [out:json][timeout:240];
 (
-  nwr["amenity"~"^(restaurant|bar|pub|biergarten|nightclub|cafe|ice_cream|cinema|theatre|arts_centre|music_venue)$"]["name"](40.54,-74.05,40.92,-73.70);
-  nwr["tourism"~"^(museum|gallery|viewpoint)$"]["name"](40.54,-74.05,40.92,-73.70);
-  nwr["leisure"~"^(park|garden)$"]["name"]["wikidata"](40.54,-74.05,40.92,-73.70);
+  nwr["amenity"~"^(restaurant|bar|pub|biergarten|nightclub|cafe|ice_cream|cinema|theatre|arts_centre|music_venue)$"]["name"](BBOX);
+  nwr["tourism"~"^(museum|gallery|viewpoint)$"]["name"](BBOX);
+  nwr["leisure"~"^(park|garden)$"]["name"]["wikidata"](BBOX);
 );
 out center tags;
 """
@@ -240,8 +240,9 @@ def needs(t):
     return out
 
 
-def fetch_osm():
-    data = urllib.parse.urlencode({"data": OSM_QUERY}).encode()
+def fetch_osm(city):
+    bbox = ",".join(str(x) for x in city["bbox"])
+    data = urllib.parse.urlencode({"data": OSM_QUERY.replace("BBOX", bbox)}).encode()
     j = get_json(OVERPASS, data=data, timeout=300)
     out = []
     for e in j.get("elements", []):
@@ -258,9 +259,9 @@ def fetch_osm():
             "cuisine": t.get("cuisine", ""), "website": t.get("website") or t.get("contact:website") or "",
             "hours": t.get("opening_hours", ""), "rooftop": t.get("rooftop") == "yes" or "rooftop" in t["name"].lower(),
             "music": t.get("live_music") == "yes" or kind == "music_venue", "rsv": booking(t),
-            "hrs": parse_hours(t.get("opening_hours")), "x": needs(t),
+            "hrs": parse_hours(t.get("opening_hours")), "x": needs(t), "chain": bool(t.get("brand") or t.get("brand:wikidata")),
         })
-    log(f"openstreetmap: {len(out)} named places")
+    log(f"openstreetmap: {len(out)} named places in {city['name']}")
     return out
 
 
@@ -299,11 +300,14 @@ def fetch_neighborhoods():
     return locate
 
 
-def build_candidates(insp, osm, curated, locate):
-    # curated spots are already in index.html; blocklisted ones closed but are still on OpenStreetMap
+OSM_SKIP_CUISINE = re.compile(r"coffee|sandwich|bubble_tea|donut|juice|bagel|kebab|fried_chicken|burger|chicken", re.I)
+
+
+def build_candidates(city, insp, osm, curated, locate):
+    """Notable places for one city. With restaurant inspection data (NYC), a restaurant must be both inspected
+    recently (so it is open) and on OpenStreetMap with a website or hours. Without it, OSM alone decides."""
     blocked = BLOCKLIST.read_text(encoding="utf-8").splitlines() if BLOCKLIST.exists() else []
     cur = {norm(n) for n in curated + [b for b in blocked if b.strip() and not b.startswith("#")]}
-    # grid index of OSM places for fast nearby lookups
     grid = {}
     for o in osm:
         grid.setdefault((round(o["lat"], 3), round(o["lon"], 3)), []).append(o)
@@ -324,39 +328,52 @@ def build_candidates(insp, osm, curated, locate):
             if (ok == k or (len(k) > 4 and (k in ok or ok in k))) and km((r["lat"], r["lon"]), (o["lat"], o["lon"])) < 0.12:
                 match = o
                 break
-        if not match or not (match["website"] or match["hours"]):
+        if not match or match["chain"] or not (match["website"] or match["hours"]):
             continue  # not notable enough to show up on OpenStreetMap with details
         used_osm.add(match["id"])
-        cands[r["id"]] = {**r, "hood": locate(r["lat"], r["lon"])[1], "kind": match["kind"], "website": match["website"], "rooftop": match["rooftop"],
-                          "music": match["music"], "rsv": match["rsv"], "hrs": match["hrs"], "x": match["x"], "osm": match["id"]}
-    # bars, venues, museums, parks: OpenStreetMap only (bars are not all in the inspection data)
+        cands[r["id"]] = {**r, "hood": locate(r["lat"], r["lon"])[1] if locate else "", "kind": match["kind"], "website": match["website"],
+                          "rooftop": match["rooftop"], "music": match["music"], "rsv": match["rsv"], "hrs": match["hrs"], "x": match["x"], "osm": match["id"]}
     for o in osm:
-        if o["id"] in used_osm or o["kind"] in ("restaurant", "cafe", "ice_cream"):
+        if o["id"] in used_osm or o["kind"] in ("cafe", "ice_cream") or (insp and o["kind"] == "restaurant"):
             continue
-        if is_chain(o["name"]) or norm(o["name"]) in cur or re.search(r"playground|triangle", o["name"], re.I):
+        if is_chain(o["name"], o) or norm(o["name"]) in cur or re.search(r"playground|triangle", o["name"], re.I):
             continue
-        if o["kind"] in ("bar", "pub", "biergarten", "nightclub") and not (o["website"] or o["hours"]):
+        if o["kind"] in ("restaurant", "bar", "pub", "biergarten", "nightclub") and not (o["website"] or o["hours"]):
             continue
-        boro, hood = locate(o["lat"], o["lon"])
-        if not boro:
-            continue  # New Jersey, the Bronx, Long Island: the OSM box is a rectangle
+        if o["kind"] == "restaurant" and OSM_SKIP_CUISINE.search(o["cuisine"]):
+            continue
+        boro, hood = locate(o["lat"], o["lon"]) if locate else ("", "")
+        if locate and not boro:
+            continue  # outside the city's official areas (the OSM box is a rectangle)
         cands[o["id"]] = {**o, "boro": boro, "hood": hood, "addr": ""}
-    log(f"candidates: {len(cands)} notable places after filters")
+    log(f"candidates: {len(cands)} notable places in {city['name']} after filters")
     return cands
 
 
 # ---------------------------------------------------------------- AI tagging
-PROMPT = """You tag New York City places for a date night and friends night planning app.
+PROMPT = """You tag places in CITY for a date night and friends night planning app.
 For each place, decide from your own knowledge. If you do not actually recognize the specific place, return known:false. Never guess vibes for places you don't know.
-Return JSON: {"items":[{"id":"...","known":true,"type":"dinner|drinks|late|free|skip","price":0,"cuisine":"...","tags":["..."],"why":"max 8 words","hood":"neighborhood name","boro":"M|BK|Q|other"}]}
-type: dinner = restaurant good for a night out, drinks = bar, late = activity or dessert or venue, free = costs nothing to get in, like a park, viewpoint or free museum (paid museums, tours and cinemas are late), skip = not good for a night out (takeout spot, office cafeteria, generic deli).
-price: 0 free, 1 $, 2 $$, 3 $$$, 4 $$$$ per person.
-cuisine (dinner only, else ""): one of %s
-tags: any that clearly apply, from: %s
-hood: the NYC neighborhood, like West Village, Williamsburg, Astoria. boro: M Manhattan, BK Brooklyn, Q Queens, other for anywhere else.
+Return JSON: {"items":[{"id":"...","known":true,"type":"dinner|drinks|late|free|skip","price":0,"cuisine":"...","tags":["..."],"why":"max 8 words","hood":"neighborhood name","boro":"AREAS|other"}]}
+type: dinner = restaurant good for a night out, drinks = bar, late = activity or dessert or venue, free = costs nothing to get in, like a park, viewpoint or free museum (paid museums, tours and cinemas are late), skip = not good for a night out (takeout spot, office cafeteria, generic deli, chain).
+price: 0 free, 1 CUR, 2 CUR2, 3 CUR3, 4 CUR4 per person.
+cuisine (dinner only, else ""): one of CUISINE_LIST
+tags: any that clearly apply, from: TAG_LIST
+hood: the neighborhood in CITY, like HOODS. boro: AREA_HELP
 If the place has closed for good or moved out of that neighborhood, return known:false. Same named places in different neighborhoods are different places.
-PLACES (id | name | kind | cuisine hint | address | borough | neighborhood):
+PLACES (id | name | kind | cuisine hint | address | area | neighborhood):
 """
+
+
+def prompt_for(city):
+    areas = city.get("areas") or []
+    cur = city.get("currency") or "$"
+    # fixed lists first, then the contributor's text, and no % formatting (a "%" in a city name must not break it)
+    base = PROMPT.replace("CUISINE_LIST", ", ".join(CUISINES)).replace("TAG_LIST", ", ".join(TAGS))
+    return (base.replace("CITY", city["name"]).replace("AREAS", "|".join(a["code"] for a in areas) or "\"\"")
+            .replace("CUR4", cur * 4).replace("CUR3", cur * 3).replace("CUR2", cur * 2).replace("CUR", cur)
+            .replace("HOODS", ", ".join(h["label"] for h in city.get("hoods", [])[:4]))
+            .replace("AREA_HELP", ", ".join(f'{a["code"]} {a["label"]}' for a in areas) + ", other for anywhere else" if areas
+                     else 'leave "" (this city has no areas)'))
 
 
 class OutOfQuota(Exception):
@@ -467,10 +484,11 @@ def parse_items(text):
     return j.get("items", []) if isinstance(j, dict) else []
 
 
-def clean_tag(item, cand):
+def clean_tag(item, cand, city):
     t = item.get("type")
-    boro = cand.get("boro") or item.get("boro")
-    if not item.get("known") or t not in ("dinner", "drinks", "late", "free") or boro not in ("M", "BK", "Q"):
+    codes = [a["code"] for a in city.get("areas") or []]
+    boro = (cand.get("boro") or item.get("boro") or "") if codes else ""
+    if not item.get("known") or t not in ("dinner", "drinks", "late", "free") or (codes and boro not in codes):
         return {"skip": True}
     tags = [x for x in item.get("tags", []) if x in TAGS]
     if cand.get("rooftop") and "rooftop" not in tags:
@@ -487,7 +505,7 @@ def clean_tag(item, cand):
             "web": cand.get("website", "")[:120] if re.match(r"https?://", cand.get("website", ""), re.I) else ""}
 
 
-def tag_new(cands, cache):
+def tag_new(cands, cache, city, max_batches):
     todo = [c for cid, c in cands.items() if cid not in cache]
     # mix restaurants, bars and activities so every category grows each run; places with a website first
     def bucket(c):
@@ -495,15 +513,15 @@ def tag_new(cands, cache):
         return 0 if c["id"].startswith("nyc:") else 1 if k in ("bar", "pub", "biergarten", "nightclub") else 2
     groups = [sorted([c for c in todo if bucket(c) == g], key=lambda c: (not c.get("website"), not c.get("hours"))) for g in range(3)]
     todo = [c for trio in __import__("itertools").zip_longest(*groups) for c in trio if c]
-    log(f"to tag: {len(todo)} new places, up to {MAX_BATCHES} batches of {BATCH_SIZE} this run")
-    done = 0
-    for b in range(MAX_BATCHES):
+    log(f"to tag: {len(todo)} new places in {city['name']}, up to {max_batches} batches of {BATCH_SIZE} this run")
+    done, prompt = 0, prompt_for(city)
+    for b in range(max_batches):
         batch = todo[b * BATCH_SIZE:(b + 1) * BATCH_SIZE]
         if not batch:
             break
         lines = "\n".join(f"{c['id']} | {c['name']} | {c.get('kind', '')} | {c.get('cuisine', '')} | {c.get('addr', '')} | {c.get('boro', '')} | {c.get('hood', '')}" for c in batch)
         try:
-            items = parse_items(ai_call(PROMPT % (", ".join(CUISINES), ", ".join(TAGS)) + lines))
+            items = parse_items(ai_call(prompt + lines))
         except OutOfQuota as e:
             log("stopping, free AI limit reached for today:", e)
             break
@@ -513,7 +531,7 @@ def tag_new(cands, cache):
         by_id = {i.get("id"): i for i in items if isinstance(i, dict)}
         for c in batch:
             if c["id"] in by_id:
-                cache[c["id"]] = clean_tag(by_id[c["id"]], c)
+                cache[c["id"]] = clean_tag(by_id[c["id"]], c, city)
                 done += 1
         if b % 5 == 4:
             save_cache(cache)
@@ -544,28 +562,40 @@ def popularity(stats, name):
 
 
 # ---------------------------------------------------------------- main
-def curated_rows():
-    html = INDEX.read_text(encoding="utf-8")
-    raw = html.split("const RAW = `", 1)[1].split("`", 1)[0]
-    return [l.split("|") for l in raw.strip().splitlines() if "|" in l]
+CITY_ID = re.compile(r"^[a-z][a-z-]{1,23}$")
 
 
-def curated_names():
-    return [r[0] for r in curated_rows()]
+def load_cities():
+    """Every cities/<id>/city.json. Contributors add cities, so check the fields the pipeline relies on."""
+    cities = []
+    for p in sorted(CITIES.glob("*/city.json")):
+        if p.parent.is_symlink() or p.is_symlink():
+            sys.exit(f"{p}: city folders must be real folders, not links")
+        c = json.loads(p.read_text(encoding="utf-8"))
+        bbox = c.get("bbox")
+        if c.get("id") != p.parent.name or not CITY_ID.match(c["id"]) or not c.get("name"):
+            sys.exit(f"{p}: id must match its folder name (lowercase letters and dashes) and name is required")
+        if not (isinstance(bbox, list) and len(bbox) == 4 and all(isinstance(x, (int, float)) for x in bbox)
+                and bbox[0] < bbox[2] and bbox[1] < bbox[3] and (bbox[2] - bbox[0]) * (bbox[3] - bbox[1]) < 1.0):
+            sys.exit(f"{p}: bbox must be [south, west, north, east] and cover a city, not a country")
+        cities.append(c)
+    return cities
 
 
-def curated_info(osm, locate):
-    """Coordinates, hours and needs for the hand picked spots, from the one OSM place with the same name in the
-    same borough. Skipped when the match is ambiguous (several branches), so we never attach the wrong hours."""
+def curated_info(picks, osm, locate):
+    """Coordinates, hours and needs for the hand picked spots, from the one OSM place with the same name (in the
+    same area when the city has areas). Skipped when the match is ambiguous, so we never attach the wrong hours."""
     by_name = {}
     for o in osm:
         by_name.setdefault(norm(o["name"]), []).append(o)
     info = {}
-    for row in curated_rows():
-        name, hood, boro = row[0], row[2] if len(row) > 2 else "", row[3] if len(row) > 3 else ""
-        hits = [o for o in by_name.get(norm(name), []) if locate(o["lat"], o["lon"])[0] == boro]
-        if len(hits) > 1:
-            hits = [o for o in hits if hood and hood.split(" ")[0].lower() in locate(o["lat"], o["lon"])[1].lower()]
+    for row in picks:
+        name, hood, boro = row.get("n", ""), row.get("h", ""), row.get("b", "")
+        hits = by_name.get(norm(name), [])
+        if locate:
+            hits = [o for o in hits if locate(o["lat"], o["lon"])[0] == boro]
+            if len(hits) > 1:
+                hits = [o for o in hits if hood and hood.split(" ")[0].lower() in locate(o["lat"], o["lon"])[1].lower()]
         if len(hits) != 1:
             continue
         o = hits[0]
@@ -574,17 +604,19 @@ def curated_info(osm, locate):
     return info
 
 
-def main():
-    cache = json.loads(CACHE.read_text()) if CACHE.exists() else {}
-    curated = curated_names()
-    insp, osm, locate = fetch_inspections(), fetch_osm(), fetch_neighborhoods()
-    if len(insp) < 1000 or len(osm) < 1000 or locate.count < 150:
-        sys.exit(f"source data looks incomplete (inspections {len(insp)}, osm {len(osm)}, neighborhoods {locate.count}); keeping the old spots.json")
-    cands = build_candidates(insp, osm, curated, locate)
-    tag_new(cands, cache)
+def build_city(city, cache, stats, max_batches):
+    src = city.get("sources") or {}
+    picks = city.get("picks") or []
+    curated = [p.get("n", "") for p in picks]
+    insp = fetch_inspections() if src.get("restaurants") == "nyc-inspections" else []
+    locate = fetch_neighborhoods() if src.get("neighborhoods") == "nyc-nta" else None
+    osm = fetch_osm(city)
+    if len(osm) < 500 or (src.get("restaurants") and len(insp) < 1000) or (locate and locate.count < 150):
+        raise RuntimeError(f"source data looks incomplete (osm {len(osm)}, inspections {len(insp)}); keeping the old spots")
+    cands = build_candidates(city, insp, osm, curated, locate)
+    tag_new(cands, cache, city, max_batches)
     save_cache(cache)
 
-    stats = fetch_stats()
     live, seen = [], set()
     for cid, c in cache.items():
         if c.get("skip") or cid not in cands:   # not found this run = closed or no longer listed
@@ -593,18 +625,38 @@ def main():
         if k in seen:
             continue
         seen.add(k)
-        # official neighborhood beats the AI's guess; booking info is refreshed from OSM every run
+        # official neighborhood beats the AI's guess; booking, hours and needs are refreshed from OSM every run
         fresh = {k: cands[cid].get(k) for k in ("rsv", "hrs", "x") if cands[cid].get(k)}
         live.append({**c, "h": cands[cid].get("hood") or c["h"], **fresh, "pop": popularity(stats, c["n"])})
-    cur_pop = {n: popularity(stats, n) for n in curated if popularity(stats, n)}
     live.sort(key=lambda s: (s["t"], s["n"]))
-    cur_info = curated_info(osm, locate)
+    cur_pop = {n: popularity(stats, n) for n in curated if popularity(stats, n)}
+    cur_info = curated_info(picks, osm, locate)
     log(f"hand picked spots matched on OpenStreetMap: {len(cur_info)} of {len(curated)}")
-    OUT.write_text(json.dumps({"updated": dt.date.today().isoformat(), "count": len(live), "spots": live,
+    out = CITIES / city["id"] / "spots.json"
+    out.write_text(json.dumps({"updated": dt.date.today().isoformat(), "count": len(live), "spots": live,
                                "curatedPop": cur_pop, "curatedInfo": cur_info}, ensure_ascii=False, separators=(",", ":")))
     by_type = {t: sum(1 for s in live if s["t"] == t) for t in ("dinner", "drinks", "late", "free")}
-    log(f"spots.json: {len(live)} live spots {by_type}, {sum(1 for c in cache.values() if c.get('skip'))} skipped, "
-        f"{len([c for c in cands if c not in cache])} still waiting to be tagged")
+    log(f"{city['id']}/spots.json: {len(live)} live spots {by_type}, {len([c for c in cands if c not in cache])} still waiting to be tagged")
+
+
+def main():
+    cache = json.loads(CACHE.read_text()) if CACHE.exists() else {}
+    cities = load_cities()
+    only = os.environ.get("CITY")
+    if only:
+        cities = [c for c in cities if c["id"] == only]
+    stats = fetch_stats()
+    per_city = max(1, MAX_BATCHES // max(1, len(cities)))  # share the free daily AI quota between cities
+    failed = []
+    for city in cities:
+        log(f"=== {city['name']} ===")
+        try:
+            build_city(city, cache, stats, per_city)
+        except Exception as e:  # one city's source being down shouldn't stop the others
+            log(f"{city['id']} failed, keeping its old spots:", e)
+            failed.append(city["id"])
+    if failed and len(failed) == len(cities):
+        sys.exit("every city failed")
 
 
 if __name__ == "__main__":
