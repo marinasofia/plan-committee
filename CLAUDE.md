@@ -20,7 +20,7 @@ AI agents argue in a group chat and agree on one real NYC date night or friends 
 
 Act as a senior security engineer and pen test every change before it is committed. Run the security-auditor agent too, and fix or report what you find before pushing. Check at least:
 
-* Secrets: no keys, tokens, emails or personal paths in code, data files, logs or git history. The Gemini key goes in the URL (`?key=`), so never log request URLs or raw error bodies that could echo it.
+* Secrets: no keys, tokens, emails or personal paths in code, data files, logs or git history. Send the Gemini key in the `x-goog-api-key` header, never in the URL, and never log request headers or raw error bodies that could echo a key.
 * XSS in `index.html`: share links (`#j=`, `#r=`, `#p=`), `spots.json`, OpenStreetMap data and AI replies are all untrusted. Everything put into `innerHTML` goes through `esc()`, links through `safeUrl()` (http and https only), colors through `safeColor()`. Users' AI keys live in localStorage, so any XSS steals them.
 * GitHub Actions: no `pull_request_target` or comment triggers, least `permissions`, no `${{ }}` of untrusted input inside `run:`, secrets only in the step that needs them.
 * Worker (`worker/`): validate and cap input, parameterized D1 queries, nothing a stranger posts can reach the page as HTML.

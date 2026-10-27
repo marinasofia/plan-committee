@@ -591,7 +591,7 @@ const shortModel=m=>(m||"").split("/").pop().replace(/:free$/,"").replace(/-vers
 async function geminiModels(){
   if(cfg.gModel)return [cfg.gModel];
   if(gemModels&&gemModels.length)return gemModels;
-  const r=await fetch(`${GBASE}/models?pageSize=200&key=${encodeURIComponent(cfg.gKey)}`).catch(()=>{throw new PErr("net","Can't reach Gemini")});
+  const r=await fetch(`${GBASE}/models?pageSize=200`,{headers:{"x-goog-api-key":cfg.gKey}}).catch(()=>{throw new PErr("net","Can't reach Gemini")});
   if(!r.ok)throw new PErr("auth","Gemini key didn't work");
   const j=await r.json();const ver=n=>parseFloat((n.match(/gemini-(\d+(?:\.\d+)?)/)||[0,0])[1]);
   const ok=(j.models||[]).filter(m=>(m.supportedGenerationMethods||[]).includes("generateContent")).map(m=>m.name.replace("models/",""))
@@ -634,7 +634,7 @@ async function callProvider(p,system,user,json){
   const models=await geminiModels();
   while(models.length){
     const model=models[0];
-    const r=await fetch(`${GBASE}/models/${model}:generateContent?key=${encodeURIComponent(cfg.gKey)}`,{method:"POST",headers:{"Content-Type":"application/json"},
+    const r=await fetch(`${GBASE}/models/${model}:generateContent`,{method:"POST",headers:{"Content-Type":"application/json","x-goog-api-key":cfg.gKey},
       body:JSON.stringify({systemInstruction:{parts:[{text:system}]},contents:[{role:"user",parts:[{text:user}]}],generationConfig:{temperature:json?0.4:1.0,...(json?{responseMimeType:"application/json"}:{})}})})
       .catch(()=>{throw new PErr("net","Can't reach Gemini")});
     if(r.ok){const j=await r.json();const t=(j.candidates?.[0]?.content?.parts||[]).filter(x=>!x.thought).map(x=>x.text||"").join("").trim();
@@ -703,7 +703,8 @@ $("testKeys").onclick=async()=>{
 };
 
 /* quick key: paste any key, we work out whose it is */
-const KEY_TYPES=[[/^AIza[\w-]{30,}$/,"gemini","gKey","Gemini"],[/^gsk_\w{20,}$/,"groq","qKey","Groq"],[/^sk-or-[\w-]{20,}$/,"openrouter","oKey","OpenRouter"]];
+/* Google has two key formats (AIza… and the newer AQ.…). Anything unrecognized is tried on each service in turn. */
+const KEY_TYPES=[[/^(AIza[\w-]{30,}|AQ\.[\w.-]{20,})$/,"gemini","gKey","Gemini"],[/^gsk_\w{20,}$/,"groq","qKey","Groq"],[/^sk-or-[\w-]{20,}$/,"openrouter","oKey","OpenRouter"]];
 function openQuickKey(){$("qkInput").value="";qkSay("It stays in this browser and only goes to Google or Groq.");$("quickKey").classList.remove("hide")}
 function qkSay(t,cls){const el=$("qkStatus");el.textContent=t;el.style.color=cls==="bad"?"#b4413c":cls==="ok"?"var(--ok)":""}
 $("closeQuick").onclick=()=>$("quickKey").classList.add("hide");
@@ -713,14 +714,19 @@ async function quickKeyGo(){
   if(qkBusy)return;
   const k=$("qkInput").value.trim().replace(/\s+/g,"");
   if(!k){qkSay("Paste your key first.","bad");return}
-  const t=KEY_TYPES.find(([re])=>re.test(k));
-  if(!t){qkSay("That doesn't look like a Gemini (AIza…) or Groq (gsk_…) key. Copy it again.","bad");return}
-  const [,p,field,name]=t;
-  qkBusy=true;$("qkGo").disabled=true;qkSay(`Checking your ${name} key…`);
-  const prev=cfg[field];cfg[field]=k;gemModels=null;groqPick=null;delete dead[p];delete cool[p];
-  try{await callProvider(p,"Reply with the single word: ok","ok?",false)}
-  catch(e){if(e.kind!=="quota"){cfg[field]=prev;qkSay(e.kind==="auth"?`${name} didn't accept that key. Copy it again.`:e.message,"bad");qkBusy=false;$("qkGo").disabled=false;return}}
-  store.set("cfg2",cfg);qkSay(`${name} key works.`,"ok");qkBusy=false;$("qkGo").disabled=false;
+  if(k.length<20||/\s/.test(k)){qkSay("That looks too short to be a key. Copy it again.","bad");return}
+  const known=KEY_TYPES.find(([re])=>re.test(k));
+  qkBusy=true;$("qkGo").disabled=true;
+  let ok=null,lastMsg="";
+  for(const [,p,field,name] of known?[known]:KEY_TYPES){
+    qkSay(`Checking your key with ${name}…`);
+    const prev=cfg[field];cfg[field]=k;gemModels=null;groqPick=null;delete dead[p];delete cool[p];
+    try{await callProvider(p,"Reply with the single word: ok","ok?",false);ok=name;break}
+    catch(e){if(e.kind==="quota"){ok=name;break}cfg[field]=prev;lastMsg=e.kind==="auth"?`${name} didn't accept that key. Copy it again.`:e.message}
+  }
+  qkBusy=false;$("qkGo").disabled=false;
+  if(!ok){qkSay(known?lastMsg:"Neither Gemini nor Groq accepted that key. Copy it again.","bad");return}
+  store.set("cfg2",cfg);qkSay(`${ok} key works.`,"ok");
   $("quickKey").classList.add("hide");renderSetup();start();
 }
 $("qkGo").onclick=quickKeyGo;
