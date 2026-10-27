@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>The Plan Committee</title>
 <meta name="description" content="Your friends pick what they want. AI agents argue for each of you in a group chat and agree on one NYC plan.">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-s6M2gJlRuAi6Jap/M4AisxBozK/u7/qUty5n+DBrANc='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https:; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-Jk1SIo1Fk4pAxYLGEvKlL8ueUDLJIcyoBTdLhzz/QnE='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https:; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
 <meta name="referrer" content="no-referrer">
 <meta name="theme-color" content="#fbf9f6">
 <link rel="manifest" href="manifest.webmanifest">
@@ -157,6 +157,7 @@ button,input,select,textarea{font:inherit;color:inherit}
 .obart{display:flex;gap:6px;margin-bottom:26px}.obart .av{width:54px;height:54px;font-size:20px;margin-left:-14px;border:3px solid var(--paper)}.obart .av:first-child{margin-left:0}
 .obi{width:54px;height:54px;border-radius:50%;display:grid;place-items:center;background:var(--accent-soft);color:var(--accent);font-size:24px;font-weight:600}
 .obdots{display:flex;gap:6px;justify-content:center;margin-top:10px}.obdots i{width:7px;height:7px;border-radius:50%;background:var(--line)}.obdots i.on{background:var(--ink)}
+.hop{font-size:11px;color:var(--muted);padding:0 0 0 62px;margin:-4px 0 4px;font-family:"DM Mono",monospace}
 .walkin{font-size:11.5px;color:var(--muted);padding:3px 4px}
 .who span{font-size:12.5px;background:#fff;border:1px solid var(--line);border-radius:99px;padding:4px 10px}
 </style>
@@ -194,11 +195,12 @@ button,input,select,textarea{font:inherit;color:inherit}
       <div class="toggle"><div><div class="tt">The Wallet</div><div class="ts">a referee agent that guards the budget</div></div><button class="sw" id="walletSw" type="button" aria-label="The Wallet"></button></div>
     </div>
 
-    <div class="sec"><span class="lab">When</span><input class="field" id="when" value="Saturday night"></div>
+    <div class="sec"><span class="lab">When</span><div class="btnrow"><input class="field" id="when" value="Saturday night" style="flex:1.4"><select class="field" id="startAt" style="flex:1" aria-label="Start time"></select></div></div>
     <div class="sec"><span class="lab">Neighborhood</span><div class="chips" id="hoodChips"></div></div>
+    <div class="sec"><span class="lab">Anyone need</span><div class="chips" id="needChips"></div></div>
 
     <button class="cta" id="startBtn" type="button">Start the group chat</button>
-    <p class="small">Places from hand picks, NYC Open Data and © OpenStreetMap contributors. Check hours before you go.</p>
+    <p class="small">Places from hand picks, NYC Open Data and © OpenStreetMap contributors. Weather by Open-Meteo. Check hours before you go.</p>
     <p class="small" id="keyHint">Runs on a free Gemini or Groq key. You'll get one in about a minute when you start.</p>
     <p class="small">Keys and picks stay on this device and go only to the AI you chose. Google's free Gemini tier may use prompts to improve its models.</p>
     <p class="small" id="installHint" style="display:none"><a href="#" id="installLink">Install the app</a> so it opens like an app and keeps your key.</p>
@@ -425,16 +427,25 @@ Domino Park|f|Williamsburg|BK|0||views lowkey|waterfront park, skyline views
 Prospect Park|f|Park Slope|BK|0||lowkey|Brooklyn's big park
 Gantry Plaza State Park|f|Long Island City|Q|0||views romantic|Manhattan skyline across the river
 `;
-const SPOTS = RAW.trim().split("\n").map(l=>{const [n,t,h,b,p,c,f,v]=l.split("|");return {n,t:{d:"dinner",k:"drinks",l:"late",f:"free"}[t],h,b,p:+p,c,f:f.split(" ").filter(Boolean),v,cur:true}});
+const SPOTS = RAW.trim().split("\n").map(l=>{const [n,t,h,b,p,c,f,v]=l.split("|");return {n,t:{d:"dinner",k:"drinks",l:"late",f:"free"}[t],h,b,p:+p,c,f:f.split(" ").filter(Boolean),v,x:[],cur:true}});
 const CURATED_COUNT=SPOTS.length;
 /* Optional: URL of your Cloudflare Worker (see worker/README). Leave empty to turn usage counts off. */
 const STATS_URL="";
 function track(kind,names){if(!STATS_URL||MOCK||!names?.length)return;try{fetch(STATS_URL.replace(/\/$/,"")+"/e",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({kind,names:names.slice(0,4)}),keepalive:true}).catch(()=>{})}catch(e){}}
 /* More spots, added automatically every day by the GitHub Action (pipeline/build_spots.py) */
+/* coordinates, opening hours, needs and booking info come from spots.json: only accept well formed values */
+const NEED_KEYS=["wheel","nowheel","vegan","veg","gf"];
+function extra(s,src){
+  const num=v=>typeof v==="number"&&isFinite(v);
+  s.lat=num(src.lat)?src.lat:undefined;s.lon=num(src.lon)?src.lon:undefined;
+  s.hrs=Array.isArray(src.hrs)&&src.hrs.length===7&&src.hrs.every(d=>Array.isArray(d)&&d.every(x=>Array.isArray(x)&&x.length===2&&x.every(num)))?src.hrs:undefined;
+  s.x=Array.isArray(src.x)?src.x.filter(v=>NEED_KEYS.includes(v)):[];
+  s.rsv=typeof src.rsv==="string"?src.rsv:"";return s}
 async function loadMoreSpots(){
   try{const r=await fetch("spots.json",{cache:"no-cache"});if(!r.ok)return;const j=await r.json();
     const have=new Set(SPOTS.map(s=>s.n.toLowerCase().replace(/[^a-z0-9]/g,"")));
-    for(const s of j.spots||[]){const k=s.n.toLowerCase().replace(/[^a-z0-9]/g,"");if(have.has(k)||!s.t)continue;have.add(k);SPOTS.push({...s,f:s.f||[],c:s.c||"",h:s.h||"",v:s.v||""})}
+    for(const s of j.spots||[]){const k=s.n.toLowerCase().replace(/[^a-z0-9]/g,"");if(have.has(k)||!s.t)continue;have.add(k);SPOTS.push(extra({...s,f:s.f||[],c:s.c||"",h:s.h||"",v:s.v||""},s))}
+    for(const [n,info] of Object.entries(j.curatedInfo||{})){const c=SPOTS.find(s=>s.cur&&s.n===n);if(c)extra(c,info)}
     for(const [n,pop] of Object.entries(j.curatedPop||{})){const c=SPOTS.find(s=>s.cur&&s.n===n);if(c)c.pop=pop}
   }catch(e){}
 }
@@ -447,6 +458,9 @@ const VIBES=["romantic","cozy","fancy","chaotic","artsy","lowkey","dancing","ner
 const MUSTS=[["rooftop","rooftop"],["views","views"],["live music","music"],["photo moment","photo"],["dessert","dessert"],["late night","late"]];
 const DEALS=[["no lines","wait"],["nothing loud","loud"],["no cash only","cash"],["stay in Manhattan","onlyM"],["stay in Brooklyn","onlyBK"],["home by 11","early"]];
 const PERS={dramatic:"Dramatic and theatrical, everything is life or death.",stubborn:"Stubborn, rarely gives in, but caves for a good trade.",chill:"Chill and easygoing, but has one hill to die on.","the mediator":"The peacemaker who finds the compromise.",chaotic:"Chaotic, pitches wild ideas, very funny."};
+const NEEDS=[["wheelchair access","wheel"],["vegan","vegan"],["vegetarian","veg"],["gluten free","gf"]];
+const STARTS=[1020,1080,1110,1140,1170,1200,1260,1320];
+const fmtMin=m=>{m=((m%1440)+1440)%1440;if(!m)return "midnight";const h=Math.floor(m/60),mm=m%60;return `${h%12||12}${mm?":"+String(mm).padStart(2,"0"):""} ${h<12?"am":"pm"}`};
 const HOODS=["Anywhere","West Village","SoHo / Nolita","East Village","Lower East Side","Williamsburg","Midtown","Chelsea","Brooklyn","Queens"];
 const COLORS=["#c8b6e2","#b9d3c2","#f4c3b0","#a9c8e8","#e7c9a0","#d7b9d5"];
 const WALLET_COLOR="#f1d58a";
@@ -470,6 +484,9 @@ const store={get(k,d){try{const v=localStorage.getItem("pc_"+k);return v===null?
 const params=new URLSearchParams(location.search);
 const MOCK=params.has("mock");
 let plan=store.get("plan",null)||defaultPlan(params.get("mode")==="girls"?"girls":"date");
+/* plans also arrive from share links, so clamp the fields we compute with */
+function fixPlan(){plan.when=String(plan.when??"Saturday night").slice(0,60)||"Saturday night";plan.start=STARTS.includes(+plan.start)?+plan.start:1140;plan.needs=(Array.isArray(plan.needs)?plan.needs:[]).filter(v=>NEEDS.some(n=>n[1]===v))}
+fixPlan();
 const savePlan=()=>store.set("plan",plan);
 let cfg={pool:"smart",gKey:"",gModel:"",qKey:"",qModel:"",oKey:"",oModel:"openrouter/free",cBase:"",cKey:"",cModel:"",...store.get("cfg2",{})};
 delete cfg.ol;delete cfg.olModel;delete cfg.olUrl;  /* Ollama support was removed */
@@ -500,6 +517,7 @@ function renderHead(){const ag=agentList();
   $("title").textContent=plan.mode==="girls"?"friends night committee":"date night committee";
   $("subtitle").textContent=`${ag.length} AI agents · 1 plan · 0 chill`}
 function renderSetup(){
+  fixPlan();
   document.querySelectorAll("#modeSeg button").forEach(b=>b.classList.toggle("on",b.dataset.mode===plan.mode));
   $("members").innerHTML=plan.members.map((m,i)=>`<div class="member" data-i="${i}"><div class="av" style="background:${COLORS[i%COLORS.length]}">${initials(m.n)}</div>
     <div><div class="mn">${esc(m.n)}</div><div class="ms">${esc(summary(m))}</div></div><button class="x" data-x="${i}" type="button" aria-label="remove">×</button></div>`).join("");
@@ -507,6 +525,8 @@ function renderSetup(){
   $("members").querySelectorAll("[data-x]").forEach(b=>b.onclick=()=>{if(plan.members.length<=1)return;plan.members.splice(+b.dataset.x,1);savePlan();renderSetup()});
   $("walletSw").classList.toggle("on",plan.wallet);
   $("when").value=plan.when;
+  $("startAt").innerHTML=STARTS.map(m=>`<option value="${m}" ${m===plan.start?"selected":""}>starts ${fmtMin(m)}</option>`).join("");
+  chips("needChips",NEEDS,v=>plan.needs.includes(v),v=>{plan.needs=tog(plan.needs,v);savePlan()});
   chips("hoodChips",HOODS,v=>plan.hood===v,v=>{plan.hood=v;savePlan()});
   $("addHere").style.display=plan.members.length>=6?"none":"";
   $("startBtn").textContent=`Start the group chat (${agentList().length} agents)`;
@@ -516,6 +536,7 @@ function renderSetup(){
 document.querySelectorAll("#modeSeg button").forEach(b=>b.onclick=()=>{if(plan.mode===b.dataset.mode)return;plan=defaultPlan(b.dataset.mode);savePlan();renderSetup()});
 $("walletSw").onclick=()=>{plan.wallet=!plan.wallet;savePlan();renderSetup()};
 $("when").oninput=()=>{plan.when=$("when").value;savePlan()};
+$("startAt").onchange=()=>{plan.start=+$("startAt").value;savePlan()};
 $("addHere").onclick=()=>{plan.members.push(member(""));savePlan();openEditor(plan.members.length-1,true)};
 $("inviteBtn").onclick=()=>invite();
 
@@ -556,7 +577,7 @@ async function unpack(str){const bytes=b64u.dec(str.slice(1));
   const raw=str[0]==="z"?new Uint8Array(await new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream("deflate-raw"))).arrayBuffer()):bytes;
   return JSON.parse(new TextDecoder().decode(raw))}
 const baseUrl=()=>location.href.split("#")[0].split("?")[0];
-const planPayload=()=>({id:plan.id,mode:plan.mode,when:plan.when,hood:plan.hood,wallet:plan.wallet,members:plan.members});
+const planPayload=()=>({id:plan.id,mode:plan.mode,when:plan.when,start:plan.start,needs:plan.needs,hood:plan.hood,wallet:plan.wallet,members:plan.members});
 async function shareOut(title,text,url,btn,label){
   if(location.protocol==="file:")sys("Heads up: links only open for friends once this page is hosted online, like on GitHub Pages.");
   try{if(navigator.share){await navigator.share({title,text,url});return}}catch(e){if(e.name==="AbortError")return}
@@ -605,23 +626,53 @@ function hoodMatch(s){const h=plan.hood;if(h==="Anywhere")return false;if(h==="B
 function personScore(s,m){let sc=0;
   if(s.t==="dinner"&&(m.c.includes("anything")||m.c.includes(s.c)||(m.c.includes("veg")&&s.f.includes("veg"))))sc+=3;
   sc+=1.5*m.v.filter(v=>s.f.includes(v)).length+2*m.m.filter(v=>s.f.includes(v)).length;return sc}
+/* ---- opening hours: s.hrs is Mon..Sun lists of [open, close] minutes, close may pass midnight ---- */
+function isOpen(s,date,min){ // true, false, or null when we don't know
+  if(!s.hrs)return null;const d=(date.getDay()+6)%7, prev=(d+6)%7;
+  return s.hrs[d].some(([a,b])=>min>=a&&min<b)||s.hrs[prev].some(([a,b])=>b>1440&&min+1440<b)}
+function closesAt(s,date,min){if(!s.hrs)return null;const d=(date.getDay()+6)%7, prev=(d+6)%7;
+  const h=s.hrs[d].find(([a,b])=>min>=a&&min<b)||s.hrs[prev].map(([a,b])=>[a-1440,b-1440]).find(([a,b])=>min>=a&&min<b);return h?h[1]:null}
+const SLOT={dinner:0,drinks:120,late:210,free:180};  // minutes after the start time
+/* ---- distance ---- */
+function km(a,b){if(a?.lat==null||b?.lat==null)return null;const r=Math.PI/180,dl=(b.lat-a.lat)*r,dn=(b.lon-a.lon)*r;
+  const x=Math.sin(dl/2)**2+Math.cos(a.lat*r)*Math.cos(b.lat*r)*Math.sin(dn/2)**2;return 12742*Math.asin(Math.sqrt(x))}
+function travel(a,b){const d=km(a,b);if(d==null)return "";if(d<0.15)return "right next door";
+  return d<=2?`${Math.max(2,Math.round(d*1.3/4.8*60))} min walk`:`about ${Math.round(10+d*3)} min by subway or cab`}
+/* ---- weather (Open-Meteo: free, no key; we only send NYC's coordinates and the date) ---- */
+let WX=null;
+async function fetchWeather(date,startMin){WX=null;
+  try{const day=`${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,"0")}-${String(date.getDate()).padStart(2,"0")}`;
+    const r=await fetch(`https://api.open-meteo.com/v1/forecast?latitude=40.73&longitude=-73.99&hourly=temperature_2m,precipitation_probability&temperature_unit=fahrenheit&timezone=America%2FNew_York&start_date=${day}&end_date=${day}`,{signal:AbortSignal.timeout(4000)});
+    if(!r.ok)return;const h=(await r.json()).hourly||{};const i=Math.min(23,Math.floor(startMin/60)),win=[i,i+1,i+2,i+3].filter(k=>k<24);
+    const rain=Math.max(...win.map(k=>+h.precipitation_probability?.[k]||0)),temp=Math.round(+h.temperature_2m?.[i]);
+    if(isFinite(rain)&&isFinite(temp))WX={rain:Math.round(rain),temp,bad:rain>=50||temp<40,nice:rain<20&&temp>=62&&temp<=86}}catch(e){}}
+const OUTDOOR=s=>s.t==="free"||s.f.includes("rooftop");
 function shortlist(){
   const C=constraints();
-  const ok=(s,strict)=>{if(s.p>C.maxB+(strict?0:1))return false;if(!strict)return true;
+  const base=nightDate(plan.when),needs=plan.needs;
+  const slotOk=s=>{const m=plan.start+(SLOT[s.t]||0);return isOpen(s,new Date(base.getTime()+Math.floor(m/1440)*864e5),m%1440)!==false};
+  const ok=(s,strict)=>{if(!slotOk(s))return false;if(needs.includes("wheel")&&s.x.includes("nowheel"))return false;
+    if(s.p>C.maxB+(strict?0:1))return false;if(!strict)return true;
     if(C.deals.has("wait")&&s.f.includes("wait"))return false;if(C.deals.has("loud")&&s.f.includes("loud"))return false;
     if(C.deals.has("cash")&&s.f.includes("cash"))return false;if(C.onlyM&&s.b!=="M")return false;if(C.onlyBK&&s.b!=="BK")return false;return true};
   const recent=hist.slice(-24);
-  const score=s=>plan.members.reduce((a,m)=>a+personScore(s,m),0)+(hoodMatch(s)?4:0)+(faves.includes(s.n)?2:0)+(s.cur?1:0)+(s.pop||0)-(recent.includes(s.n)&&!faves.includes(s.n)?6:0)+Math.random()*2.5;
+  const needScore=s=>needs.reduce((a,n)=>a+(s.x.includes(n)||(n==="veg"&&s.f.includes("veg"))?(n==="wheel"||s.t==="dinner"?5:0):0),0);
+  const wxScore=s=>!WX||!OUTDOOR(s)?0:WX.bad?-6:WX.nice?2:0;
+  let anchor=null;  // keep the night in one area: everything is scored by distance to the best dinner pick
+  const near=s=>{const d=km(anchor,s);return d==null?0:d<1.5?6:d<3?3:d<5?0:-6};
+  const score=s=>plan.members.reduce((a,m)=>a+personScore(s,m),0)+(hoodMatch(s)?4:0)+(faves.includes(s.n)?2:0)+(s.cur?1:0)+(s.pop||0)-(recent.includes(s.n)&&!faves.includes(s.n)?6:0)
+    +needScore(s)+wxScore(s)+(anchor?near(s):0)+Math.random()*2.5;
   const pick=(t,k)=>{let pool=SPOTS.filter(s=>s.t===t&&ok(s,true));if(pool.length<Math.min(k,3))pool=SPOTS.filter(s=>s.t===t&&ok(s,false));
     const ranked=pool.map(s=>({s,sc:score(s)})).sort((a,b)=>b.sc-a.sc).map(x=>x.s);
     // keep a few slots for newer auto-added spots so the list keeps discovering new places
     const fresh=ranked.filter(s=>!s.cur).slice(0,Math.floor(k/3));
     return [...ranked.filter(s=>!fresh.includes(s)).slice(0,k-fresh.length),...fresh]};
-  const list=[...pick("dinner",6),...pick("drinks",5),...pick("late",4),...pick("free",3)];
+  const dinners=pick("dinner",6);anchor=dinners.find(s=>s.lat!=null)||null;
+  const list=[...dinners,...pick("drinks",5),...pick("late",4),...pick("free",3)];
   for(let i=list.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[list[i],list[j]]=[list[j],list[i]]}
   return {list,C};
 }
-const spotLine=s=>`${s.n} | ${s.t} | ${s.h} | ${PRICE[s.p]} | ${s.v}`;
+const spotLine=s=>`${s.n} | ${s.t} | ${s.h} | ${PRICE[s.p]} | ${s.v}${s.x.includes("wheel")?" | wheelchair ok":""}${s.x.includes("vegan")?" | vegan options":""}`;
 function norm(s){return (s||"").toLowerCase().replace(/[^a-z0-9]/g,"")}
 function findSpot(n){const k=norm(n);if(!k)return null;return SPOTS.find(s=>norm(s.n)===k)||SPOTS.find(s=>k.includes(norm(s.n))||(norm(s.n).includes(k)&&k.length>4))}
 
@@ -782,7 +833,10 @@ $("qkInput").addEventListener("paste",()=>setTimeout(quickKeyGo,50));
 
 /* ===================== the agents ===================== */
 let transcript=[], agents=[], SL=null, busy=false, lastPlan=null, round=0;
-function brief(){const C=SL.C;return `Plan: ${plan.when} in NYC. Neighborhood preference: ${plan.hood}. Group max budget: ${PRICE[C.maxB]} per place.${C.early?" Someone must be home by 11pm.":""}`}
+function brief(){const C=SL.C;return `Plan: ${plan.when} in NYC, starting at ${fmtMin(plan.start)}. Neighborhood preference: ${plan.hood}. Group max budget: ${PRICE[C.maxB]} per place.${C.early?" Someone must be home by 11pm.":""}`
+  +(plan.needs.length?` The group needs: ${plan.needs.map(v=>labelOf(NEEDS,v)).join(", ")}.`:"")
+  +(WX?` Forecast: ${WX.temp}°F, ${WX.rain}% chance of rain${WX.bad?", so outdoor spots and rooftops are a bad idea":WX.nice?", perfect for outdoors":""}.`:"")
+  +" Keep the stops close to each other."}
 function personaFor(a){
   if(a.wallet)return `You are The Wallet, the group's shared bank account, personified. Dry humor. You guard the budget (max ${PRICE[SL.C.maxB]} per place), call out pricey picks, push cheap and free stops, and you mediate.`;
   return `You are the AI agent for ${a.n}. Personality: ${PERS[a.ps]||PERS.chill}
@@ -818,7 +872,7 @@ async function makePlan(){
   const sys=`You turn a group chat into a final night out plan. Only use places from this list, exact names:\n${SL.list.map(spotLine).join("\n")}\nReturn only JSON.`;
   const user=`${brief()}\n\nGROUP CHAT:\n${chatText()}\n\nReturn JSON exactly like:
 {"title":"a short cute name for the night, max 5 words","stops":[{"time":"7:30 pm","name":"exact place name","note":"why it won, max 12 words"}],"drama":0,"verdict":"one funny sentence about who won the argument"}
-Use 3 stops in order (dinner, drinks, then a late or free stop), realistic NYC times${SL.C.early?", ending by 10:30 pm":""}. drama is 0 to 100 for how much they fought.`;
+Use 3 stops in order (dinner, drinks, then a late or free stop), close to each other, first stop at ${fmtMin(plan.start)}, realistic NYC times${SL.C.early?", ending by 10:30 pm":""}. drama is 0 to 100 for how much they fought.`;
   let res;try{res=await llm(sys,user,true)}finally{hideTyping()}
   const p=parseJSON(res.text);
   p.stops=(p.stops||[]).map(s=>({...s,spot:findSpot(s.name)})).filter(s=>s.spot).slice(0,4);
@@ -856,14 +910,19 @@ const reserve=s=>BOOKING.test(s.rsv||"")?esc(s.rsv):"https://www.google.com/sear
 function routeUrl(stops){const q=s=>encodeURIComponent(s.spot.n+", New York, NY");
   let u="https://www.google.com/maps/dir/?api=1&origin="+q(stops[0])+"&destination="+q(stops[stops.length-1]);
   if(stops.length>2)u+="&waypoints="+stops.slice(1,-1).map(q).join("%7C");return u}
+function stopInfo(s,p){const base=nightDate(p.when||plan.when),t=parseTime(s.time,base),m=t.getHours()*60+t.getMinutes();
+  const open=isOpen(s.spot,t,m),until=open?closesAt(s.spot,t,m):null,bits=[];
+  if(open===false)bits.push("may be closed then, check hours");else if(until!=null)bits.push(`open till ${fmtMin(until)}`);
+  if(s.spot.x.includes("wheel"))bits.push("wheelchair ok");if(s.spot.x.includes("vegan"))bits.push("vegan options");if(s.spot.x.includes("gf"))bits.push("gluten free options");
+  return bits.length?" · "+bits.join(" · "):""}
 function renderTicket(p,names,count){
   const d=document.createElement("div");d.className="ticket";
   const drama=Math.max(0,Math.min(100,parseInt(p.drama)||0));
   d.innerHTML=`<div class="top"><div class="eyebrow">the plan · ${esc(p.when||plan.when)}</div><h2>${esc(p.title||"The Plan")}</h2>
     <div class="when">${names.map(esc).join(" · ")} · agreed after ${count} messages</div></div>
     <div class="perf"></div>
-    <div class="stops">${p.stops.map(s=>`<div class="stop"><div class="tm">${esc(s.time||"")}</div><div><div class="nm">${esc(s.spot.n)}</div>
-      <div class="meta">${esc(s.spot.h)} · ${PRICE[s.spot.p]}</div>${s.note?`<div class="why">${esc(s.note)}</div>`:""}
+    <div class="stops">${p.stops.map((s,i)=>`${i?`<div class="hop">${esc(travel(p.stops[i-1].spot,s.spot))}</div>`:""}<div class="stop"><div class="tm">${esc(s.time||"")}</div><div><div class="nm">${esc(s.spot.n)}</div>
+      <div class="meta">${esc(s.spot.h)} · ${PRICE[s.spot.p]||""}${esc(stopInfo(s,p))}</div>${s.note?`<div class="why">${esc(s.note)}</div>`:""}
       <div class="slinks"><a href="${gmapSpot(s.spot)}" target="_blank" rel="noopener">map</a>${safeUrl(s.spot.web)?`<a href="${safeUrl(s.spot.web)}" target="_blank" rel="noopener">site</a>`:""}${s.spot.t==="dinner"||s.spot.t==="drinks"?(s.spot.rsv==="walkin"?`<span class="walkin">walk in</span>`:`<a href="${reserve(s.spot)}" target="_blank" rel="noopener">reserve</a>`):""}<button type="button" data-fave="${esc(s.spot.n)}" class="${faves.includes(s.spot.n)?"on":""}">${faves.includes(s.spot.n)?"saved":"save"}</button></div></div></div>`).join("")}</div>
     <div class="drama"><div class="lbl"><span>drama meter</span><span>${drama}%</span></div><div class="meter"><span></span></div>${p.verdict?`<div class="verdict">${esc(p.verdict)}</div>`:""}</div>
     ${REPLAY?"":`<div class="tbtns"><button type="button" class="pri" data-a="send">Send to the group</button><button type="button" data-a="veto">Veto</button></div>`}
@@ -913,7 +972,7 @@ async function playReplay(R){
     if(a){showTyping(a);await sleep(450+Math.min(text.length*13,1300));hideTyping()}else await sleep(450);
     addBubble(a,text,via||null)}
   await sleep(500);
-  renderTicket({...R.p,when:R.w,stops:R.p.stops.map(([time,name,note])=>({time,note,spot:findSpot(name)})).filter(s=>s.spot)},humans,R.t.filter(m=>m[0]>=0).length);
+  renderTicket({...R.p,when:String(R.w??""),stops:R.p.stops.map(([time,name,note])=>({time:String(time??""),note,spot:findSpot(name)})).filter(s=>s.spot)},humans,R.t.filter(m=>m[0]>=0).length);
 }
 $("ownBtn").onclick=()=>{history.replaceState(null,"",location.pathname+location.search);REPLAY=null;$("app").classList.remove("replay");chatEl.innerHTML="";renderSetup();$("setup").classList.remove("hide")};
 
@@ -923,6 +982,7 @@ async function start(){
   if(!MOCK&&!providers().length){openQuickKey();return}
   plan.members=plan.members.filter(m=>m.n);savePlan();
   $("setup").classList.add("hide");chatEl.innerHTML="";transcript=[];lastPlan=null;lastWho=null;mi=0;
+  fixPlan();await fetchWeather(nightDate(plan.when),plan.start);
   SL=shortlist();
   agents=agentList().map(a=>({...a,favs:a.wallet?[]:SL.list.map(s=>({s,sc:personScore(s,a)+Math.random()})).sort((x,y)=>y.sc-x.sc).slice(0,3).map(x=>x.s.n)}));
   const now=new Date();const st=document.createElement("div");st.className="stamp";
@@ -930,7 +990,8 @@ async function start(){
   const rounds=agents.length<=3?3:2;
   const opener=`${plan.when.toLowerCase()} plans. ${plan.hood==="Anywhere"?"anywhere in the city":plan.hood}. everyone's agent is here. you have ${rounds} rounds to agree. go`;
   await sleep(350);transcript.push({who:"The human who started this chat",text:opener});addBubble(null,opener);
-  sys(`${SL.list.length} of ${SPOTS.length.toLocaleString()} NYC spots made the shortlist from everyone's picks`);
+  sys(`${SL.list.length} of ${SPOTS.length.toLocaleString()} NYC spots made the shortlist: open at your time, close together${plan.needs.length?", with what you need":""}`);
+  if(WX)sys(`Forecast for ${plan.when.toLowerCase()}: ${WX.temp}°F, ${WX.rain}% chance of rain.${WX.bad?" Outdoor spots and rooftops moved down the list.":WX.nice?" Good night for outdoors.":""}`);
   await go(rounds,1);
 }
 async function go(rounds,startAt){

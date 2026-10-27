@@ -174,6 +174,72 @@ def booking(t):
     return "walkin" if t.get("reservation") == "no" else ""
 
 
+DAYS = ["mo", "tu", "we", "th", "fr", "sa", "su"]
+
+
+def parse_hours(oh):
+    """OSM opening_hours -> 7 lists (Mon..Sun) of [open, close] minutes; close can pass 1440 (after midnight).
+    Handles the common forms ("Mo-Fr 11:00-23:00; Sa,Su 10:00-02:00; Mo off", "24/7"). Anything fancier
+    (holidays, months, sunset) returns None, which the app treats as "hours unknown", never as closed."""
+    oh = (oh or "").strip().lower()
+    if not oh or len(oh) > 300:
+        return None
+    if oh == "24/7":
+        return [[[0, 1440]] for _ in DAYS]
+    week = [None] * 7
+    for rule in re.split(r"\s*(?:;|\|\|)\s*", oh):
+        if not rule:
+            continue
+        if rule.startswith("ph"):
+            continue  # public holidays: ignore
+        m = re.fullmatch(r"((?:[a-z]{2}(?:-[a-z]{2})?)(?:\s*,\s*[a-z]{2}(?:-[a-z]{2})?)*)?\s*(.*)", rule)
+        days_part, times = m.group(1), m.group(2).strip()
+        days = set(range(7))
+        if days_part:
+            days = set()
+            for part in re.split(r"\s*,\s*", days_part):
+                a, _, b = part.partition("-")
+                if a not in DAYS or (b and b not in DAYS):
+                    return None
+                i, j = DAYS.index(a), DAYS.index(b or a)
+                days |= {(i + k) % 7 for k in range((j - i) % 7 + 1)}
+        if times in ("off", "closed"):
+            spans = []
+        else:
+            spans = []
+            for t in re.split(r"\s*,\s*", times):
+                tm = re.fullmatch(r"(\d{1,2}):(\d{2})\s*-\s*(\d{1,2}):(\d{2})|(\d{1,2}):(\d{2})\+", t)
+                if not tm:
+                    return None
+                if tm.group(5):
+                    start = int(tm.group(5)) * 60 + int(tm.group(6))
+                    end = start + 300  # "open end": assume five hours
+                else:
+                    start, end = int(tm.group(1)) * 60 + int(tm.group(2)), int(tm.group(3)) * 60 + int(tm.group(4))
+                    if end <= start:
+                        end += 1440
+                if start >= 1440 or end > 2880:
+                    return None
+                spans.append([start, end])
+        for d in days:
+            week[d] = spans
+    week = [w if w is not None else [] for w in week]
+    return week if any(week) else None  # "closed every day" is more likely a bad edit than a real place: treat as unknown
+
+
+def needs(t):
+    """Accessibility and diet info from OSM tags, only when the tag says yes."""
+    out = []
+    if t.get("wheelchair") == "yes":
+        out.append("wheel")
+    for tag, key in (("diet:vegan", "vegan"), ("diet:vegetarian", "veg"), ("diet:gluten_free", "gf")):
+        if t.get(tag) in ("yes", "only"):
+            out.append(key)
+    if t.get("wheelchair") == "no":
+        out.append("nowheel")
+    return out
+
+
 def fetch_osm():
     data = urllib.parse.urlencode({"data": OSM_QUERY}).encode()
     j = get_json(OVERPASS, data=data, timeout=300)
@@ -192,6 +258,7 @@ def fetch_osm():
             "cuisine": t.get("cuisine", ""), "website": t.get("website") or t.get("contact:website") or "",
             "hours": t.get("opening_hours", ""), "rooftop": t.get("rooftop") == "yes" or "rooftop" in t["name"].lower(),
             "music": t.get("live_music") == "yes" or kind == "music_venue", "rsv": booking(t),
+            "hrs": parse_hours(t.get("opening_hours")), "x": needs(t),
         })
     log(f"openstreetmap: {len(out)} named places")
     return out
@@ -261,7 +328,7 @@ def build_candidates(insp, osm, curated, locate):
             continue  # not notable enough to show up on OpenStreetMap with details
         used_osm.add(match["id"])
         cands[r["id"]] = {**r, "hood": locate(r["lat"], r["lon"])[1], "kind": match["kind"], "website": match["website"], "rooftop": match["rooftop"],
-                          "music": match["music"], "rsv": match["rsv"], "osm": match["id"]}
+                          "music": match["music"], "rsv": match["rsv"], "hrs": match["hrs"], "x": match["x"], "osm": match["id"]}
     # bars, venues, museums, parks: OpenStreetMap only (bars are not all in the inspection data)
     for o in osm:
         if o["id"] in used_osm or o["kind"] in ("restaurant", "cafe", "ice_cream"):
@@ -477,10 +544,34 @@ def popularity(stats, name):
 
 
 # ---------------------------------------------------------------- main
-def curated_names():
+def curated_rows():
     html = INDEX.read_text(encoding="utf-8")
     raw = html.split("const RAW = `", 1)[1].split("`", 1)[0]
-    return [l.split("|")[0] for l in raw.strip().splitlines() if "|" in l]
+    return [l.split("|") for l in raw.strip().splitlines() if "|" in l]
+
+
+def curated_names():
+    return [r[0] for r in curated_rows()]
+
+
+def curated_info(osm, locate):
+    """Coordinates, hours and needs for the hand picked spots, from the one OSM place with the same name in the
+    same borough. Skipped when the match is ambiguous (several branches), so we never attach the wrong hours."""
+    by_name = {}
+    for o in osm:
+        by_name.setdefault(norm(o["name"]), []).append(o)
+    info = {}
+    for row in curated_rows():
+        name, hood, boro = row[0], row[2] if len(row) > 2 else "", row[3] if len(row) > 3 else ""
+        hits = [o for o in by_name.get(norm(name), []) if locate(o["lat"], o["lon"])[0] == boro]
+        if len(hits) > 1:
+            hits = [o for o in hits if hood and hood.split(" ")[0].lower() in locate(o["lat"], o["lon"])[1].lower()]
+        if len(hits) != 1:
+            continue
+        o = hits[0]
+        info[name] = {k: v for k, v in {"lat": round(o["lat"], 5), "lon": round(o["lon"], 5), "hrs": o["hrs"],
+                                        "x": o["x"], "rsv": o["rsv"]}.items() if v}
+    return info
 
 
 def main():
@@ -503,11 +594,14 @@ def main():
             continue
         seen.add(k)
         # official neighborhood beats the AI's guess; booking info is refreshed from OSM every run
-        live.append({**c, "h": cands[cid].get("hood") or c["h"], "rsv": cands[cid].get("rsv", ""), "pop": popularity(stats, c["n"])})
+        fresh = {k: cands[cid].get(k) for k in ("rsv", "hrs", "x") if cands[cid].get(k)}
+        live.append({**c, "h": cands[cid].get("hood") or c["h"], **fresh, "pop": popularity(stats, c["n"])})
     cur_pop = {n: popularity(stats, n) for n in curated if popularity(stats, n)}
     live.sort(key=lambda s: (s["t"], s["n"]))
+    cur_info = curated_info(osm, locate)
+    log(f"hand picked spots matched on OpenStreetMap: {len(cur_info)} of {len(curated)}")
     OUT.write_text(json.dumps({"updated": dt.date.today().isoformat(), "count": len(live), "spots": live,
-                               "curatedPop": cur_pop}, ensure_ascii=False, separators=(",", ":")))
+                               "curatedPop": cur_pop, "curatedInfo": cur_info}, ensure_ascii=False, separators=(",", ":")))
     by_type = {t: sum(1 for s in live if s["t"] == t) for t in ("dinner", "drinks", "late", "free")}
     log(f"spots.json: {len(live)} live spots {by_type}, {sum(1 for c in cache.values() if c.get('skip'))} skipped, "
         f"{len([c for c in cands if c not in cache])} still waiting to be tagged")
