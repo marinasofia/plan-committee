@@ -226,10 +226,6 @@ button,input,select,textarea{font:inherit;color:inherit}
       <input class="field" id="cModel" placeholder="model">
       <p class="small">Any OpenAI compatible API.</p></div>
 
-    <div class="prov"><div class="ph">Local (Ollama) <span class="st" id="st-ollama"></span><button class="sw" id="olSw" type="button" aria-label="Use Ollama"></button></div>
-      <input class="field" id="olModel" placeholder="model" value="llama3.2">
-      <input class="field" id="olUrl" placeholder="http://localhost:11434" value="http://localhost:11434">
-      <p class="small">Free and unlimited on your own computer. Run <code>ollama pull llama3.2</code>, then start it with <code>OLLAMA_ORIGINS="*" ollama serve</code>.</p></div>
 
     <button class="cta" id="testKeys" type="button">Save and test</button>
   </div>
@@ -247,7 +243,7 @@ button,input,select,textarea{font:inherit;color:inherit}
       <input class="field" id="qkInput" type="password" placeholder="paste your key" autocomplete="off" spellcheck="false">
       <p class="small" id="qkStatus">It stays in this browser and only goes to Google or Groq.</p></div>
     <button class="cta" id="qkGo" type="button">Start the group chat</button>
-    <p class="small"><a href="#" id="qkMore">More options (OpenRouter, Ollama, other APIs)</a></p>
+    <p class="small"><a href="#" id="qkMore">More options (OpenRouter, other APIs)</a></p>
   </div>
 </div>
 
@@ -428,9 +424,10 @@ const params=new URLSearchParams(location.search);
 const MOCK=params.has("mock");
 let plan=store.get("plan",null)||defaultPlan(params.get("mode")==="girls"?"girls":"date");
 const savePlan=()=>store.set("plan",plan);
-let cfg={pool:"smart",gKey:"",gModel:"",qKey:"",qModel:"",oKey:"",oModel:"openrouter/free",cBase:"",cKey:"",cModel:"",ol:false,olModel:"llama3.2",olUrl:"http://localhost:11434",...store.get("cfg2",{})};
+let cfg={pool:"smart",gKey:"",gModel:"",qKey:"",qModel:"",oKey:"",oModel:"openrouter/free",cBase:"",cKey:"",cModel:"",...store.get("cfg2",{})};
+delete cfg.ol;delete cfg.olModel;delete cfg.olUrl;  /* Ollama support was removed */
 if(cfg.qModel==="llama-3.3-70b-versatile")cfg.qModel="";  /* retired by Groq */
-{const old=store.get("cfg",null);if(old&&!store.get("cfg2",null)){if(old.key)cfg.gKey=old.key;if(old.prov==="ollama")cfg.ol=true;store.set("cfg2",cfg)}}
+{const old=store.get("cfg",null);if(old&&!store.get("cfg2",null)){if(old.key)cfg.gKey=old.key;store.set("cfg2",cfg)}}
 let hist=store.get("hist",[]), faves=store.get("faves",[]);
 
 /* ===================== helpers ===================== */
@@ -584,11 +581,11 @@ function findSpot(n){const k=norm(n);if(!k)return null;return SPOTS.find(s=>norm
 /* ===================== AI providers: spread across keys, fail over ===================== */
 class PErr extends Error{constructor(kind,msg,wait){super(msg);this.kind=kind;this.wait=wait}}
 const GBASE="https://generativelanguage.googleapis.com/v1beta";
-const GAP={gemini:4300,groq:2300,openrouter:3300,custom:600,ollama:0};
+const GAP={gemini:4300,groq:2300,openrouter:3300,custom:600};
 const last={}, cool={}, dead={};
 let gemModels=null;
 function providers(){const p=[];
-  if(cfg.qKey)p.push("groq");if(cfg.gKey)p.push("gemini");if(cfg.oKey)p.push("openrouter");if(cfg.cKey&&cfg.cBase&&cfg.cModel)p.push("custom");if(cfg.ol)p.push("ollama");
+  if(cfg.qKey)p.push("groq");if(cfg.gKey)p.push("gemini");if(cfg.oKey)p.push("openrouter");if(cfg.cKey&&cfg.cBase&&cfg.cModel)p.push("custom");
   return p}
 const shortModel=m=>(m||"").split("/").pop().replace(/:free$/,"").replace(/-versatile|-instruct|-latest|-preview.*$/g,"").slice(0,24);
 async function geminiModels(){
@@ -633,13 +630,6 @@ async function callProvider(p,system,user,json){
   if(p==="groq")return openaiCall("https://api.groq.com/openai/v1",cfg.qKey,cfg.qModel||await groqModel(),system,user,json,"Groq");
   if(p==="openrouter")return openaiCall("https://openrouter.ai/api/v1",cfg.oKey,cfg.oModel||"openrouter/free",system,user,json,"OpenRouter");
   if(p==="custom")return openaiCall(cfg.cBase.replace(/\/$/,""),cfg.cKey,cfg.cModel,system,user,json,"Your API");
-  if(p==="ollama"){
-    const r=await fetch(`${cfg.olUrl.replace(/\/$/,"")}/api/chat`,{method:"POST",headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({model:cfg.olModel,stream:false,format:json?"json":undefined,options:{temperature:json?0.4:1},messages:[{role:"system",content:system},{role:"user",content:user}]})})
-      .catch(()=>{throw new PErr("net",'Can\'t reach Ollama. Start it with OLLAMA_ORIGINS="*" ollama serve')});
-    if(!r.ok)throw new PErr("other",`Ollama error ${r.status}. Did you run ollama pull ${cfg.olModel}?`);
-    return {text:(await r.json()).message.content.trim(),model:cfg.olModel};
-  }
   // gemini: walk through the free Flash models, dropping any that run out of daily quota
   const models=await geminiModels();
   while(models.length){
@@ -673,7 +663,7 @@ async function llm(system,user,json,prefer){
       if(dead[p]||(cool[p]&&cool[p]>Date.now()))continue;
       try{const r=await callProvider(p,system,user,json);return {...r,provider:p}}
       catch(e){lastErr=e;if(!(e instanceof PErr))throw e;
-        if(e.kind==="auth"||(p==="ollama"&&e.kind==="net")){dead[p]=e.message;continue}  // Ollama not running won't fix itself in 30s
+        if(e.kind==="auth"){dead[p]=e.message;continue}
         if(e.kind==="quota"||e.kind==="net"){cool[p]=Date.now()+(e.wait||30000);continue}
         if(order.length>1)continue;
         throw e}
@@ -690,23 +680,20 @@ function renderSettings(){
   document.querySelectorAll("#poolSeg button").forEach(b=>b.classList.toggle("on",b.dataset.pool===cfg.pool));
   $("poolNote").textContent=cfg.pool==="battle"?"Each agent runs on a different AI from your keys, and its model shows next to its name.":"Agents take turns across your keys to stay under free limits.";
   $("gKey").value=cfg.gKey;$("qKey").value=cfg.qKey;$("qModel").value=cfg.qModel;$("oKey").value=cfg.oKey;$("oModel").value=cfg.oModel;
-  $("cBase").value=cfg.cBase;$("cKey").value=cfg.cKey;$("cModel").value=cfg.cModel;$("olModel").value=cfg.olModel;$("olUrl").value=cfg.olUrl;
-  $("olSw").classList.toggle("on",cfg.ol);
+  $("cBase").value=cfg.cBase;$("cKey").value=cfg.cKey;$("cModel").value=cfg.cModel;
   const sel=$("gModel");if(cfg.gModel&&![...sel.options].some(o=>o.value===cfg.gModel))sel.insertAdjacentHTML("beforeend",`<option>${esc(cfg.gModel)}</option>`);sel.value=cfg.gModel;
 }
 document.querySelectorAll("#poolSeg button").forEach(b=>b.onclick=()=>{cfg.pool=b.dataset.pool;renderSettings()});
-$("olSw").onclick=()=>{cfg.ol=!cfg.ol;$("olSw").classList.toggle("on",cfg.ol)};
 $("gearBtn").onclick=()=>{renderSettings();$("settings").classList.remove("hide")};
 $("closeSettings").onclick=()=>{readSettings();$("settings").classList.add("hide");renderSetup()};
 function readSettings(){
   Object.assign(cfg,{gKey:$("gKey").value.trim(),gModel:$("gModel").value,qKey:$("qKey").value.trim(),qModel:$("qModel").value.trim(),
-    oKey:$("oKey").value.trim(),oModel:$("oModel").value.trim()||"openrouter/free",cBase:$("cBase").value.trim(),cKey:$("cKey").value.trim(),cModel:$("cModel").value.trim(),
-    olModel:$("olModel").value.trim()||"llama3.2",olUrl:$("olUrl").value.trim()||"http://localhost:11434"});
+    oKey:$("oKey").value.trim(),oModel:$("oModel").value.trim()||"openrouter/free",cBase:$("cBase").value.trim(),cKey:$("cKey").value.trim(),cModel:$("cModel").value.trim()});
   store.set("cfg2",cfg);gemModels=null;groqPick=null;for(const k in dead)delete dead[k];for(const k in cool)delete cool[k];
 }
 $("testKeys").onclick=async()=>{
   readSettings();const P=providers();
-  ["gemini","groq","openrouter","custom","ollama"].forEach(p=>{const el=$("st-"+p);el.textContent=P.includes(p)?"testing…":"";el.className="st"});
+  ["gemini","groq","openrouter","custom"].forEach(p=>{const el=$("st-"+p);el.textContent=P.includes(p)?"testing…":"";el.className="st"});
   if(!P.length){$("st-gemini").textContent="add at least one key";return}
   if(cfg.gKey){try{const list=[...await geminiModels()];$("gModel").innerHTML=`<option value="">auto (starts with ${esc(list[0]||"none")})</option>`+list.map(m=>`<option ${m===cfg.gModel?"selected":""}>${esc(m)}</option>`).join("")}catch(e){}}
   await Promise.all(P.map(async p=>{const el=$("st-"+p);
@@ -717,8 +704,7 @@ $("testKeys").onclick=async()=>{
 
 /* quick key: paste any key, we work out whose it is */
 const KEY_TYPES=[[/^AIza[\w-]{30,}$/,"gemini","gKey","Gemini"],[/^gsk_\w{20,}$/,"groq","qKey","Groq"],[/^sk-or-[\w-]{20,}$/,"openrouter","oKey","OpenRouter"]];
-async function ollamaUp(){try{return (await fetch(`${cfg.olUrl.replace(/\/$/,"")}/api/tags`,{signal:AbortSignal.timeout(1500)})).ok}catch(e){return false}}
-function openQuickKey(note){$("qkInput").value="";qkSay(note||"It stays in this browser and only goes to Google or Groq.");$("quickKey").classList.remove("hide")}
+function openQuickKey(){$("qkInput").value="";qkSay("It stays in this browser and only goes to Google or Groq.");$("quickKey").classList.remove("hide")}
 function qkSay(t,cls){const el=$("qkStatus");el.textContent=t;el.style.color=cls==="bad"?"#b4413c":cls==="ok"?"var(--ok)":""}
 $("closeQuick").onclick=()=>$("quickKey").classList.add("hide");
 $("qkMore").onclick=e=>{e.preventDefault();$("quickKey").classList.add("hide");$("gearBtn").click()};
@@ -878,7 +864,7 @@ $("ownBtn").onclick=()=>{history.replaceState(null,"",location.pathname+location
 /* ===================== flow ===================== */
 function setComposer(on){$("say").disabled=!on;$("sendBtn").disabled=!on;$("say").placeholder=on?"veto, or add a note for the agents…":"the agents are talking…"}
 async function start(){
-  if(!MOCK&&!providers().some(p=>p!=="ollama")&&!(cfg.ol&&await ollamaUp())){openQuickKey(cfg.ol?"Ollama isn't running on this computer, so use a free key instead.":"");return}
+  if(!MOCK&&!providers().length){openQuickKey();return}
   plan.members=plan.members.filter(m=>m.n);savePlan();
   $("setup").classList.add("hide");chatEl.innerHTML="";transcript=[];lastPlan=null;lastWho=null;mi=0;
   SL=shortlist();

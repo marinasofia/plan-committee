@@ -2,7 +2,7 @@
 
 Everyone picks what they want. Each person gets an AI agent that argues for them in a group chat, and they agree on one real NYC plan.
 
-* `index.html` is the whole app (no server). Users bring their own free AI key (Gemini, Groq, OpenRouter, any OpenAI compatible API, or local Ollama).
+* `index.html` is the whole app (no server). Users bring their own free AI key (Gemini, Groq, OpenRouter or any OpenAI compatible API).
 * `spots.json` grows by itself every day (see below). 125 hand picked spots live inside `index.html` and always rank as top picks.
 
 ## How the spot list grows by itself
