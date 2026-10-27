@@ -12,13 +12,18 @@ Open http://localhost:8000/?mock. Mock mode runs scripted agents, so you don't n
 
 ## Good first contributions
 
-* **Add a hand picked spot.** Add a line to the `RAW` list in `index.html`:
-  `Name|type|Neighborhood|Borough|price|cuisine|tags|short why`
-  * type: `d` dinner, `k` drinks, `l` late (activity, dessert, venue), `f` free
-  * Borough: `M`, `BK` or `Q`. Price: `0` to `4`.
-  * cuisine (dinner only): italian, pizza, steak, french, asian, latin, comfort, american, mediterranean, seafood, veg
-  * tags, from: romantic cozy fancy chaotic artsy lowkey dancing nerdy rooftop music views photo dessert wait loud quiet cash veg late
-  * Only real places that are open now, and no chains.
+* **Add a hand picked spot.** Add one line to `picks` in `cities/<city>/city.json`, for example:
+  `{"n": "Via Carota", "t": "dinner", "h": "West Village", "b": "M", "p": 2, "c": "italian", "f": ["romantic", "cozy"], "v": "cozy Italian, no reservations"}`
+  * `t`: dinner, drinks, late (activity, dessert, venue) or free. `p`: price 0 to 4. `b`: the city's area code, or `""` if the city has no areas.
+  * `c` (dinner only): italian, pizza, steak, french, asian, latin, comfort, american, mediterranean, seafood, veg
+  * `f`, from: romantic cozy fancy chaotic artsy lowkey dancing nerdy rooftop music views photo dessert wait loud quiet cash veg late
+  * Only real places that are open now, and no chains. Run `python3 tools/format_city.py` to tidy the file.
+* **Add your city.** Copy `cities/london/` to `cities/<your-city>/` (lowercase, dashes), then edit `city.json`:
+  * `id` (same as the folder), `name`, `short`, `search` (what to add to a map search, like "London, UK")
+  * `bbox`: `[south, west, north, east]` around the city, `center`, `tz` (like `Europe/Paris`), `units` (`c` or `f`), `currency`
+  * `hoods`: up to 9 neighborhood chips, and 10 to 30 hand picks to start
+  * Text in city files (names, `v` blurbs, neighborhood labels) is shown to people and given to the AI, so keep it short and factual. Maintainers review it like code.
+  * Add the city to `cities/index.json` and set `cities/<your-city>/spots.json` to `{"spots": []}`. The daily pipeline fills it from OpenStreetMap, and a free AI tags it over the next few days.
 * **Report a closed place.** Open an issue, or add its exact name to `data/blocklist.txt`.
 * **Better agent banter** in mock mode, so the no key demo is more fun.
 

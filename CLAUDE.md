@@ -5,6 +5,7 @@ AI agents argue in a group chat and agree on one real NYC date night or friends 
 ## How it works
 
 * `index.html` is the whole app: one file, no build step, no server. It is installable as an app (`manifest.webmanifest`, `sw.js`, `icons/`); `og.png` is the link preview image. Users bring their own free AI key. 125 hand picked spots live inside it (`const RAW`) and always rank first. `index.html?mock` runs scripted agents with no key.
+* Cities live in `cities/<id>/`: `city.json` (settings and hand picks, written by people) and `spots.json` (generated daily). `cities/index.json` lists them. The app loads the city at startup and validates every field; `tools/format_city.py` formats city files.
 * `spots.json` is the extra spot list the app loads on every visit. It is built daily by `pipeline/build_spots.py` via `.github/workflows/update-spots.yml`, and the Actions bot commits `spots.json` and `data/tagged.json`.
 * Pipeline: NYC Open Data restaurant inspections from the last 12 months (closed places drop out) plus OpenStreetMap places via Overpass. Restaurants must also be on OSM with a website or hours. Chains, takeout cuisines and curated spots are removed. A free AI (Groq, then Gemini) tags new places in batches; unknown places are skipped. Tags are cached in `data/tagged.json` so each place is tagged once.
 * `worker/` is an optional Cloudflare Worker for anonymous usage counts (`STATS_URL`).

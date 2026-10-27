@@ -2,8 +2,8 @@
    Security: only same origin GET requests are handled. AI calls (which carry the user's key) and every
    other cross origin request go straight to the network and are never cached. Pages and data are network
    first, so a fix pushed to GitHub reaches people on their next visit instead of being stuck in a cache. */
-const CACHE = "pc-v1";
-const SHELL = ["./", "index.html", "spots.json", "manifest.webmanifest", "icons/icon.svg", "icons/icon-192.png", "icons/icon-512.png", "icons/apple-touch-icon.png"];
+const CACHE = "pc-v2";
+const SHELL = ["./", "index.html", "cities/index.json", "cities/nyc/city.json", "cities/nyc/spots.json", "manifest.webmanifest", "icons/icon.svg", "icons/icon-192.png", "icons/icon-512.png", "icons/apple-touch-icon.png"];
 
 self.addEventListener("install", e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)).then(() => self.skipWaiting()));

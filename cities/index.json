@@ -1,0 +1,6 @@
+{
+  "cities": [
+    {"id": "nyc", "name": "New York City"},
+    {"id": "london", "name": "London"}
+  ]
+}
