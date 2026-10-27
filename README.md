@@ -1,39 +1,65 @@
-# The Plan Committee
+<p align="center"><img src="og.png" alt="The Plan Committee: AI agents argue in a group chat and agree on one NYC plan" width="720"></p>
 
-Everyone picks what they want. Each person gets an AI agent that argues for them in a group chat, and they agree on one real NYC plan.
+<h1 align="center">The Plan Committee</h1>
 
-* `index.html` is the whole app (no server). Users bring their own free AI key (Gemini, Groq, OpenRouter or any OpenAI compatible API).
-* Installable as an app: `manifest.webmanifest`, `sw.js` (offline support) and `icons/`. `og.png` is the preview card for shared links.
-* After editing the script in `index.html`, run `python3 tools/csp.py` to update its Content Security Policy hash.
-* `spots.json` grows by itself every day (see below). 125 hand picked spots live inside `index.html` and always rank as top picks.
+<p align="center">
+  Everyone picks what they want. Each person gets an AI agent that fights for them in a group chat.<br>
+  They agree on one real NYC plan: dinner, drinks, something after.
+</p>
 
-## How the spot list grows by itself
+<p align="center">
+  <a href="https://marinasofia.github.io/plan-committee/"><b>Try it live</b></a> ·
+  <a href="https://marinasofia.github.io/plan-committee/?mock">Try it with no AI key</a> ·
+  <a href="CONTRIBUTING.md">Contribute</a>
+</p>
 
-`.github/workflows/update-spots.yml` runs `pipeline/build_spots.py` every day:
+<p align="center">
+  <a href="LICENSE"><img alt="MIT license" src="https://img.shields.io/badge/license-MIT-1c1b1a"></a>
+  <img alt="No build step" src="https://img.shields.io/badge/build_step-none-c9718f">
+  <img alt="Costs nothing to run" src="https://img.shields.io/badge/hosting-%240-3d8b5a">
+</p>
 
-1. Downloads every NYC restaurant inspected in the last 12 months from NYC Open Data. Places that stop getting inspected drop out, so closed restaurants disappear on their own.
-2. Downloads bars, venues, museums, cinemas, parks and viewpoints from OpenStreetMap.
-3. Keeps notable places (on OpenStreetMap with a website or hours), removes chains and takeout categories.
-4. A free AI tags new places in batches (type, price, cuisine, vibe). Places the AI doesn't recognize are skipped, so it never makes up vibes. Each place is tagged once and cached in `data/tagged.json`.
-5. Optional: reads anonymous usage counts (plans, saves, vetoes) so places people love rank higher.
+If you like it, a ⭐ helps other people find it.
+
+## What it does
+
+<img src="docs/setup.png" alt="Setup screen" width="300" align="right">
+
+* **Date night or friends night.** Add your people, or send an invite link to the group chat so everyone picks on their own phone. Friends never need a key or an account.
+* **Agents with personalities.** Dramatic, stubborn, chill, the mediator, chaotic. An optional Wallet agent guards the budget.
+* **Real places only.** 125 hand picked spots, plus thousands more from NYC Open Data and OpenStreetMap, refreshed every day. Closed restaurants drop out on their own.
+* **A plan you can use.** Map, website, reserve (straight to Resy or OpenTable when we know the page), add to calendar, share the whole argument as a replay link.
+* **Your AI, your key.** Bring a free Gemini or Groq key (one minute, no card). It stays on your device and goes only to the AI you picked.
+* **Installable.** Add it to your home screen and it opens like an app.
+
+<br clear="right">
+
+## How it works
+
+* **No server, no build step.** The whole app is [`index.html`](index.html). Open it in a browser and it runs.
+* **No database.** Plans, picks and invites live in the link itself (after the `#`, which never reaches any server) and in your browser.
+* **The spot list grows by itself.** A daily GitHub Action ([`pipeline/build_spots.py`](pipeline/build_spots.py)) pulls fresh data, filters out chains and takeout spots, and has a free AI tag new places by vibe, price and cuisine. Places the AI doesn't recognize are skipped, so it never makes up vibes. Neighborhoods come from NYC's official map, not the AI.
+* **Locked down.** A hash based Content Security Policy, a service worker that never touches AI calls, and a security scan on every pull request. See [SECURITY.md](SECURITY.md).
+
+## Run it yourself
+
+```
+git clone https://github.com/marinasofia/plan-committee.git
+cd plan-committee
+python3 -m http.server 8000
+```
+
+Open http://localhost:8000/?mock for scripted agents with no AI key, or http://localhost:8000 to use your own key.
+
+### Host your own copy (free)
+
+1. Fork the repo.
+2. Turn on **Settings > Pages > Deploy from branch > main / root**.
+3. For the daily spot updates, add a free `GROQ_API_KEY` (console.groq.com/keys) and/or `GEMINI_API_KEY` (aistudio.google.com/apikey) under **Settings > Secrets and variables > Actions**, then run **Actions > Update spots** once.
 
 Free limits: about 40 batches of 25 places per run fits inside Groq's free daily tokens. The first week fills the backlog, then each run only tags new openings.
 
-## Setup (one time, about 10 minutes)
-
-1. Create the repo and push:
-   ```
-   cd plan-committee
-   git init -b main && git add . && git commit -m "The Plan Committee"
-   gh repo create plan-committee --private --source=. --push
-   ```
-2. Add your free AI key: repo **Settings > Secrets and variables > Actions > New repository secret**
-   * `GROQ_API_KEY` (free at console.groq.com/keys) and/or `GEMINI_API_KEY` (free at aistudio.google.com/apikey)
-3. Run it once by hand: **Actions > Update spots > Run workflow**. After that it runs daily.
-4. Turn on the website: **Settings > Pages > Deploy from branch > main / root**.
-   * GitHub Pages on a **private** repo needs GitHub Pro. Students get Pro free with the GitHub Student Developer Pack (education.github.com/pack). Otherwise make the repo public.
-
-## Optional: usage counts (Cloudflare, free, no card)
+### Optional: usage counts (Cloudflare, free, no card)
 
 ```
 cd worker
@@ -42,10 +68,15 @@ npx wrangler d1 create plan-committee        # copy the database_id into wrangle
 npx wrangler d1 execute plan-committee --remote --file=schema.sql
 npx wrangler deploy                          # prints your worker URL
 ```
-Then paste the worker URL into `STATS_URL` near the top of the script in `index.html`, and add it as a repo **variable** (not secret) named `STATS_URL`. Only place names and counts are stored, nothing about people.
 
-## Testing
+Paste the worker URL into `STATS_URL` near the top of the script in `index.html`, run `python3 tools/csp.py`, and add it as a repo **variable** named `STATS_URL`. Only place names and counts are stored, nothing about people. Before deploying it publicly, add rate limiting (see the open issues).
 
-Open `index.html?mock` to run scripted agents with no AI key.
+## Contributing
 
-Data: NYC Open Data (DOHMH Restaurant Inspection Results), © OpenStreetMap contributors (ODbL).
+New spots, better agent banter, other cities, bug fixes: all welcome. Start with [CONTRIBUTING.md](CONTRIBUTING.md) and look for issues labeled **good first issue**.
+
+## License and data
+
+* Code: [MIT](LICENSE).
+* Restaurant data: NYC Open Data (DOHMH Restaurant Inspection Results) and Neighborhood Tabulation Areas.
+* Place data: © OpenStreetMap contributors, available under the [Open Database License](https://opendatacommons.org/licenses/odbl/). `spots.json` and `data/tagged.json` are derived from it and are shared under the ODbL too.
