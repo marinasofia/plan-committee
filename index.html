@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>The Plan Committee</title>
 <meta name="description" content="Your friends pick what they want. AI agents argue for each of you in a group chat and agree on one plan for a night out in NYC or London.">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-/NBbvyiYyVbvqOBAQUr29ek5VTGRdgkDmr2u/vp/LnM='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https:; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-yMlrYDoWWpsy4LLdpqQHrxWP/UcIZMU+L7gkuQNkbW8='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https:; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
 <meta name="referrer" content="no-referrer">
 <meta name="theme-color" content="#fbf9f6">
 <link rel="manifest" href="manifest.webmanifest">
@@ -161,10 +161,8 @@ button,input,select,textarea{font:inherit;color:inherit}
 .who{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
 .qk{text-align:center;text-decoration:none;color:var(--ink);border-style:solid;background:#fff;line-height:1.3}
 .qk .small{display:block;margin-top:2px;font-weight:400}
-.ob{min-height:58vh;display:flex}.obs{display:none;flex-direction:column;justify-content:center;width:100%}.obs.on{display:flex}
 .obart{display:flex;gap:6px;margin-bottom:26px}.obart .av{width:54px;height:54px;font-size:20px;margin-left:-14px;border:3px solid var(--paper)}.obart .av:first-child{margin-left:0}
 .obi{width:54px;height:54px;border-radius:50%;display:grid;place-items:center;background:var(--accent-soft);color:var(--accent);font-size:24px;font-weight:600}
-.obdots{display:flex;gap:6px;justify-content:center;margin-top:10px}.obdots i{width:7px;height:7px;border-radius:50%;background:var(--line)}.obdots i.on{background:var(--ink)}
 .vote{border-top:1px dashed var(--line);padding-top:12px}.vote .lbl{font-family:"DM Mono",monospace;font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);padding:0 16px 8px}
 .vote .field{margin:0 16px 10px;width:calc(100% - 32px)}
 .hop{font-size:11px;color:var(--muted);padding:0 0 0 62px;margin:-4px 0 4px;font-family:"DM Mono",monospace}
@@ -278,23 +276,19 @@ button,input,select,textarea{font:inherit;color:inherit}
     <button class="cta" id="testKeys" type="button">Save and test</button>
   </div>
 
-  <!-- onboarding: first visit only, skipped for friends arriving from an invite or plan link -->
+  <!-- first visit: just names, then straight into the chat. Skipped for friends arriving from an invite or plan link -->
   <div class="sheet hide top" id="onboard">
-    <div class="ob" id="obSlides">
-      <div class="obs"><div class="obart"><span class="av" style="background:#c8b6e2">M</span><span class="av" style="background:#b9d3c2">A</span><span class="av" style="background:#f4c3b0">J</span></div>
-        <h2>Everyone picks.<br>Agents argue.<br>You go out.</h2>
-        <p class="lead">Each person gets an AI agent that fights for what they want in a group chat. They agree on one real plan: dinner, drinks, something after.</p></div>
-      <div class="obs"><div class="obart"><span class="obi">+</span><span class="obi">↗</span></div>
-        <h2>Bring your people.</h2>
-        <p class="lead">Add them on this phone, or tap Invite friends and drop the link in your group chat. They pick on their own phone. No app, no key, no signup.</p></div>
-      <div class="obs"><div class="obart"><span class="obi">✦</span></div>
-        <h2>Free AI,<br>set up once.</h2>
-        <p class="lead">The planner pastes a free Gemini or Groq key once. It takes a minute, costs nothing and stays on this phone.</p>
-        <p class="small" id="obInstall"></p></div>
-    </div>
-    <div class="obdots" id="obDots"><i></i><i></i><i></i></div>
-    <button class="cta" id="obNext" type="button">Next</button>
-    <p class="small" style="text-align:center"><a href="#" id="obSkip">Skip</a></p>
+    <div class="obart"><span class="av" style="background:#c8b6e2">M</span><span class="av" style="background:#b9d3c2">A</span><span class="av" style="background:#f4c3b0">J</span></div>
+    <h2>Everyone picks.<br>Agents argue.<br>You go out.</h2>
+    <p class="lead">Each person gets an AI agent with its own personality. They fight it out in a group chat and agree on one real plan.</p>
+    <form id="obForm">
+      <div class="sec"><span class="lab">Your name</span><input class="field" id="obMe" placeholder="your name" maxlength="20" autocomplete="given-name"></div>
+      <div class="sec"><span class="lab">Who's coming</span><input class="field" id="obOthers" placeholder="their names: Sam, Lee" maxlength="120" autocomplete="off"></div>
+      <div class="sec"><div class="seg" id="obMode"><button type="button" data-mode="date">Date night</button><button type="button" data-mode="girls">Friends night</button></div></div>
+      <button class="cta" id="obGo" type="submit">Let the agents plan</button>
+    </form>
+    <p class="small" style="text-align:center">Picks are optional, the agents improvise. <a href="#" id="obSkip">Set it up in detail</a></p>
+    <p class="small" style="text-align:center" id="obInstall"></p>
   </div>
 
   <!-- quick key: the one minute path for people with no key yet -->
@@ -980,7 +974,8 @@ async function start(){
   $("setup").classList.add("hide");chatEl.innerHTML="";transcript=[];lastPlan=null;lastWho=null;mi=0;
   fixPlan();await fetchWeather(nightDate(plan.when),plan.start);
   SL=shortlist();
-  agents=agentList().map(a=>({...a,drew:!a.wallet&&!PERS[a.ps],ps:a.wallet||PERS[a.ps]?a.ps:rand(REAL_PERS),favs:a.wallet?[]:SL.list.map(s=>({s,sc:personScore(s,a)+Math.random()})).sort((x,y)=>y.sc-x.sc).slice(0,3).map(x=>x.s.n)}));
+  const taken=new Set(agentList().map(a=>a.ps)),draw=()=>{const left=REAL_PERS.filter(k=>!taken.has(k)),k=rand(left.length?left:REAL_PERS);taken.add(k);return k};  // no two agents draw the same one
+  agents=agentList().map(a=>({...a,drew:!a.wallet&&!PERS[a.ps],ps:a.wallet||PERS[a.ps]?a.ps:draw(),favs:a.wallet?[]:SL.list.map(s=>({s,sc:personScore(s,a)+Math.random()})).sort((x,y)=>y.sc-x.sc).slice(0,3).map(x=>x.s.n)}));
   const now=new Date();const st=document.createElement("div");st.className="stamp";
   st.textContent=now.toLocaleDateString(undefined,{weekday:"long"})+" "+now.toLocaleTimeString([],{hour:"numeric",minute:"2-digit"});chatEl.appendChild(st);
   const rounds=agents.length<=3?3:2;
@@ -1034,7 +1029,7 @@ async function mockLLM(system,user,json,prefer){await sleep(200);
 /* ===================== start ===================== */
 async function handleHash(first){
   const h=location.hash.match(/^#([jrpvc])=(.+)$/);
-  if(!h){if(first&&MOCK&&params.has("auto"))start();else if(first&&!MOCK&&!store.get("onboarded",0)&&!providers().length)openOnboarding();return}
+  if(!h){if(first&&MOCK&&params.has("auto"))start();else if(first&&!store.get("onboarded",0)&&isSample(plan))openOnboarding();return}
   if(busy)return;
   try{const data=await unpack(h[2]);
     const want=h[1]==="p"?data?.c:h[1]==="v"||h[1]==="c"?null:data?.city;  // open the link in its own city
@@ -1089,12 +1084,19 @@ $("installLink").onclick=async e=>{e.preventDefault();
   else{const n=$("notice");n.style.display="";n.textContent="On iPhone: tap the Share button, then Add to Home Screen."}};
 /* ask the browser not to clear our storage (keys, plan) when space runs low or after a week away */
 function keepStorage(){try{navigator.storage?.persist?.().catch(()=>{})}catch(e){}}
-let obI=0;
-function showOb(i){obI=i;[...$("obSlides").children].forEach((el,j)=>el.classList.toggle("on",j===i));
-  [...$("obDots").children].forEach((el,j)=>el.classList.toggle("on",j===i));$("obNext").textContent=i===2?"Let's plan":"Next"}
-function openOnboarding(){renderInstall();showOb(0);$("onboard").classList.remove("hide")}
+/* first visit: names in, mode guessed from the head count (until tapped), then straight to the chat */
+let obMode=null;
+const obGuess=()=>obMode||($("obOthers").value.split(",").filter(n=>n.trim()).length>1?"girls":"date");
+const paintOb=()=>document.querySelectorAll("#obMode button").forEach(b=>b.classList.toggle("on",b.dataset.mode===obGuess()));
+document.querySelectorAll("#obMode button").forEach(b=>b.onclick=()=>{obMode=b.dataset.mode;paintOb()});
+$("obOthers").oninput=paintOb;
+function openOnboarding(){renderInstall();paintOb();$("onboard").classList.remove("hide");setTimeout(()=>$("obMe").focus(),450)}
 function doneOb(){store.set("onboarded",1);$("onboard").classList.add("hide")}
-$("obNext").onclick=()=>obI<2?showOb(obI+1):doneOb();
+$("obForm").onsubmit=async e=>{e.preventDefault();const me=$("obMe").value.trim().slice(0,20);
+  if(!me){$("obMe").focus();$("obMe").style.borderColor="#b4413c";return}
+  const names=[me,...$("obOthers").value.split(",").map(n=>n.trim().slice(0,20)).filter(Boolean)].slice(0,6),mode=obGuess();
+  stash();plan={...defaultPlan(mode),id:uid(),name:mode==="girls"?"Friends night":"Date night",city:plan.city,members:names.map(n=>member(n))};
+  store.set("myname",me);savePlan();doneOb();renderSetup();await start()};
 $("obSkip").onclick=e=>{e.preventDefault();doneOb()};
 renderInstall();if(standalone())keepStorage();
 if("serviceWorker" in navigator&&isSecureContext)navigator.serviceWorker.register("sw.js").catch(()=>{});
