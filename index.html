@@ -802,7 +802,8 @@ function sys(t,err){const d=document.createElement("div");d.className="sys"+(err
 /* ===================== ticket ===================== */
 const gmap=n=>"https://www.google.com/maps/search/?api=1&query="+encodeURIComponent(n+", New York, NY");
 const gmapSpot=s=>s.lat?"https://www.google.com/maps/search/?api=1&query="+encodeURIComponent(s.n)+"%20"+s.lat+"%2C"+s.lon:gmap(s.n);
-const reserve=n=>"https://www.opentable.com/s?term="+encodeURIComponent(n)+"&metroId=8";
+/* many NYC places book through Resy, Tock or walk in only, so search instead of guessing OpenTable */
+const reserve=s=>"https://www.google.com/search?q="+encodeURIComponent(`${s.n} ${s.h||""} New York reservation`.replace(/\s+/g," "));
 function routeUrl(stops){const q=s=>encodeURIComponent(s.spot.n+", New York, NY");
   let u="https://www.google.com/maps/dir/?api=1&origin="+q(stops[0])+"&destination="+q(stops[stops.length-1]);
   if(stops.length>2)u+="&waypoints="+stops.slice(1,-1).map(q).join("%7C");return u}
@@ -814,7 +815,7 @@ function renderTicket(p,names,count){
     <div class="perf"></div>
     <div class="stops">${p.stops.map(s=>`<div class="stop"><div class="tm">${esc(s.time||"")}</div><div><div class="nm">${esc(s.spot.n)}</div>
       <div class="meta">${esc(s.spot.h)} · ${PRICE[s.spot.p]}</div>${s.note?`<div class="why">${esc(s.note)}</div>`:""}
-      <div class="slinks"><a href="${gmapSpot(s.spot)}" target="_blank" rel="noopener">map</a>${safeUrl(s.spot.web)?`<a href="${safeUrl(s.spot.web)}" target="_blank" rel="noopener">site</a>`:""}${s.spot.t==="dinner"||s.spot.t==="drinks"?`<a href="${reserve(s.spot.n)}" target="_blank" rel="noopener">reserve</a>`:""}<button type="button" data-fave="${esc(s.spot.n)}" class="${faves.includes(s.spot.n)?"on":""}">${faves.includes(s.spot.n)?"saved":"save"}</button></div></div></div>`).join("")}</div>
+      <div class="slinks"><a href="${gmapSpot(s.spot)}" target="_blank" rel="noopener">map</a>${safeUrl(s.spot.web)?`<a href="${safeUrl(s.spot.web)}" target="_blank" rel="noopener">site</a>`:""}${s.spot.t==="dinner"||s.spot.t==="drinks"?`<a href="${reserve(s.spot)}" target="_blank" rel="noopener">reserve</a>`:""}<button type="button" data-fave="${esc(s.spot.n)}" class="${faves.includes(s.spot.n)?"on":""}">${faves.includes(s.spot.n)?"saved":"save"}</button></div></div></div>`).join("")}</div>
     <div class="drama"><div class="lbl"><span>drama meter</span><span>${drama}%</span></div><div class="meter"><span></span></div>${p.verdict?`<div class="verdict">${esc(p.verdict)}</div>`:""}</div>
     ${REPLAY?"":`<div class="tbtns"><button type="button" class="pri" data-a="send">Send to the group</button><button type="button" data-a="veto">Veto</button></div>`}
     <div class="tbtns sub"><button type="button" data-a="route">Route</button><button type="button" data-a="cal">Add to calendar</button></div>
