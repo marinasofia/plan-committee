@@ -11,6 +11,8 @@ AI agents argue in a group chat and agree on one real NYC date night or friends 
 
 ## Rules
 
+* The project is open source (MIT code, ODbL place data). Contributor PRs run in users' browsers next to their AI keys: review every change to `index.html`, `sw.js` and workflows line by line, especially new hosts in fetch calls, CSP edits and anything rendered as HTML.
+
 * Everything stays free: no paid services, no Supabase.
 * Data only from NYC Open Data, OpenStreetMap and the free AI keys in repo secrets (`GROQ_API_KEY`, `GEMINI_API_KEY`). Never scrape Google Maps, Yelp, Resy or The Infatuation.
 * Keep `index.html` a single file with no build step. The pipeline uses the Python standard library only.

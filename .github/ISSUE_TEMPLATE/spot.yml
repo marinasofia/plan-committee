@@ -1,0 +1,23 @@
+name: Add or remove a spot
+description: Suggest a place, or report one that closed or looks wrong
+labels: [spots]
+body:
+  - type: dropdown
+    id: kind
+    attributes:
+      label: What kind of change
+      options: [Add a place, Place closed, Wrong info]
+    validations:
+      required: true
+  - type: input
+    id: name
+    attributes:
+      label: Place name and neighborhood
+      placeholder: Buvette, West Village
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: Details
+      description: Why it's great for a night out, or what's wrong.
