@@ -26,6 +26,7 @@ If you like it, a ⭐ helps other people find it.
 <img src="docs/setup.png" alt="Setup screen" width="300" align="right">
 
 * **Date night or friends night.** Add your people, or send an invite link to the group chat so everyone picks on their own phone. Friends never need a key or an account.
+* **Your people, saved.** Send friends a profile link: 6 quick taps and their taste and agent personality are saved on your phone. Next time you just tap who's coming.
 * **Agents with personalities.** Dramatic, stubborn, chill, the mediator, chaotic. An optional Wallet agent guards the budget.
 * **Any city.** New York and London so far. Each city is one folder in [`cities/`](cities), so adding yours is one pull request ([how](CONTRIBUTING.md)).
 * **Real places only.** 125 hand picked spots, plus thousands more from NYC Open Data and OpenStreetMap, refreshed every day. Closed restaurants drop out on their own.
