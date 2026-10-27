@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>The Plan Committee</title>
 <meta name="description" content="Your friends pick what they want. AI agents argue for each of you in a group chat and agree on one NYC plan.">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-Jk1SIo1Fk4pAxYLGEvKlL8ueUDLJIcyoBTdLhzz/QnE='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https:; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-7/SFl/Fkhwp9BOdv7mNgjAbMutvMu0pReo1L0wbUEj0='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https:; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
 <meta name="referrer" content="no-referrer">
 <meta name="theme-color" content="#fbf9f6">
 <link rel="manifest" href="manifest.webmanifest">
@@ -157,6 +157,8 @@ button,input,select,textarea{font:inherit;color:inherit}
 .obart{display:flex;gap:6px;margin-bottom:26px}.obart .av{width:54px;height:54px;font-size:20px;margin-left:-14px;border:3px solid var(--paper)}.obart .av:first-child{margin-left:0}
 .obi{width:54px;height:54px;border-radius:50%;display:grid;place-items:center;background:var(--accent-soft);color:var(--accent);font-size:24px;font-weight:600}
 .obdots{display:flex;gap:6px;justify-content:center;margin-top:10px}.obdots i{width:7px;height:7px;border-radius:50%;background:var(--line)}.obdots i.on{background:var(--ink)}
+.vote{border-top:1px dashed var(--line);padding-top:12px}.vote .lbl{font-family:"DM Mono",monospace;font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);padding:0 16px 8px}
+.vote .field{margin:0 16px 10px;width:calc(100% - 32px)}
 .hop{font-size:11px;color:var(--muted);padding:0 0 0 62px;margin:-4px 0 4px;font-family:"DM Mono",monospace}
 .walkin{font-size:11.5px;color:var(--muted);padding:3px 4px}
 .who span{font-size:12.5px;background:#fff;border:1px solid var(--line);border-radius:99px;padding:4px 10px}
@@ -492,7 +494,7 @@ let cfg={pool:"smart",gKey:"",gModel:"",qKey:"",qModel:"",oKey:"",oModel:"openro
 delete cfg.ol;delete cfg.olModel;delete cfg.olUrl;  /* Ollama support was removed */
 if(cfg.qModel==="llama-3.3-70b-versatile")cfg.qModel="";  /* retired by Groq */
 {const old=store.get("cfg",null);if(old&&!store.get("cfg2",null)){if(old.key)cfg.gKey=old.key;store.set("cfg2",cfg)}}
-let hist=store.get("hist",[]), faves=store.get("faves",[]);
+let hist=store.get("hist",[]), faves=store.get("faves",[]), sent=store.get("sent",{});  /* sent: plans you shared, with friends' votes */
 
 /* ===================== helpers ===================== */
 function esc(s){return String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
@@ -573,8 +575,13 @@ const b64u={enc:b=>{let s="";for(let i=0;i<b.length;i+=8192)s+=String.fromCharCo
 async function pack(obj){const raw=new TextEncoder().encode(JSON.stringify(obj));
   if(window.CompressionStream){const z=await new Response(new Blob([raw]).stream().pipeThrough(new CompressionStream("deflate-raw"))).arrayBuffer();return "z"+b64u.enc(new Uint8Array(z))}
   return "j"+b64u.enc(raw)}
-async function unpack(str){const bytes=b64u.dec(str.slice(1));
-  const raw=str[0]==="z"?new Uint8Array(await new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream("deflate-raw"))).arrayBuffer()):bytes;
+/* links come from strangers: cap the size before and after decompressing so a tiny "zip bomb" link can't freeze the tab */
+const MAX_LINK=256e3;
+async function unpack(str){if(str.length>MAX_LINK)throw new Error("link too big");const bytes=b64u.dec(str.slice(1));
+  if(str[0]!=="z")return JSON.parse(new TextDecoder().decode(bytes));
+  const reader=new Blob([bytes]).stream().pipeThrough(new DecompressionStream("deflate-raw")).getReader();const parts=[];let total=0;
+  for(;;){const {done,value}=await reader.read();if(done)break;total+=value.length;if(total>MAX_LINK){reader.cancel();throw new Error("link too big")}parts.push(value)}
+  const raw=new Uint8Array(total);let o=0;for(const v of parts){raw.set(v,o);o+=v.length}
   return JSON.parse(new TextDecoder().decode(raw))}
 const baseUrl=()=>location.href.split("#")[0].split("?")[0];
 const planPayload=()=>({id:plan.id,mode:plan.mode,when:plan.when,start:plan.start,needs:plan.needs,hood:plan.hood,wallet:plan.wallet,members:plan.members});
@@ -925,7 +932,9 @@ function renderTicket(p,names,count){
       <div class="meta">${esc(s.spot.h)} · ${PRICE[s.spot.p]||""}${esc(stopInfo(s,p))}</div>${s.note?`<div class="why">${esc(s.note)}</div>`:""}
       <div class="slinks"><a href="${gmapSpot(s.spot)}" target="_blank" rel="noopener">map</a>${safeUrl(s.spot.web)?`<a href="${safeUrl(s.spot.web)}" target="_blank" rel="noopener">site</a>`:""}${s.spot.t==="dinner"||s.spot.t==="drinks"?(s.spot.rsv==="walkin"?`<span class="walkin">walk in</span>`:`<a href="${reserve(s.spot)}" target="_blank" rel="noopener">reserve</a>`):""}<button type="button" data-fave="${esc(s.spot.n)}" class="${faves.includes(s.spot.n)?"on":""}">${faves.includes(s.spot.n)?"saved":"save"}</button></div></div></div>`).join("")}</div>
     <div class="drama"><div class="lbl"><span>drama meter</span><span>${drama}%</span></div><div class="meter"><span></span></div>${p.verdict?`<div class="verdict">${esc(p.verdict)}</div>`:""}</div>
-    ${REPLAY?"":`<div class="tbtns"><button type="button" class="pri" data-a="send">Send to the group</button><button type="button" data-a="veto">Veto</button></div>`}
+    ${REPLAY?(VOTE_ID?`<div class="vote"><div class="lbl">are you in?</div><input class="field" data-a="vname" placeholder="your name" maxlength="30" autocomplete="off">
+      <div class="tbtns"><button type="button" class="pri" data-a="in">I'm in</button><button type="button" data-a="nope">Veto a stop</button></div>
+      <div class="chips" data-a="vstops" style="display:none;padding:0 16px 12px">${p.stops.map((s,i)=>`<button type="button" class="chip" data-i="${i}">${esc(s.spot.n)}</button>`).join("")}</div></div>`:""):`<div class="tbtns"><button type="button" class="pri" data-a="send">Send to the group</button><button type="button" data-a="veto">Veto</button></div>`}
     <div class="tbtns sub"><button type="button" data-a="route">Route</button><button type="button" data-a="cal">Add to calendar</button></div>
     <div class="foot">planned by AI agents who argued so you didn't have to</div>`;
   chatEl.appendChild(d);lastWho=null;scroll();
@@ -933,6 +942,13 @@ function renderTicket(p,names,count){
   d.querySelector('[data-a="route"]').onclick=()=>window.open(routeUrl(p.stops),"_blank","noopener");
   d.querySelector('[data-a="cal"]').onclick=()=>downloadICS(p);
   d.querySelectorAll("[data-fave]").forEach(b=>b.onclick=()=>{const n=b.dataset.fave;faves=tog(faves,n);store.set("faves",faves);if(faves.includes(n))track("save",[n]);b.classList.toggle("on",faves.includes(n));b.textContent=faves.includes(n)?"saved":"save"});
+  if(REPLAY&&VOTE_ID){const nameIn=d.querySelector('[data-a="vname"]');nameIn.value=store.get("myname","");
+    const cast=async(v,si,btn)=>{const n=nameIn.value.trim();if(!n){nameIn.focus();nameIn.placeholder="add your name first";return}store.set("myname",n);
+      const url=baseUrl()+"#v="+await pack({id:VOTE_ID,n,v,s:si});
+      await shareOut("My vote",v==="in"?`${n} is in for ${p.title||"the plan"}`:`${n} wants to swap ${p.stops[si].spot.n}`,url,btn,"Vote copied")};
+    d.querySelector('[data-a="in"]').onclick=e=>cast("in",null,e.target);
+    d.querySelector('[data-a="nope"]').onclick=()=>{d.querySelector('[data-a="vstops"]').style.display=""};
+    d.querySelectorAll('[data-a="vstops"] .chip').forEach(b=>b.onclick=()=>cast("veto",+b.dataset.i,b))}
   if(!REPLAY){d.querySelector('[data-a="send"]').onclick=e=>sharePlan(p,e.target);d.querySelector('[data-a="veto"]').onclick=()=>{$("say").focus();$("say").value="veto: "}}
 }
 function nightDate(w){w=(w||"").toLowerCase();const d=new Date();d.setHours(0,0,0,0);
@@ -952,7 +968,10 @@ function downloadICS(p){
   const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([ics],{type:"text/calendar"}));a.download="the-plan.ics";a.click();
 }
 async function sharePlan(p,btn){
-  const payload={v:2,m:plan.mode,w:plan.when,a:agents.map(a=>[a.n,a.color]),t:transcript.map(m=>[m.ai??-1,m.text,m.via||""]),
+  if(typeof p.id!=="string"||!/^[a-z0-9]{4,12}$/.test(p.id))p.id=uid();  // never trust an id the AI might have put in its JSON
+  sent[p.id]={title:String(p.title||"The plan"),when:plan.when,stops:p.stops.map(s=>s.spot.n),votes:sent[p.id]?.votes||{},at:Date.now()};
+  const ids=Object.keys(sent).sort((a,b)=>sent[b].at-sent[a].at);for(const k of ids.slice(20))delete sent[k];store.set("sent",sent);
+  const payload={v:2,id:p.id,m:plan.mode,w:plan.when,a:agents.map(a=>[a.n,a.color]),t:transcript.map(m=>[m.ai??-1,m.text,m.via||""]),
     p:{title:p.title,drama:p.drama,verdict:p.verdict,stops:p.stops.map(s=>[s.time,s.spot.n,s.note||""])}};
   const url=baseUrl()+"#p="+await pack(payload);
   await shareOut(p.title||"The plan",`our ${plan.when.toLowerCase()} plan: ${p.stops.map(s=>s.spot.n).join(", then ")}. our AI agents fought about it, watch:`,url,btn);
@@ -960,8 +979,9 @@ async function sharePlan(p,btn){
 
 /* ===================== replay (a friend opened a plan link) ===================== */
 let REPLAY=null;
+let VOTE_ID=null;
 async function playReplay(R){
-  REPLAY=R;$("app").classList.add("replay");$("setup").classList.add("hide");
+  REPLAY=R;VOTE_ID=typeof R.id==="string"&&/^[a-z0-9]{4,12}$/.test(R.id)?R.id:null;$("app").classList.add("replay");$("setup").classList.add("hide");
   const ag=R.a.map(([n,color],i)=>({n:String(n??""),color:safeColor(color,i)}));
   $("stack").innerHTML=ag.slice(0,5).map(a=>`<div class="av" style="background:${a.color}">${initials(a.n)}</div>`).join("");
   $("title").textContent=R.m==="girls"?"friends night committee":"date night committee";$("subtitle").textContent=`${ag.length} AI agents · 1 plan`;
@@ -1015,16 +1035,38 @@ async function mockLLM(system,user,json,prefer){await sleep(200);
 
 /* ===================== start ===================== */
 async function handleHash(first){
-  const h=location.hash.match(/^#([jrp])=(.+)$/);
+  const h=location.hash.match(/^#([jrpv])=(.+)$/);
   if(!h){if(first&&MOCK&&params.has("auto"))start();else if(first&&!MOCK&&!store.get("onboarded",0)&&!providers().length)openOnboarding();return}
   if(busy)return;
   try{const data=await unpack(h[2]);
     if(h[1]==="p"){if(REPLAY)return;await playReplay(data)}
     else if(h[1]==="j"){$("setup").classList.add("hide");openJoin(data)}
+    else if(h[1]==="v"){history.replaceState(null,"",location.pathname+location.search);recordVote(data)}
     else if(h[1]==="r"){const added=mergeReply(data);history.replaceState(null,"",location.pathname+location.search);REPLAY=null;$("app").classList.remove("replay");renderSetup();$("setup").classList.remove("hide");
       const n=$("notice");n.style.display="";n.textContent=added.length?`${added.join(", ")} just joined. Start when everyone's in.`:"Everyone in that link is already here.";}
   }catch(e){console.warn(e);sys("This link looks broken. Plan your own night instead.",true)}
 }
+/* ===================== group vote: friends answer a shared plan with a link, nothing goes through a server ===================== */
+function recordVote(V){
+  const id=typeof V?.id==="string"&&/^[a-z0-9]{4,12}$/.test(V.id)?V.id:"",P=id&&Object.hasOwn(sent,id)?sent[id]:null;
+  if(!P){sys("That vote is for a plan sent from another phone. Open it on the phone that sent the plan.",true);return}
+  const n=String(V.n??"").trim().slice(0,30),v=V.v==="in"?"in":V.v==="veto"?"veto":null,si=Number.isInteger(V.s)&&V.s>=0&&V.s<P.stops.length?V.s:null;
+  if(!n||!v||(v==="veto"&&si==null)){sys("This vote link looks broken.",true);return}
+  if(Object.keys(P.votes||{}).length>=12&&!Object.hasOwn(P.votes||{},n)){sys("This plan already has 12 votes.",true);return}
+  if(!Object.hasOwn(P,"votes")||typeof P.votes!=="object")P.votes={};
+  P.votes=Object.assign(Object.create(null),P.votes,{[n]:{v,s:si}});store.set("sent",sent);
+  $("setup").classList.add("hide");chatEl.innerHTML="";lastWho=null;renderVotes(P);  // only clear the chat once the vote is valid
+}
+function renderVotes(P){
+  const vs=Object.entries(P.votes),ins=vs.filter(([,x])=>x.v==="in").length;
+  const d=document.createElement("div");d.className="ticket";
+  d.innerHTML=`<div class="top"><div class="eyebrow">group vote · ${esc(P.when)}</div><h2>${esc(P.title)}</h2><div class="when">${ins} in · ${vs.length-ins} want a swap</div></div>
+    <div class="stops">${P.stops.map((n,i)=>{const no=vs.filter(([,x])=>x.v==="veto"&&x.s===i).map(([k])=>k);
+      return `<div class="stop"><div class="tm">${no.length?"swap?":"ok"}</div><div><div class="nm">${esc(n)}</div>${no.length?`<div class="why">${esc(no.join(", "))} want${no.length>1?"":"s"} to swap this</div>`:""}</div></div>`}).join("")}</div>
+    <div class="foot">${vs.map(([k,x])=>esc(k)+(x.v==="in"?" is in":" voted to swap")).join(" · ")}</div>
+    <div class="tbtns"><button type="button" class="pri" data-a="again">Plan again</button></div>`;
+  chatEl.appendChild(d);d.querySelector('[data-a="again"]').onclick=()=>$("newBtn").click();scroll()}
+
 /* ===================== install, onboarding ===================== */
 const standalone=()=>matchMedia("(display-mode: standalone)").matches||navigator.standalone===true;
 const isIOS=/iPhone|iPad|iPod/.test(navigator.userAgent)||(navigator.platform==="MacIntel"&&navigator.maxTouchPoints>1);
