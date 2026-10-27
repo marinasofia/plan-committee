@@ -673,7 +673,7 @@ async function llm(system,user,json,prefer){
       if(dead[p]||(cool[p]&&cool[p]>Date.now()))continue;
       try{const r=await callProvider(p,system,user,json);return {...r,provider:p}}
       catch(e){lastErr=e;if(!(e instanceof PErr))throw e;
-        if(e.kind==="auth"){dead[p]=e.message;continue}
+        if(e.kind==="auth"||(p==="ollama"&&e.kind==="net")){dead[p]=e.message;continue}  // Ollama not running won't fix itself in 30s
         if(e.kind==="quota"||e.kind==="net"){cool[p]=Date.now()+(e.wait||30000);continue}
         if(order.length>1)continue;
         throw e}
@@ -717,7 +717,8 @@ $("testKeys").onclick=async()=>{
 
 /* quick key: paste any key, we work out whose it is */
 const KEY_TYPES=[[/^AIza[\w-]{30,}$/,"gemini","gKey","Gemini"],[/^gsk_\w{20,}$/,"groq","qKey","Groq"],[/^sk-or-[\w-]{20,}$/,"openrouter","oKey","OpenRouter"]];
-function openQuickKey(){$("qkInput").value="";qkSay("It stays in this browser and only goes to Google or Groq.");$("quickKey").classList.remove("hide")}
+async function ollamaUp(){try{return (await fetch(`${cfg.olUrl.replace(/\/$/,"")}/api/tags`,{signal:AbortSignal.timeout(1500)})).ok}catch(e){return false}}
+function openQuickKey(note){$("qkInput").value="";qkSay(note||"It stays in this browser and only goes to Google or Groq.");$("quickKey").classList.remove("hide")}
 function qkSay(t,cls){const el=$("qkStatus");el.textContent=t;el.style.color=cls==="bad"?"#b4413c":cls==="ok"?"var(--ok)":""}
 $("closeQuick").onclick=()=>$("quickKey").classList.add("hide");
 $("qkMore").onclick=e=>{e.preventDefault();$("quickKey").classList.add("hide");$("gearBtn").click()};
@@ -877,7 +878,7 @@ $("ownBtn").onclick=()=>{history.replaceState(null,"",location.pathname+location
 /* ===================== flow ===================== */
 function setComposer(on){$("say").disabled=!on;$("sendBtn").disabled=!on;$("say").placeholder=on?"veto, or add a note for the agents…":"the agents are talking…"}
 async function start(){
-  if(!MOCK&&!providers().length){openQuickKey();return}
+  if(!MOCK&&!providers().some(p=>p!=="ollama")&&!(cfg.ol&&await ollamaUp())){openQuickKey(cfg.ol?"Ollama isn't running on this computer, so use a free key instead.":"");return}
   plan.members=plan.members.filter(m=>m.n);savePlan();
   $("setup").classList.add("hide");chatEl.innerHTML="";transcript=[];lastPlan=null;lastWho=null;mi=0;
   SL=shortlist();
