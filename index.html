@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>The Plan Committee</title>
 <meta name="description" content="Your friends pick what they want. AI agents argue for each of you in a group chat and agree on one plan for a night out in NYC or London.">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-Uc5bTYw7Pn8sErtSvWUSpLDJTrY4vWnLFQsbjZVS8NM='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https:; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-Dh1oQmbBRTuhEW57N5i/Bd5G19o4SRX6wA6BMkUHJ74='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https:; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
 <meta name="referrer" content="no-referrer">
 <meta name="theme-color" content="#fbf9f6">
 <link rel="manifest" href="manifest.webmanifest">
@@ -984,7 +984,7 @@ function renderTicket(p,names,count){
     ${REPLAY?(VOTE_ID?`<div class="vote"><div class="lbl">are you in?</div><input class="field" data-a="vname" placeholder="your name" maxlength="30" autocomplete="off">
       <div class="tbtns"><button type="button" class="pri" data-a="in">I'm in</button><button type="button" data-a="nope">Veto a stop</button></div>
       <div class="chips" data-a="vstops" style="display:none;padding:0 16px 12px">${p.stops.map((s,i)=>`<button type="button" class="chip" data-i="${i}">${esc(s.spot.n)}</button>`).join("")}</div></div>`:""):`<div class="tbtns"><button type="button" class="pri" data-a="send">Send to the group</button><button type="button" data-a="veto">Change something</button></div>
-      <div class="chips" data-a="chg" style="display:none;padding:0 16px 12px">${p.stops.map((s,i)=>`<button type="button" class="chip" data-swap="${i}">swap ${esc(s.spot.n)}</button>`).join("")}<button type="button" class="chip" data-c="cheaper">cheaper</button><button type="button" class="chip" data-c="closer">closer together</button>${plan.start<1320?`<button type="button" class="chip" data-c="later">start later</button>`:""}<button type="button" class="chip" data-c="else">something else…</button></div>`}
+      <div class="chips" data-a="chg" style="display:none;padding:0 16px 12px">${p.stops.map((s,i)=>`<button type="button" class="chip" data-swap="${i}">swap ${esc(s.spot.n)}</button>`).join("")}<button type="button" class="chip" data-c="cheaper">cheaper</button><button type="button" class="chip" data-c="closer">closer together</button>${plan.start<STARTS[STARTS.length-1]?`<button type="button" class="chip" data-c="later">start later</button>`:""}<button type="button" class="chip" data-c="else">something else…</button></div>`}
     <div class="tbtns sub"><button type="button" data-a="route">Route</button><button type="button" data-a="cal">Add to calendar</button></div>
     <div class="foot">planned by AI agents who argued so you didn't have to</div>`;
   chatEl.appendChild(d);lastWho=null;scroll();
@@ -1003,11 +1003,11 @@ function renderTicket(p,names,count){
     // change something: one tap tells the agents what to fix, then they argue it out and post a new plan
     const box=d.querySelector('[data-a="chg"]');d.querySelector('[data-a="veto"]').onclick=()=>{box.style.display=box.style.display?"":"none";if(!box.style.display)scroll()};
     box.querySelectorAll("[data-swap]").forEach(b=>b.onclick=()=>{const st=p.stops[+b.dataset.swap];if(busy)return;
-      SL.list=SL.list.filter(x=>x.n!==st.spot.n);  // gone from the list, so nobody can pick it again
+      if(SL.list.length>4)SL.list=SL.list.filter(x=>x.n!==st.spot.n);  // gone from the list, so nobody can pick it again
       box.style.display="none";overrule(`veto: swap ${st.spot.n}. pick something else for that stop`)});
     box.querySelectorAll("[data-c]").forEach(b=>b.onclick=()=>{if(busy)return;const c=b.dataset.c;box.style.display="none";
       if(c==="else"){$("say").focus();$("say").value="veto: ";return}
-      if(c==="later"){plan.start=Math.min(1320,plan.start+60);savePlan()}
+      if(c==="later"){plan.start=STARTS.find(m=>m>=plan.start+60)??STARTS[STARTS.length-1];savePlan()}
       overrule(c==="cheaper"?"veto: too pricey. make it cheaper":c==="closer"?"veto: the stops are too far apart. keep them close together":`veto: start later, first stop at ${fmtMin(plan.start)}`)})}
 }
 function nightDate(w){w=(w||"").toLowerCase();const d=new Date();d.setHours(0,0,0,0);
@@ -1088,7 +1088,7 @@ async function go(rounds,startAt){
   catch(e){if(e.message==="NO_KEY"){sys("Add an AI key in settings first.",true);$("gearBtn").click()}else sys(e.message,true)}
   busy=false;setComposer(true);
 }
-async function overrule(t){if(busy||!SL)return;
+async function overrule(t){if(busy||!SL)return;busy=true;setComposer(false);  // claim the turn before any await, so a double tap can't start two runs
   if(/veto/i.test(t)&&lastPlan)track("veto",lastPlan.stops.map(s=>s.spot.n));transcript.push({who:"The human (has the final say)",text:t});addBubble(null,t);await sleep(300);await go(2,round+1)}
 $("composer").onsubmit=e=>{e.preventDefault();const t=$("say").value.trim();if(!t||busy)return;$("say").value="";overrule(t)};
 $("startBtn").onclick=start;
