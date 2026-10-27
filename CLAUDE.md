@@ -27,7 +27,7 @@ Act as a senior security engineer and pen test every change before it is committ
 * CSP: `index.html` only runs the inline script whose sha256 is in its Content Security Policy. After any edit to the script, run `python3 tools/csp.py`, or the app will not run. CI checks it.
 * Hosting: the app has its own origin on Cloudflare Pages. Don't move it back to GitHub Pages: every repo on a `username.github.io` shares one origin and could read users' saved keys. Keep `_headers` (frame blocking, nosniff, no-cache for `sw.js`).
 * Service worker (`sw.js`): only same origin GET requests, never AI calls or anything cross origin; keep pages network first so fixes reach people.
-* XSS in `index.html`: share links (`#j=`, `#r=`, `#p=`), `spots.json`, OpenStreetMap data and AI replies are all untrusted. Everything put into `innerHTML` goes through `esc()`, links through `safeUrl()` (http and https only), colors through `safeColor()`. Users' AI keys live in localStorage, so any XSS steals them.
+* XSS in `index.html`: share links (`#j=`, `#r=`, `#p=`, `#v=`, `#c=`, `#f=`, `#m=`), `spots.json`, OpenStreetMap data and AI replies are all untrusted. Everything put into `innerHTML` goes through `esc()`, links through `safeUrl()` (http and https only), colors through `safeColor()`. Users' AI keys live in localStorage, so any XSS steals them.
 * GitHub Actions: no `pull_request_target` or comment triggers, least `permissions`, no `${{ }}` of untrusted input inside `run:`, secrets only in the step that needs them.
 * Worker (`worker/`): validate and cap input, parameterized D1 queries, nothing a stranger posts can reach the page as HTML.
 * New dependencies or third party scripts: avoid them; if needed, pin exact versions.
