@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>The Plan Committee</title>
 <meta name="description" content="Your friends pick what they want. AI agents argue for each of you in a group chat and agree on one plan for a night out in NYC or London.">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-gJCtEOWGSFP4udJAud16TdZOawRnT3EKP06WS8q71As='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https:; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-Uc5bTYw7Pn8sErtSvWUSpLDJTrY4vWnLFQsbjZVS8NM='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https:; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
 <meta name="referrer" content="no-referrer">
 <meta name="theme-color" content="#fbf9f6">
 <link rel="manifest" href="manifest.webmanifest">
@@ -983,7 +983,8 @@ function renderTicket(p,names,count){
     <div class="drama"><div class="lbl"><span>drama meter</span><span>${drama}%</span></div><div class="meter"><span></span></div>${p.verdict?`<div class="verdict">${esc(p.verdict)}</div>`:""}</div>
     ${REPLAY?(VOTE_ID?`<div class="vote"><div class="lbl">are you in?</div><input class="field" data-a="vname" placeholder="your name" maxlength="30" autocomplete="off">
       <div class="tbtns"><button type="button" class="pri" data-a="in">I'm in</button><button type="button" data-a="nope">Veto a stop</button></div>
-      <div class="chips" data-a="vstops" style="display:none;padding:0 16px 12px">${p.stops.map((s,i)=>`<button type="button" class="chip" data-i="${i}">${esc(s.spot.n)}</button>`).join("")}</div></div>`:""):`<div class="tbtns"><button type="button" class="pri" data-a="send">Send to the group</button><button type="button" data-a="veto">Veto</button></div>`}
+      <div class="chips" data-a="vstops" style="display:none;padding:0 16px 12px">${p.stops.map((s,i)=>`<button type="button" class="chip" data-i="${i}">${esc(s.spot.n)}</button>`).join("")}</div></div>`:""):`<div class="tbtns"><button type="button" class="pri" data-a="send">Send to the group</button><button type="button" data-a="veto">Change something</button></div>
+      <div class="chips" data-a="chg" style="display:none;padding:0 16px 12px">${p.stops.map((s,i)=>`<button type="button" class="chip" data-swap="${i}">swap ${esc(s.spot.n)}</button>`).join("")}<button type="button" class="chip" data-c="cheaper">cheaper</button><button type="button" class="chip" data-c="closer">closer together</button>${plan.start<1320?`<button type="button" class="chip" data-c="later">start later</button>`:""}<button type="button" class="chip" data-c="else">something else…</button></div>`}
     <div class="tbtns sub"><button type="button" data-a="route">Route</button><button type="button" data-a="cal">Add to calendar</button></div>
     <div class="foot">planned by AI agents who argued so you didn't have to</div>`;
   chatEl.appendChild(d);lastWho=null;scroll();
@@ -998,7 +999,16 @@ function renderTicket(p,names,count){
     d.querySelector('[data-a="in"]').onclick=e=>cast("in",null,e.target);
     d.querySelector('[data-a="nope"]').onclick=()=>{d.querySelector('[data-a="vstops"]').style.display=""};
     d.querySelectorAll('[data-a="vstops"] .chip').forEach(b=>b.onclick=()=>cast("veto",+b.dataset.i,b))}
-  if(!REPLAY){d.querySelector('[data-a="send"]').onclick=e=>sharePlan(p,e.target);d.querySelector('[data-a="veto"]').onclick=()=>{$("say").focus();$("say").value="veto: "}}
+  if(!REPLAY){d.querySelector('[data-a="send"]').onclick=e=>sharePlan(p,e.target);
+    // change something: one tap tells the agents what to fix, then they argue it out and post a new plan
+    const box=d.querySelector('[data-a="chg"]');d.querySelector('[data-a="veto"]').onclick=()=>{box.style.display=box.style.display?"":"none";if(!box.style.display)scroll()};
+    box.querySelectorAll("[data-swap]").forEach(b=>b.onclick=()=>{const st=p.stops[+b.dataset.swap];if(busy)return;
+      SL.list=SL.list.filter(x=>x.n!==st.spot.n);  // gone from the list, so nobody can pick it again
+      box.style.display="none";overrule(`veto: swap ${st.spot.n}. pick something else for that stop`)});
+    box.querySelectorAll("[data-c]").forEach(b=>b.onclick=()=>{if(busy)return;const c=b.dataset.c;box.style.display="none";
+      if(c==="else"){$("say").focus();$("say").value="veto: ";return}
+      if(c==="later"){plan.start=Math.min(1320,plan.start+60);savePlan()}
+      overrule(c==="cheaper"?"veto: too pricey. make it cheaper":c==="closer"?"veto: the stops are too far apart. keep them close together":`veto: start later, first stop at ${fmtMin(plan.start)}`)})}
 }
 function nightDate(w){w=(w||"").toLowerCase();const d=new Date();d.setHours(0,0,0,0);
   if(/tomorrow/.test(w)){d.setDate(d.getDate()+1);return d}if(/tonight|today/.test(w))return d;
@@ -1047,7 +1057,7 @@ async function playReplay(R){
 $("ownBtn").onclick=async()=>{await ownCity();history.replaceState(null,"",location.pathname+location.search);REPLAY=null;$("app").classList.remove("replay");chatEl.innerHTML="";renderSetup();$("setup").classList.remove("hide")};
 
 /* ===================== flow ===================== */
-function setComposer(on){$("say").disabled=!on;$("sendBtn").disabled=!on;$("say").placeholder=on?"veto, or add a note for the agents…":"the agents are talking…"}
+function setComposer(on){$("say").disabled=!on;$("sendBtn").disabled=!on;$("say").placeholder=on?"change something, or add a note…":"the agents are talking…"}
 /* after viewing someone else's link, switch back to the city of your own plan */
 async function ownCity(){if(CITY?.id!==plan.city){await loadCity(plan.city);plan.city=CITY.id}}  // an unknown city falls back to NYC
 async function start(){
@@ -1078,8 +1088,9 @@ async function go(rounds,startAt){
   catch(e){if(e.message==="NO_KEY"){sys("Add an AI key in settings first.",true);$("gearBtn").click()}else sys(e.message,true)}
   busy=false;setComposer(true);
 }
-$("composer").onsubmit=async e=>{e.preventDefault();if(busy||!SL)return;const t=$("say").value.trim();if(!t)return;$("say").value="";
-  if(/veto/i.test(t)&&lastPlan)track("veto",lastPlan.stops.map(s=>s.spot.n));transcript.push({who:"The human (has the final say)",text:t});addBubble(null,t);await sleep(300);await go(2,round+1)};
+async function overrule(t){if(busy||!SL)return;
+  if(/veto/i.test(t)&&lastPlan)track("veto",lastPlan.stops.map(s=>s.spot.n));transcript.push({who:"The human (has the final say)",text:t});addBubble(null,t);await sleep(300);await go(2,round+1)}
+$("composer").onsubmit=e=>{e.preventDefault();const t=$("say").value.trim();if(!t||busy)return;$("say").value="";overrule(t)};
 $("startBtn").onclick=start;
 $("newBtn").onclick=async()=>{if(busy)return;await ownCity();REPLAY=null;$("app").classList.remove("replay");history.replaceState(null,"",location.pathname+location.search);renderSetup();$("setup").classList.remove("hide")};
 
@@ -1113,6 +1124,7 @@ async function mockLLM(system,user,json,prefer){await sleep(200);
       stops:[{time:fmtMin(plan.start),name:d.n,note:"everyone could live with it"},{time:fmtMin(plan.start+120),name:k.n,note:"the compromise"},{time:fmtMin(plan.start+210),name:l.n,note:"the closer"}],
       drama:40+Math.floor(Math.random()*55),verdict:rand(["The loudest agent won, as usual.","Everyone lost a little, which means it's fair.","One agent caved for dessert. We won't say who."])}),model:"mock"}}
   const last=[...transcript].reverse().find(m=>m.ai!=null)?.who||"everyone";
+  if(/^The human/.test(transcript[transcript.length-1]?.who||"")){mi++;return {text:rand(["fine. heard. new idea: {a}","ok ok, the human has spoken. {a}?","respecting the veto. {a} though","noted. {a}, and nobody complain"]).replace("{a}",()=>pickN(0)),model:"mock"}}  // the first agent after a veto reacts to it
   const all=MOCK_LINES[speaker?.wallet?"wallet":speaker?.ps]||MOCK_LINES.chill,fresh=all.filter(l=>!mockUsed.has(l)),line=rand(fresh.length?fresh:all);
   if(!fresh.length)all.forEach(l=>mockUsed.delete(l));mockUsed.add(line);
   mi++;return {text:line.replace(/\{([abn])\}/g,(_,k)=>k==="a"?pickN(0):k==="b"?pickN(1):last),model:["llama-3.3-70b","gemini-flash-lite","nemotron-nano"][(prefer??mi)%3]}}
