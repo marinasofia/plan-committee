@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>The Plan Committee</title>
 <meta name="description" content="Your friends pick what they want. AI agents argue for each of you in a group chat and agree on one plan for a night out in NYC or London.">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-X8bmD2c0o9kG4oTnShrqGn+jQqgC5sCHtil8aVX7w3E='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https:; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-/NBbvyiYyVbvqOBAQUr29ek5VTGRdgkDmr2u/vp/LnM='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https:; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
 <meta name="referrer" content="no-referrer">
 <meta name="theme-color" content="#fbf9f6">
 <link rel="manifest" href="manifest.webmanifest">
@@ -133,6 +133,14 @@ button,input,select,textarea{font:inherit;color:inherit}
 .member .mn{font-weight:600;font-size:15.5px}
 .member .ms{font-size:12.5px;color:var(--muted);margin-top:2px;line-height:1.35}
 .member .x{border:0;background:none;color:var(--muted);font-size:20px;cursor:pointer;padding:4px 6px}
+.member .pers{display:inline-block;margin-top:5px;border:1px solid var(--accent);background:var(--accent-soft);color:#8c3d5a;border-radius:99px;padding:3px 10px;font-size:12px;font-weight:600;cursor:pointer}
+.more{margin-top:20px;border-top:1px solid var(--line)}
+.more>summary{list-style:none;cursor:pointer;display:flex;justify-content:space-between;gap:10px;align-items:baseline;padding:14px 2px 2px;font-weight:600;font-size:14.5px}
+.more>summary::-webkit-details-marker{display:none}
+.more>summary::after{content:"+";color:var(--muted);font-weight:400}
+.more[open]>summary::after{content:"−"}
+.more .sm{flex:1;text-align:right;font-weight:400;font-size:12.5px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#setup .cta{position:sticky;bottom:0;box-shadow:0 -10px 20px var(--paper)}
 .btnrow{display:flex;gap:8px}
 .ghost{flex:1;padding:12px 8px;border-radius:14px;border:1px dashed #cfc6bb;background:none;font-weight:600;font-size:13.5px;cursor:pointer}
 .toggle{display:flex;align-items:center;justify-content:space-between;gap:12px;background:#fff;border:1px solid var(--line);border-radius:16px;padding:12px 14px;margin-top:8px}
@@ -185,26 +193,30 @@ button,input,select,textarea{font:inherit;color:inherit}
   <!-- setup -->
   <div class="sheet" id="setup">
     <h2>Let the agents<br>plan your night.</h2>
-    <p class="lead">Everyone picks what they want. Each person gets an AI agent that fights for them in a group chat, and they agree on one real plan for your night out.</p>
+    <p class="lead">Add names and hit start. Each person gets an AI agent with its own personality that fights for them.</p>
 
     <div class="sec" id="citySec" style="display:none"><span class="lab">City</span><div class="chips" id="cityChips"></div></div>
-    <div class="sec"><span class="lab">Your crews</span><div class="chips" id="crewChips"></div>
-      <input class="field" id="crewName" placeholder="name this crew" maxlength="30" autocomplete="off" style="margin-top:8px">
-      <p class="small" style="margin-top:4px"><a href="#" id="crewDel">Delete this crew</a></p></div>
+    <div class="sec" id="crewSec"><span class="lab">Your crews</span><div class="chips" id="crewChips"></div></div>
     <div class="sec"><div class="seg" id="modeSeg"><button type="button" data-mode="date">Date night</button><button type="button" data-mode="girls">Friends night</button></div></div>
 
     <div class="sec"><span class="lab">The committee</span>
       <p class="small" id="notice" style="display:none;color:var(--ok);margin:0 0 8px"></p>
       <div id="members"></div>
-      <div class="btnrow"><button class="ghost" id="addHere" type="button">+ Add someone here</button><button class="ghost" id="inviteBtn" type="button">Invite friends</button></div>
-      <button class="ghost" id="crewBtn" type="button" style="width:100%;margin-top:8px">Share crew link (pin it in your group chat)</button>
-      <p class="small" style="margin:6px 2px 0">Invite sends a link to your group chat. Friends pick on their own phone and send it back. They don't need a key.</p>
-      <div class="toggle"><div><div class="tt">The Wallet</div><div class="ts">a referee agent that guards the budget</div></div><button class="sw" id="walletSw" type="button" aria-label="The Wallet"></button></div>
+      <form class="btnrow" id="addForm"><input class="field" id="quickName" placeholder="add a name, or a few: Sam, Lee" maxlength="80" autocomplete="off" style="flex:1"><button class="chip" id="addHere" type="submit">Add</button></form>
+      <p class="small" style="margin:6px 2px 0">Tap the personality to reroll it. Tap a person to set their picks, or skip it and their agent improvises.</p>
+      <button class="ghost" id="inviteBtn" type="button" style="width:100%;margin-top:10px">Invite friends to pick on their own phone</button>
     </div>
 
-    <div class="sec"><span class="lab">When</span><div class="btnrow"><input class="field" id="when" value="Saturday night" style="flex:1.4"><select class="field" id="startAt" style="flex:1" aria-label="Start time"></select></div></div>
-    <div class="sec"><span class="lab">Neighborhood</span><div class="chips" id="hoodChips"></div></div>
-    <div class="sec"><span class="lab">Anyone need</span><div class="chips" id="needChips"></div></div>
+    <details class="more" id="moreOpts"><summary><span>More options</span><span class="sm" id="moreSum"></span></summary>
+      <div class="sec"><span class="lab">When</span><div class="btnrow"><input class="field" id="when" value="Saturday night" style="flex:1.4"><select class="field" id="startAt" style="flex:1" aria-label="Start time"></select></div></div>
+      <div class="sec"><span class="lab">Neighborhood</span><div class="chips" id="hoodChips"></div></div>
+      <div class="sec"><span class="lab">Anyone need</span><div class="chips" id="needChips"></div></div>
+      <div class="toggle"><div><div class="tt">The Wallet</div><div class="ts">a referee agent that guards the budget</div></div><button class="sw" id="walletSw" type="button" aria-label="The Wallet"></button></div>
+      <div class="sec"><span class="lab">This crew</span>
+        <input class="field" id="crewName" placeholder="name this crew" maxlength="30" autocomplete="off">
+        <button class="ghost" id="crewBtn" type="button" style="width:100%;margin-top:8px">Share crew link (pin it in your group chat)</button>
+        <p class="small" style="margin-top:6px"><a href="#" id="newCrewLink">Start a new crew</a> · <a href="#" id="crewDel">Delete this crew</a></p></div>
+    </details>
 
     <button class="cta" id="startBtn" type="button">Start the group chat</button>
     <p class="small">Places from hand picks, NYC Open Data and © OpenStreetMap contributors. Weather by Open-Meteo. Check hours before you go.</p>
@@ -220,13 +232,15 @@ button,input,select,textarea{font:inherit;color:inherit}
     <h2 id="edTitle">Your picks</h2>
     <div class="who" id="edWho"></div>
     <div class="sec"><span class="lab">Name</span><input class="field" id="edName" placeholder="your name" autocomplete="off"></div>
+    <div class="sec"><span class="lab">Your agent's personality</span><div class="chips" id="edPers"></div></div>
     <div class="sec"><span class="lab">Craving</span><div class="chips" id="edCrave"></div></div>
     <div class="sec"><span class="lab">Max budget</span><div class="chips" id="edBudget"></div></div>
     <div class="sec"><span class="lab">Vibe</span><div class="chips" id="edVibe"></div></div>
-    <div class="sec"><span class="lab">Must have</span><div class="chips" id="edMust"></div></div>
-    <div class="sec"><span class="lab">Dealbreakers</span><div class="chips" id="edDeal"></div></div>
-    <div class="sec"><span class="lab">Your agent's personality</span><div class="chips" id="edPers"></div></div>
-    <div class="sec"><span class="lab">Anything else (optional)</span><input class="field" id="edNote" placeholder="e.g. it's our anniversary, allergic to shellfish" maxlength="90"></div>
+    <details class="more" id="edMore"><summary><span>Must haves, dealbreakers, a note</span><span class="sm">optional</span></summary>
+      <div class="sec"><span class="lab">Must have</span><div class="chips" id="edMust"></div></div>
+      <div class="sec"><span class="lab">Dealbreakers</span><div class="chips" id="edDeal"></div></div>
+      <div class="sec"><span class="lab">Anything else</span><input class="field" id="edNote" placeholder="e.g. it's our anniversary, allergic to shellfish" maxlength="90"></div>
+    </details>
     <button class="cta" id="edSave" type="button">Save</button>
   </div>
 
@@ -448,21 +462,26 @@ function renderHead(){const ag=agentList();
   $("stack").innerHTML=ag.slice(0,5).map(a=>`<div class="av" style="background:${a.color}">${initials(a.n)}</div>`).join("");
   $("title").textContent=plan.mode==="girls"?"friends night committee":"date night committee";
   $("subtitle").textContent=`${ag.length} AI agents · 1 plan · 0 chill`}
+const moreSum=()=>$("moreSum").textContent=[plan.when,"starts "+fmtMin(plan.start),plan.hood==="Anywhere"?"":plan.hood,plan.wallet?"Wallet on":""].filter(Boolean).join(" · ");
 function renderSetup(){
   fixPlan();renderCrews();$("crewName").value=plan.name;
   document.querySelectorAll("#modeSeg button").forEach(b=>b.classList.toggle("on",b.dataset.mode===plan.mode));
   $("members").innerHTML=plan.members.map((m,i)=>`<div class="member" data-i="${i}"><div class="av" style="background:${COLORS[i%COLORS.length]}">${initials(m.n)}</div>
-    <div><div class="mn">${esc(m.n)}</div><div class="ms">${esc(summary(m))}</div></div><button class="x" data-x="${i}" type="button" aria-label="remove">×</button></div>`).join("");
-  $("members").querySelectorAll(".member").forEach(el=>el.onclick=e=>{if(e.target.dataset.x!==undefined)return;openEditor(+el.dataset.i)});
+    <div><div class="mn">${esc(m.n)}</div><div class="ms">${esc(summary(m))}</div><button class="pers" data-p="${i}" type="button" aria-label="reroll personality">agent: ${esc(m.ps)} ↻</button></div><button class="x" data-x="${i}" type="button" aria-label="remove">×</button></div>`).join("");
+  $("members").querySelectorAll(".member").forEach(el=>el.onclick=e=>{if(e.target.dataset.x!==undefined||e.target.dataset.p!==undefined)return;openEditor(+el.dataset.i)});
+  $("members").querySelectorAll("[data-p]").forEach(b=>b.onclick=()=>{const m=plan.members[+b.dataset.p];m.ps=rand(Object.keys(PERS).filter(k=>k!==m.ps));savePlan();renderSetup()});
+  $("crewSec").style.display=Object.keys(crews).length>1?"":"none";
+  moreSum();
+  $("quickName").placeholder=plan.members.length?"add a name, or a few: Sam, Lee":"your name";
   $("members").querySelectorAll("[data-x]").forEach(b=>b.onclick=()=>{if(plan.members.length<=1)return;plan.members.splice(+b.dataset.x,1);savePlan();renderSetup()});
   $("walletSw").classList.toggle("on",plan.wallet);
   $("when").value=plan.when;
   $("startAt").innerHTML=STARTS.map(m=>`<option value="${m}" ${m===plan.start?"selected":""}>starts ${fmtMin(m)}</option>`).join("");
   chips("needChips",NEEDS,v=>plan.needs.includes(v),v=>{plan.needs=tog(plan.needs,v);savePlan()});
-  chips("hoodChips",HOODS,v=>plan.hood===v,v=>{plan.hood=v;savePlan()});
+  chips("hoodChips",HOODS,v=>plan.hood===v,v=>{plan.hood=v;savePlan();moreSum()});
   $("citySec").style.display=CITY_LIST.length>1?"":"none";
   chips("cityChips",CITY_LIST.map(c=>[c.name,c.id]),v=>CITY.id===v,async v=>{if(v===CITY.id)return;await loadCity(v);plan.city=CITY.id;plan.hood="Anywhere";savePlan();renderSetup()});
-  $("addHere").style.display=plan.members.length>=6?"none":"";
+  $("addForm").style.display=plan.members.length>=6?"none":"";
   $("startBtn").textContent=`Start the group chat (${agentList().length} agents)`;
   $("keyHint").style.display=providers().length||MOCK?"none":"";
   renderHead();
@@ -479,9 +498,14 @@ function renderCrews(){const list=Object.values(crews).sort((a,b)=>String(a.name
   $("crewChips").innerHTML=list.map(c=>`<button type="button" class="chip${c.id===plan.id?" on":""}" data-crew="${esc(c.id)}">${esc(c.name||"Crew")}</button>`).join("")+`<button type="button" class="chip" data-crew="+">+ new crew</button>`;
   $("crewChips").querySelectorAll("[data-crew]").forEach(b=>b.onclick=async()=>{const id=b.dataset.crew;if(id===plan.id)return;if(id==="+")newCrew();else useCrew(id);await ownCity();renderSetup()})}
 $("walletSw").onclick=()=>{plan.wallet=!plan.wallet;savePlan();renderSetup()};
-$("when").oninput=()=>{plan.when=$("when").value;savePlan()};
-$("startAt").onchange=()=>{plan.start=+$("startAt").value;savePlan()};
-$("addHere").onclick=()=>{plan.members.push(member(""));savePlan();openEditor(plan.members.length-1,true)};
+$("when").oninput=()=>{plan.when=$("when").value;savePlan();moreSum()};
+$("startAt").onchange=()=>{plan.start=+$("startAt").value;savePlan();moreSum()};
+/* names only: everyone starts on "anything" with a surprise personality, picks are optional */
+$("addForm").onsubmit=e=>{e.preventDefault();const names=$("quickName").value.split(",").map(n=>n.trim().slice(0,20)).filter(Boolean);
+  if(!names.length){$("quickName").focus();return}
+  for(const n of names)if(plan.members.length<6)plan.members.push(member(n));
+  $("quickName").value="";savePlan();renderSetup()};
+$("newCrewLink").onclick=async e=>{e.preventDefault();newCrew();await ownCity();renderSetup()};
 $("inviteBtn").onclick=()=>invite();
 
 /* ===================== member editor ===================== */
@@ -498,7 +522,7 @@ function openEditor(i,isNew,joinInfo){
   chips("edMust",MUSTS,v=>edDraft.m.includes(v),v=>edDraft.m=tog(edDraft.m,v));
   chips("edDeal",DEALS,v=>edDraft.d.includes(v),v=>edDraft.d=tog(edDraft.d,v));
   chips("edPers",Object.keys(PERS),v=>edDraft.ps===v,v=>edDraft.ps=v);
-  $("edNote").value=edDraft.q||"";
+  $("edNote").value=edDraft.q||"";$("edMore").open=!!(edDraft.m.length||edDraft.d.length||edDraft.q);
   $("edSave").textContent=joinInfo?"Join and send my picks back":"Save";
   $("closeEditor").style.display=joinInfo?"none":"";
   $("editor").classList.remove("hide");$("editor").scrollTop=0;
