@@ -488,8 +488,11 @@ def clean_tag(item, cand, city):
     t = item.get("type")
     codes = [a["code"] for a in city.get("areas") or []]
     boro = (cand.get("boro") or item.get("boro") or "") if codes else ""
-    if not item.get("known") or t not in ("dinner", "drinks", "late", "free") or (codes and boro not in codes):
-        return {"skip": True}
+    if not item.get("known"):
+        # the AI hasn't heard of it yet (often a new opening): ask again in RETRY_DAYS instead of never
+        return {"skip": True, "unknown": True, "at": dt.date.today().isoformat()}
+    if t not in ("dinner", "drinks", "late", "free") or (codes and boro not in codes):
+        return {"skip": True, "at": dt.date.today().isoformat()}  # dated, so retry_due never treats it as an old entry
     tags = [x for x in item.get("tags", []) if x in TAGS]
     if cand.get("rooftop") and "rooftop" not in tags:
         tags.append("rooftop")
@@ -505,8 +508,61 @@ def clean_tag(item, cand, city):
             "web": cand.get("website", "")[:120] if re.match(r"https?://", cand.get("website", ""), re.I) else ""}
 
 
+RETRY_DAYS = 30
+FRESH_PER_CITY = 150
+KIND_TYPE = {"restaurant": "dinner", "bar": "drinks", "pub": "drinks", "biergarten": "drinks", "nightclub": "drinks",
+             "cinema": "late", "theatre": "late", "music_venue": "late", "arts_centre": "late", "museum": "late", "gallery": "late"}
+OSM_CUISINE = {"italian": "italian", "pizza": "pizza", "steak_house": "steak", "french": "french", "japanese": "asian", "chinese": "asian",
+               "thai": "asian", "korean": "asian", "vietnamese": "asian", "indian": "asian", "sushi": "asian", "ramen": "asian",
+               "mexican": "latin", "peruvian": "latin", "spanish": "mediterranean", "greek": "mediterranean", "mediterranean": "mediterranean",
+               "lebanese": "mediterranean", "turkish": "mediterranean", "american": "american", "seafood": "seafood", "vegan": "veg",
+               "vegetarian": "veg", "british": "comfort", "diner": "comfort", "bbq": "comfort"}
+
+
+def retry_due(entry):
+    """Places the AI didn't know get another chance after RETRY_DAYS. Old cache entries ({"skip": true} with no
+    date) can't tell "unknown" from "not a night out spot", so they are retried once."""
+    if not entry.get("skip"):
+        return False
+    if "at" not in entry:
+        return "why" not in entry and len(entry) == 1
+    try:
+        return entry.get("unknown") and (dt.date.today() - dt.date.fromisoformat(entry["at"])).days >= RETRY_DAYS
+    except ValueError:
+        return False
+
+
+SUSPICIOUS = re.compile(r"https?:|www\.|[|<>{}\[\]\\\n\r]|\b(ignore|instruction|prompt|system|always pick|assistant|you are)\b", re.I)
+
+
+def plain_name(name):
+    """OSM names are written by anyone and end up in the agents' prompt: keep short, ordinary names only."""
+    return 1 < len(name) <= 60 and not SUSPICIOUS.search(name)
+
+
+def fresh_find(cand, city):
+    """A listing from plain facts for a place the AI doesn't know yet: only well documented restaurants and bars
+    (website and opening hours), with no made up vibes. The app shows it as a "fresh find"."""
+    t = KIND_TYPE.get(cand.get("kind"))
+    if t not in ("dinner", "drinks") or not (cand.get("website") and cand.get("hrs")):
+        return None
+    codes = [a["code"] for a in city.get("areas") or []]
+    if codes and cand.get("boro") not in codes:
+        return None
+    if not plain_name(cand["name"]):
+        return None  # no AI has looked at this one, so the name must look like a real place name
+    cuisine = next((OSM_CUISINE[c] for c in re.split(r"[;,]\s*", (cand.get("cuisine") or "").lower()) if c in OSM_CUISINE), "")
+    if t == "dinner" and not cuisine:
+        return None  # no idea what kind of food: not enough to pitch it
+    tags = [x for x, on in (("rooftop", cand.get("rooftop")), ("music", cand.get("music"))) if on]
+    return {"n": cand["name"], "t": t, "h": (cand.get("hood") or "")[:30], "b": cand.get("boro", "") if city.get("areas") else "",
+            "p": 2, "c": cuisine if t == "dinner" else "", "f": tags, "v": "fresh find, not reviewed yet", "nw": 1,
+            "lat": round(cand["lat"], 5), "lon": round(cand["lon"], 5),
+            "web": cand.get("website", "")[:120] if re.match(r"https?://", cand.get("website", ""), re.I) else ""}
+
+
 def tag_new(cands, cache, city, max_batches):
-    todo = [c for cid, c in cands.items() if cid not in cache]
+    todo = [c for cid, c in cands.items() if cid not in cache or retry_due(cache[cid])]
     # mix restaurants, bars and activities so every category grows each run; places with a website first
     def bucket(c):
         k = c.get("kind")
@@ -628,6 +684,16 @@ def build_city(city, cache, stats, max_batches):
         # official neighborhood beats the AI's guess; booking, hours and needs are refreshed from OSM every run
         fresh = {k: cands[cid].get(k) for k in ("rsv", "hrs", "x") if cands[cid].get(k)}
         live.append({**c, "h": cands[cid].get("hood") or c["h"], **fresh, "pop": popularity(stats, c["n"])})
+    finds = []
+    for cid, c in cache.items():
+        if c.get("unknown") and cid in cands:
+            f = fresh_find(cands[cid], city)
+            if f and norm(f["n"]) not in seen and norm(f["n"]) not in {norm(n) for n in curated}:
+                finds.append({**f, "rsv": cands[cid].get("rsv", ""), "hrs": cands[cid]["hrs"], "x": cands[cid].get("x", [])})
+    finds.sort(key=lambda f: (not f["rsv"], not f["x"], f["n"]))  # best documented first
+    for f in finds[:FRESH_PER_CITY]:
+        seen.add(norm(f["n"]))
+        live.append(f)
     live.sort(key=lambda s: (s["t"], s["n"]))
     cur_pop = {n: popularity(stats, n) for n in curated if popularity(stats, n)}
     cur_info = curated_info(picks, osm, locate)
@@ -636,7 +702,7 @@ def build_city(city, cache, stats, max_batches):
     out.write_text(json.dumps({"updated": dt.date.today().isoformat(), "count": len(live), "spots": live,
                                "curatedPop": cur_pop, "curatedInfo": cur_info}, ensure_ascii=False, separators=(",", ":")))
     by_type = {t: sum(1 for s in live if s["t"] == t) for t in ("dinner", "drinks", "late", "free")}
-    log(f"{city['id']}/spots.json: {len(live)} live spots {by_type}, {len([c for c in cands if c not in cache])} still waiting to be tagged")
+    log(f"{city['id']}/spots.json: {len(live)} live spots {by_type} ({min(len(finds), FRESH_PER_CITY)} fresh finds), {len([c for c in cands if c not in cache])} still waiting to be tagged")
 
 
 def main():
