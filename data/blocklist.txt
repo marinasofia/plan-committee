@@ -1,0 +1,3 @@
+# Places that closed or are not a good night out but still show up in the source data.
+# One exact place name per line. They are removed from spots.json on the next run.
+Rubin Museum of Art
