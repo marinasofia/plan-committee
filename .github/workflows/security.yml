@@ -25,6 +25,16 @@ jobs:
           "$RUNNER_TEMP/gitleaks" dir --config .gitleaks.toml --redact --no-banner .
           "$RUNNER_TEMP/gitleaks" git --config .gitleaks.toml --redact --no-banner .
 
+  csp:
+    # index.html only runs the inline script whose hash is in its Content Security Policy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Check the CSP hash matches the inline script
+        run: python3 tools/csp.py --check
+
   dependencies:
     # Dependency review is free on public repos only.
     if: github.event_name == 'pull_request' && !github.event.repository.private

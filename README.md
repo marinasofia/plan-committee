@@ -3,6 +3,8 @@
 Everyone picks what they want. Each person gets an AI agent that argues for them in a group chat, and they agree on one real NYC plan.
 
 * `index.html` is the whole app (no server). Users bring their own free AI key (Gemini, Groq, OpenRouter or any OpenAI compatible API).
+* Installable as an app: `manifest.webmanifest`, `sw.js` (offline support) and `icons/`. `og.png` is the preview card for shared links.
+* After editing the script in `index.html`, run `python3 tools/csp.py` to update its Content Security Policy hash.
 * `spots.json` grows by itself every day (see below). 125 hand picked spots live inside `index.html` and always rank as top picks.
 
 ## How the spot list grows by itself
