@@ -1,0 +1,16 @@
+{
+  "name": "The Plan Committee",
+  "short_name": "Plan Committee",
+  "description": "Everyone picks what they want. AI agents argue for each of you and agree on one real NYC plan.",
+  "id": "./",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#efebe5",
+  "theme_color": "#fbf9f6",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" },
+    { "src": "icons/icon.svg", "sizes": "any", "type": "image/svg+xml" }
+  ]
+}

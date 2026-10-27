@@ -5,6 +5,23 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>The Plan Committee</title>
 <meta name="description" content="Your friends pick what they want. AI agents argue for each of you in a group chat and agree on one NYC plan.">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-s6M2gJlRuAi6Jap/M4AisxBozK/u7/qUty5n+DBrANc='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https:; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta name="referrer" content="no-referrer">
+<meta name="theme-color" content="#fbf9f6">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Plan Committee">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://marinasofia.github.io/plan-committee/">
+<meta property="og:title" content="The Plan Committee">
+<meta property="og:description" content="Everyone picks what they want. AI agents argue for each of you and agree on one real NYC plan.">
+<meta property="og:image" content="https://marinasofia.github.io/plan-committee/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://marinasofia.github.io/plan-committee/og.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -136,6 +153,11 @@ button,input,select,textarea{font:inherit;color:inherit}
 .who{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
 .qk{text-align:center;text-decoration:none;color:var(--ink);border-style:solid;background:#fff;line-height:1.3}
 .qk .small{display:block;margin-top:2px;font-weight:400}
+.ob{min-height:58vh;display:flex}.obs{display:none;flex-direction:column;justify-content:center;width:100%}.obs.on{display:flex}
+.obart{display:flex;gap:6px;margin-bottom:26px}.obart .av{width:54px;height:54px;font-size:20px;margin-left:-14px;border:3px solid var(--paper)}.obart .av:first-child{margin-left:0}
+.obi{width:54px;height:54px;border-radius:50%;display:grid;place-items:center;background:var(--accent-soft);color:var(--accent);font-size:24px;font-weight:600}
+.obdots{display:flex;gap:6px;justify-content:center;margin-top:10px}.obdots i{width:7px;height:7px;border-radius:50%;background:var(--line)}.obdots i.on{background:var(--ink)}
+.walkin{font-size:11.5px;color:var(--muted);padding:3px 4px}
 .who span{font-size:12.5px;background:#fff;border:1px solid var(--line);border-radius:99px;padding:4px 10px}
 </style>
 </head>
@@ -168,6 +190,7 @@ button,input,select,textarea{font:inherit;color:inherit}
       <p class="small" id="notice" style="display:none;color:var(--ok);margin:0 0 8px"></p>
       <div id="members"></div>
       <div class="btnrow"><button class="ghost" id="addHere" type="button">+ Add someone here</button><button class="ghost" id="inviteBtn" type="button">Invite friends</button></div>
+      <p class="small" style="margin:6px 2px 0">Invite sends a link to your group chat. Friends pick on their own phone and send it back. They don't need a key.</p>
       <div class="toggle"><div><div class="tt">The Wallet</div><div class="ts">a referee agent that guards the budget</div></div><button class="sw" id="walletSw" type="button" aria-label="The Wallet"></button></div>
     </div>
 
@@ -177,6 +200,8 @@ button,input,select,textarea{font:inherit;color:inherit}
     <button class="cta" id="startBtn" type="button">Start the group chat</button>
     <p class="small">Places from hand picks, NYC Open Data and © OpenStreetMap contributors. Check hours before you go.</p>
     <p class="small" id="keyHint">Runs on a free Gemini or Groq key. You'll get one in about a minute when you start.</p>
+    <p class="small">Keys and picks stay on this device and go only to the AI you chose. Google's free Gemini tier may use prompts to improve its models.</p>
+    <p class="small" id="installHint" style="display:none"><a href="#" id="installLink">Install the app</a> so it opens like an app and keeps your key.</p>
   </div>
 
   <!-- member editor -->
@@ -230,6 +255,25 @@ button,input,select,textarea{font:inherit;color:inherit}
     <button class="cta" id="testKeys" type="button">Save and test</button>
   </div>
 
+  <!-- onboarding: first visit only, skipped for friends arriving from an invite or plan link -->
+  <div class="sheet hide top" id="onboard">
+    <div class="ob" id="obSlides">
+      <div class="obs"><div class="obart"><span class="av" style="background:#c8b6e2">M</span><span class="av" style="background:#b9d3c2">A</span><span class="av" style="background:#f4c3b0">J</span></div>
+        <h2>Everyone picks.<br>Agents argue.<br>You go out.</h2>
+        <p class="lead">Each person gets an AI agent that fights for what they want in a group chat. They agree on one real NYC plan: dinner, drinks, something after.</p></div>
+      <div class="obs"><div class="obart"><span class="obi">+</span><span class="obi">↗</span></div>
+        <h2>Bring your people.</h2>
+        <p class="lead">Add them on this phone, or tap Invite friends and drop the link in your group chat. They pick on their own phone. No app, no key, no signup.</p></div>
+      <div class="obs"><div class="obart"><span class="obi">✦</span></div>
+        <h2>Free AI,<br>set up once.</h2>
+        <p class="lead">The planner pastes a free Gemini or Groq key once. It takes a minute, costs nothing and stays on this phone.</p>
+        <p class="small" id="obInstall"></p></div>
+    </div>
+    <div class="obdots" id="obDots"><i></i><i></i><i></i></div>
+    <button class="cta" id="obNext" type="button">Next</button>
+    <p class="small" style="text-align:center"><a href="#" id="obSkip">Skip</a></p>
+  </div>
+
   <!-- quick key: the one minute path for people with no key yet -->
   <div class="sheet hide top" id="quickKey">
     <button class="iconbtn close" id="closeQuick" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
@@ -244,10 +288,13 @@ button,input,select,textarea{font:inherit;color:inherit}
       <p class="small" id="qkStatus">It stays in this browser and only goes to Google or Groq.</p></div>
     <button class="cta" id="qkGo" type="button">Start the group chat</button>
     <p class="small"><a href="#" id="qkMore">More options (OpenRouter, other APIs)</a></p>
+    <p class="small">Keys and picks stay on this device and go only to the AI you chose. Google's free Gemini tier may use prompts to improve its models.</p>
   </div>
 </div>
 
 <script>
+/* never run inside someone else's frame (clickjacking): GitHub Pages can't send frame-ancestors */
+if(window.top!==window.self){document.documentElement.innerHTML="";throw new Error("framed")}
 /* ===================== NYC spots =====================
    name | type (d dinner, k drinks, l late/activity, f free) | neighborhood | borough | price 0-4 | cuisine | tags | why
    Hand picked. Check hours before you go. Edit freely. */
@@ -652,6 +699,7 @@ async function callProvider(p,system,user,json){
 }
 let rr=0;
 async function llm(system,user,json,prefer){
+  if(!MOCK&&navigator.onLine===false)throw new Error("You're offline. Connect to the internet and try again.");
   if(MOCK)return mockLLM(system,user,json,prefer);
   const P=providers().filter(p=>!dead[p]);
   if(!P.length)throw new Error(providers().length?"All your AI keys failed. Check them in settings.":"NO_KEY");
@@ -689,7 +737,7 @@ $("closeSettings").onclick=()=>{readSettings();$("settings").classList.add("hide
 function readSettings(){
   Object.assign(cfg,{gKey:$("gKey").value.trim(),gModel:$("gModel").value,qKey:$("qKey").value.trim(),qModel:$("qModel").value.trim(),
     oKey:$("oKey").value.trim(),oModel:$("oModel").value.trim()||"openrouter/free",cBase:$("cBase").value.trim(),cKey:$("cKey").value.trim(),cModel:$("cModel").value.trim()});
-  store.set("cfg2",cfg);gemModels=null;groqPick=null;for(const k in dead)delete dead[k];for(const k in cool)delete cool[k];
+  store.set("cfg2",cfg);if(providers().length)keepStorage();gemModels=null;groqPick=null;for(const k in dead)delete dead[k];for(const k in cool)delete cool[k];
 }
 $("testKeys").onclick=async()=>{
   readSettings();const P=providers();
@@ -726,7 +774,7 @@ async function quickKeyGo(){
   }
   qkBusy=false;$("qkGo").disabled=false;
   if(!ok){qkSay(known?lastMsg:"Neither Gemini nor Groq accepted that key. Copy it again.","bad");return}
-  store.set("cfg2",cfg);qkSay(`${ok} key works.`,"ok");
+  store.set("cfg2",cfg);keepStorage();qkSay(`${ok} key works.`,"ok");
   $("quickKey").classList.add("hide");renderSetup();start();
 }
 $("qkGo").onclick=quickKeyGo;
@@ -803,7 +851,8 @@ function sys(t,err){const d=document.createElement("div");d.className="sys"+(err
 const gmap=n=>"https://www.google.com/maps/search/?api=1&query="+encodeURIComponent(n+", New York, NY");
 const gmapSpot=s=>s.lat?"https://www.google.com/maps/search/?api=1&query="+encodeURIComponent(s.n)+"%20"+s.lat+"%2C"+s.lon:gmap(s.n);
 /* many NYC places book through Resy, Tock or walk in only, so search instead of guessing OpenTable */
-const reserve=s=>"https://www.google.com/search?q="+encodeURIComponent(`${s.n} ${s.h||""} New York reservation`.replace(/\s+/g," "));
+const BOOKING=/^https:\/\/(www\.)?(resy\.com|opentable\.com|exploretock\.com|sevenrooms\.com)\/[^\s<>"']{1,200}$/i;
+const reserve=s=>BOOKING.test(s.rsv||"")?esc(s.rsv):"https://www.google.com/search?q="+encodeURIComponent(`${s.n} ${s.h||""} New York reservation`.replace(/\s+/g," "));
 function routeUrl(stops){const q=s=>encodeURIComponent(s.spot.n+", New York, NY");
   let u="https://www.google.com/maps/dir/?api=1&origin="+q(stops[0])+"&destination="+q(stops[stops.length-1]);
   if(stops.length>2)u+="&waypoints="+stops.slice(1,-1).map(q).join("%7C");return u}
@@ -815,7 +864,7 @@ function renderTicket(p,names,count){
     <div class="perf"></div>
     <div class="stops">${p.stops.map(s=>`<div class="stop"><div class="tm">${esc(s.time||"")}</div><div><div class="nm">${esc(s.spot.n)}</div>
       <div class="meta">${esc(s.spot.h)} · ${PRICE[s.spot.p]}</div>${s.note?`<div class="why">${esc(s.note)}</div>`:""}
-      <div class="slinks"><a href="${gmapSpot(s.spot)}" target="_blank" rel="noopener">map</a>${safeUrl(s.spot.web)?`<a href="${safeUrl(s.spot.web)}" target="_blank" rel="noopener">site</a>`:""}${s.spot.t==="dinner"||s.spot.t==="drinks"?`<a href="${reserve(s.spot)}" target="_blank" rel="noopener">reserve</a>`:""}<button type="button" data-fave="${esc(s.spot.n)}" class="${faves.includes(s.spot.n)?"on":""}">${faves.includes(s.spot.n)?"saved":"save"}</button></div></div></div>`).join("")}</div>
+      <div class="slinks"><a href="${gmapSpot(s.spot)}" target="_blank" rel="noopener">map</a>${safeUrl(s.spot.web)?`<a href="${safeUrl(s.spot.web)}" target="_blank" rel="noopener">site</a>`:""}${s.spot.t==="dinner"||s.spot.t==="drinks"?(s.spot.rsv==="walkin"?`<span class="walkin">walk in</span>`:`<a href="${reserve(s.spot)}" target="_blank" rel="noopener">reserve</a>`):""}<button type="button" data-fave="${esc(s.spot.n)}" class="${faves.includes(s.spot.n)?"on":""}">${faves.includes(s.spot.n)?"saved":"save"}</button></div></div></div>`).join("")}</div>
     <div class="drama"><div class="lbl"><span>drama meter</span><span>${drama}%</span></div><div class="meter"><span></span></div>${p.verdict?`<div class="verdict">${esc(p.verdict)}</div>`:""}</div>
     ${REPLAY?"":`<div class="tbtns"><button type="button" class="pri" data-a="send">Send to the group</button><button type="button" data-a="veto">Veto</button></div>`}
     <div class="tbtns sub"><button type="button" data-a="route">Route</button><button type="button" data-a="cal">Add to calendar</button></div>
@@ -906,7 +955,7 @@ async function mockLLM(system,user,json,prefer){await sleep(200);
 /* ===================== start ===================== */
 async function handleHash(first){
   const h=location.hash.match(/^#([jrp])=(.+)$/);
-  if(!h){if(first&&MOCK&&params.has("auto"))start();return}
+  if(!h){if(first&&MOCK&&params.has("auto"))start();else if(first&&!MOCK&&!store.get("onboarded",0)&&!providers().length)openOnboarding();return}
   if(busy)return;
   try{const data=await unpack(h[2]);
     if(h[1]==="p"){if(REPLAY)return;await playReplay(data)}
@@ -915,6 +964,31 @@ async function handleHash(first){
       const n=$("notice");n.style.display="";n.textContent=added.length?`${added.join(", ")} just joined. Start when everyone's in.`:"Everyone in that link is already here.";}
   }catch(e){console.warn(e);sys("This link looks broken. Plan your own night instead.",true)}
 }
+/* ===================== install, onboarding ===================== */
+const standalone=()=>matchMedia("(display-mode: standalone)").matches||navigator.standalone===true;
+const isIOS=/iPhone|iPad|iPod/.test(navigator.userAgent)||(navigator.platform==="MacIntel"&&navigator.maxTouchPoints>1);
+let installEvt=null;
+addEventListener("beforeinstallprompt",e=>{e.preventDefault();installEvt=e;renderInstall()});
+addEventListener("appinstalled",()=>{installEvt=null;renderInstall()});
+const installKind=()=>standalone()?"":installEvt?"prompt":isIOS?"ios":"";
+function renderInstall(){const k=installKind();
+  $("installHint").style.display=k?"":"none";$("installLink").textContent=k==="ios"?"Add it to your Home Screen":"Install the app";
+  $("obInstall").textContent=k==="ios"?"Tip: tap Share, then Add to Home Screen. It opens like an app and keeps your key.":k?"Tip: install it as an app so it keeps your key.":""}
+$("installLink").onclick=async e=>{e.preventDefault();
+  if(installEvt){installEvt.prompt();try{await installEvt.userChoice}catch(x){}installEvt=null;renderInstall()}
+  else{const n=$("notice");n.style.display="";n.textContent="On iPhone: tap the Share button, then Add to Home Screen."}};
+/* ask the browser not to clear our storage (keys, plan) when space runs low or after a week away */
+function keepStorage(){try{navigator.storage?.persist?.().catch(()=>{})}catch(e){}}
+let obI=0;
+function showOb(i){obI=i;[...$("obSlides").children].forEach((el,j)=>el.classList.toggle("on",j===i));
+  [...$("obDots").children].forEach((el,j)=>el.classList.toggle("on",j===i));$("obNext").textContent=i===2?"Let's plan":"Next"}
+function openOnboarding(){renderInstall();showOb(0);$("onboard").classList.remove("hide")}
+function doneOb(){store.set("onboarded",1);$("onboard").classList.add("hide")}
+$("obNext").onclick=()=>obI<2?showOb(obI+1):doneOb();
+$("obSkip").onclick=e=>{e.preventDefault();doneOb()};
+renderInstall();if(standalone())keepStorage();
+if("serviceWorker" in navigator&&isSecureContext)navigator.serviceWorker.register("sw.js").catch(()=>{});
+
 renderSetup();loadMoreSpots().then(()=>handleHash(true));
 window.addEventListener("hashchange",()=>handleHash(false));
 </script>

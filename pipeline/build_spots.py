@@ -162,6 +162,18 @@ out center tags;
 OSM_KINDS = set(re.findall(r"[a-z_]+", "|".join(re.findall(r'~"\^\(([^)]*)\)\$"', OSM_QUERY))))
 
 
+BOOKING = re.compile(r"^https://(www\.)?(resy\.com|opentable\.com|exploretock\.com|sevenrooms\.com)/[^\s<>\"']{1,200}$", re.I)
+
+
+def booking(t):
+    """Direct booking page from OSM tags, 'walkin' if OSM says no reservations, else ''."""
+    for k in ("reservation:website", "website:booking", "website:reservation", "reservation", "website", "contact:website"):
+        v = (t.get(k) or "").strip().replace("http://", "https://", 1)
+        if BOOKING.match(v):
+            return v
+    return "walkin" if t.get("reservation") == "no" else ""
+
+
 def fetch_osm():
     data = urllib.parse.urlencode({"data": OSM_QUERY}).encode()
     j = get_json(OVERPASS, data=data, timeout=300)
@@ -179,7 +191,7 @@ def fetch_osm():
             "id": f"osm:{e['type'][0]}{e['id']}", "name": t["name"], "kind": kind, "lat": lat, "lon": lon,
             "cuisine": t.get("cuisine", ""), "website": t.get("website") or t.get("contact:website") or "",
             "hours": t.get("opening_hours", ""), "rooftop": t.get("rooftop") == "yes" or "rooftop" in t["name"].lower(),
-            "music": t.get("live_music") == "yes" or kind == "music_venue",
+            "music": t.get("live_music") == "yes" or kind == "music_venue", "rsv": booking(t),
         })
     log(f"openstreetmap: {len(out)} named places")
     return out
@@ -249,7 +261,7 @@ def build_candidates(insp, osm, curated, locate):
             continue  # not notable enough to show up on OpenStreetMap with details
         used_osm.add(match["id"])
         cands[r["id"]] = {**r, "hood": locate(r["lat"], r["lon"])[1], "kind": match["kind"], "website": match["website"], "rooftop": match["rooftop"],
-                          "music": match["music"], "osm": match["id"]}
+                          "music": match["music"], "rsv": match["rsv"], "osm": match["id"]}
     # bars, venues, museums, parks: OpenStreetMap only (bars are not all in the inspection data)
     for o in osm:
         if o["id"] in used_osm or o["kind"] in ("restaurant", "cafe", "ice_cream"):
@@ -490,7 +502,8 @@ def main():
         if k in seen:
             continue
         seen.add(k)
-        live.append({**c, "h": cands[cid].get("hood") or c["h"], "pop": popularity(stats, c["n"])})  # official neighborhood beats the AI's guess
+        # official neighborhood beats the AI's guess; booking info is refreshed from OSM every run
+        live.append({**c, "h": cands[cid].get("hood") or c["h"], "rsv": cands[cid].get("rsv", ""), "pop": popularity(stats, c["n"])})
     cur_pop = {n: popularity(stats, n) for n in curated if popularity(stats, n)}
     live.sort(key=lambda s: (s["t"], s["n"]))
     OUT.write_text(json.dumps({"updated": dt.date.today().isoformat(), "count": len(live), "spots": live,
