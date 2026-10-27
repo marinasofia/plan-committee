@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>The Plan Committee</title>
 <meta name="description" content="Your friends pick what they want. AI agents argue for each of you in a group chat and agree on one NYC plan.">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-5roOctOetpheXz4TIrAVLWv41flVDYOcDLZ/VgwbjRY='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https:; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-plCZZrKJN7p2143JQsiqIp977q7iCkBGbSWiv9hQNZY='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https:; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
 <meta name="referrer" content="no-referrer">
 <meta name="theme-color" content="#fbf9f6">
 <link rel="manifest" href="manifest.webmanifest">
@@ -188,12 +188,16 @@ button,input,select,textarea{font:inherit;color:inherit}
     <p class="lead">Everyone picks what they want. Each person gets an AI agent that fights for them in a group chat, and they agree on one real plan for your night out.</p>
 
     <div class="sec" id="citySec" style="display:none"><span class="lab">City</span><div class="chips" id="cityChips"></div></div>
+    <div class="sec"><span class="lab">Your crews</span><div class="chips" id="crewChips"></div>
+      <input class="field" id="crewName" placeholder="name this crew" maxlength="30" autocomplete="off" style="margin-top:8px">
+      <p class="small" style="margin-top:4px"><a href="#" id="crewDel">Delete this crew</a></p></div>
     <div class="sec"><div class="seg" id="modeSeg"><button type="button" data-mode="date">Date night</button><button type="button" data-mode="girls">Friends night</button></div></div>
 
     <div class="sec"><span class="lab">The committee</span>
       <p class="small" id="notice" style="display:none;color:var(--ok);margin:0 0 8px"></p>
       <div id="members"></div>
       <div class="btnrow"><button class="ghost" id="addHere" type="button">+ Add someone here</button><button class="ghost" id="inviteBtn" type="button">Invite friends</button></div>
+      <button class="ghost" id="crewBtn" type="button" style="width:100%;margin-top:8px">Share crew link (pin it in your group chat)</button>
       <p class="small" style="margin:6px 2px 0">Invite sends a link to your group chat. Friends pick on their own phone and send it back. They don't need a key.</p>
       <div class="toggle"><div><div class="tt">The Wallet</div><div class="ts">a referee agent that guards the budget</div></div><button class="sw" id="walletSw" type="button" aria-label="The Wallet"></button></div>
     </div>
@@ -306,7 +310,7 @@ let CITY=null, SPOTS=[], HOODS=["Anywhere"], DEALS=[], PRICE=["free","$","$$","$
 const TYPES=["dinner","drinks","late","free"];
 const ALL_TAGS=["romantic","cozy","fancy","chaotic","artsy","lowkey","dancing","nerdy","rooftop","music","views","photo","dessert","wait","loud","quiet","cash","veg","late"];
 const str=(v,n)=>typeof v==="string"?v.slice(0,n):"";
-const CITY_ID=/^[a-z][a-z-]{1,23}$/;
+const CITY_ID=/^[a-z][a-z-]{1,23}$/, CREW_ID=/^[a-z0-9]{4,16}$/;
 function cleanSpot(o,cur){if(!o||typeof o!=="object")return null;const n=str(o.n,80).trim(),t=TYPES.includes(o.t)?o.t:null;if(!n||!t)return null;
   return {n,t,h:str(o.h,40),b:str(o.b,4),p:Number.isInteger(o.p)&&o.p>=0&&o.p<=4?o.p:2,c:str(o.c,20),f:Array.isArray(o.f)?o.f.filter(x=>ALL_TAGS.includes(x)):[],
     v:str(o.v,90),pop:typeof o.pop==="number"&&isFinite(o.pop)?Math.max(-3,Math.min(5,o.pop)):0,web:str(o.web,200),x:[],cur}}
@@ -384,13 +388,30 @@ let plan=store.get("plan",null)||defaultPlan(params.get("mode")==="girls"?"girls
 function cleanMembers(list){const arr=v=>Array.isArray(v)?v.filter(x=>typeof x==="string").map(x=>x.slice(0,30)).slice(0,20):[];
   return (Array.isArray(list)?list:[]).slice(0,6).filter(m=>m&&typeof m==="object").map(m=>({id:str(String(m.id??uid()),16),n:str(m.n,30),c:arr(m.c),v:arr(m.v),m:arr(m.m),
     d:arr(m.d).map(x=>x==="onlyM"?"only:M":x==="onlyBK"?"only:BK":x),b:[1,2,3,4].includes(m.b)?m.b:2,ps:Object.hasOwn(PERS,m.ps)?m.ps:"chill",q:str(m.q,90)}))}
-function fixPlan(){plan.when=String(plan.when??"Saturday night").slice(0,60)||"Saturday night";plan.start=STARTS.includes(+plan.start)?+plan.start:1140;plan.needs=(Array.isArray(plan.needs)?plan.needs:[]).filter(v=>NEEDS.some(n=>n[1]===v));
+function fixPlan(){plan.hood=str(plan.hood,30)||"Anywhere";if(typeof plan.id!=="string"||!CREW_ID.test(plan.id))plan.id=uid();plan.name=str(plan.name,30)||(plan.mode==="girls"?"Friends night":"Date night");plan.when=String(plan.when??"Saturday night").slice(0,60)||"Saturday night";plan.start=STARTS.includes(+plan.start)?+plan.start:1140;plan.needs=(Array.isArray(plan.needs)?plan.needs:[]).filter(v=>NEEDS.some(n=>n[1]===v));
   plan.city=CITY_ID.test(plan.city||"")?plan.city:"nyc";
   plan.members=cleanMembers(plan.members);
   if(!plan.members.length)plan.members=[member("You")];
   if(CITY&&CITY.id===plan.city){if(!HOODS.includes(plan.hood))plan.hood="Anywhere";const ok=new Set(DEALS.map(d=>d[1]));plan.members.forEach(m=>m.d=m.d.filter(x=>ok.has(x)))}}
 fixPlan();
-const savePlan=()=>store.set("plan",plan);
+/* crews: saved groups you plan with again and again. `plan` is the crew you're on; all of them live in `crews` */
+let crews=store.get("crews",{});if(!crews||typeof crews!=="object"||Array.isArray(crews))crews={};
+const MAX_CREWS=12;
+const savePlan=()=>{crews[plan.id]=plan;store.set("crews",crews);store.set("plan",plan)};
+const crewsFull=()=>Object.keys(crews).length>=MAX_CREWS;
+/* the sample crew a first visit starts with: drop it instead of keeping it when a real crew arrives by link */
+const isSample=p=>["Marina|Alex","Sofia|Dani|Jess"].includes(p.members.map(m=>m.n).join("|"))&&["Date night","Friends night"].includes(p.name)&&Object.keys(crews).length<=1;
+function stash(){if(isSample(plan))delete crews[plan.id];else savePlan()}
+function useCrew(id){if(!Object.hasOwn(crews,id))return;savePlan();plan=crews[id];fixPlan();savePlan()}
+function newCrew(){if(crewsFull())return say("You have 12 crews. Delete one first.");savePlan();plan={...defaultPlan(plan.mode),id:uid(),name:"New crew",city:plan.city,members:[cleanMembers([store.get("me",null)].filter(Boolean))[0]||member("You")]};savePlan()}
+/* a crew link (#c=) saves the whole group on a friend's phone, so anyone in it can start the next plan */
+function importCrew(P,confirmed){if(!P||typeof P!=="object")throw new Error("bad crew");
+  const id=typeof P.id==="string"&&CREW_ID.test(P.id)?P.id:uid(),had=Object.hasOwn(crews,id);
+  if(had&&!confirmed)return "ask";  // a link can't replace a crew you already have without a tap
+  if(!had&&crewsFull())return "full";
+  stash();plan={id,name:str(P.name,30)||"Shared crew",city:typeof P.city==="string"&&CITY_ID.test(P.city)?P.city:"nyc",mode:P.mode==="girls"?"girls":"date",
+    when:P.when,start:P.start,needs:P.needs,hood:str(P.hood,30)||"Anywhere",wallet:P.wallet===true,members:cleanMembers(P.members)};
+  fixPlan();savePlan();return had}
 let cfg={pool:"smart",gKey:"",gModel:"",qKey:"",qModel:"",oKey:"",oModel:"openrouter/free",cBase:"",cKey:"",cModel:"",...store.get("cfg2",{})};
 delete cfg.ol;delete cfg.olModel;delete cfg.olUrl;  /* Ollama support was removed */
 if(cfg.qModel==="llama-3.3-70b-versatile")cfg.qModel="";  /* retired by Groq */
@@ -420,7 +441,7 @@ function renderHead(){const ag=agentList();
   $("title").textContent=plan.mode==="girls"?"friends night committee":"date night committee";
   $("subtitle").textContent=`${ag.length} AI agents · 1 plan · 0 chill`}
 function renderSetup(){
-  fixPlan();
+  fixPlan();renderCrews();$("crewName").value=plan.name;
   document.querySelectorAll("#modeSeg button").forEach(b=>b.classList.toggle("on",b.dataset.mode===plan.mode));
   $("members").innerHTML=plan.members.map((m,i)=>`<div class="member" data-i="${i}"><div class="av" style="background:${COLORS[i%COLORS.length]}">${initials(m.n)}</div>
     <div><div class="mn">${esc(m.n)}</div><div class="ms">${esc(summary(m))}</div></div><button class="x" data-x="${i}" type="button" aria-label="remove">×</button></div>`).join("");
@@ -438,7 +459,17 @@ function renderSetup(){
   $("keyHint").style.display=providers().length||MOCK?"none":"";
   renderHead();
 }
-document.querySelectorAll("#modeSeg button").forEach(b=>b.onclick=()=>{if(plan.mode===b.dataset.mode)return;plan=defaultPlan(b.dataset.mode);savePlan();renderSetup()});
+document.querySelectorAll("#modeSeg button").forEach(b=>b.onclick=()=>{if(plan.mode===b.dataset.mode)return;plan.mode=b.dataset.mode;savePlan();renderSetup()});
+$("crewName").oninput=()=>{plan.name=str($("crewName").value,30);savePlan();renderCrews()};
+$("crewBtn").onclick=async()=>{savePlan();const url=baseUrl()+"#c="+await pack({...planPayload(),name:plan.name});
+  await shareOut(plan.name,`our crew for planning nights out: tap to save it, then anyone can start the next plan`,url,$("crewBtn"),"Crew link copied")};
+/* setup notice line, optionally with one action button (no browser dialogs) */
+function say(t,btn,fn){const n=$("notice");n.style.display="";n.textContent=t;if(btn){const b=document.createElement("button");b.type="button";b.className="chip";b.style.marginLeft="8px";b.textContent=btn;b.onclick=fn;n.appendChild(b)}}
+$("crewDel").onclick=()=>{if(Object.keys(crews).length<=1)return say("You need at least one crew.");
+  say(`Delete "${plan.name}" from this phone?`,"Delete",async()=>{delete crews[plan.id];store.set("crews",crews);plan=Object.values(crews)[0];fixPlan();savePlan();await ownCity();renderSetup();say("Crew deleted.")})};
+function renderCrews(){const list=Object.values(crews).sort((a,b)=>String(a.name).localeCompare(String(b.name)));
+  $("crewChips").innerHTML=list.map(c=>`<button type="button" class="chip${c.id===plan.id?" on":""}" data-crew="${esc(c.id)}">${esc(c.name||"Crew")}</button>`).join("")+`<button type="button" class="chip" data-crew="+">+ new crew</button>`;
+  $("crewChips").querySelectorAll("[data-crew]").forEach(b=>b.onclick=async()=>{const id=b.dataset.crew;if(id===plan.id)return;if(id==="+")newCrew();else useCrew(id);await ownCity();renderSetup()})}
 $("walletSw").onclick=()=>{plan.wallet=!plan.wallet;savePlan();renderSetup()};
 $("when").oninput=()=>{plan.when=$("when").value;savePlan()};
 $("startAt").onchange=()=>{plan.start=+$("startAt").value;savePlan()};
@@ -500,10 +531,13 @@ async function invite(){
 let joinCtx=null;
 function openJoin(P){
   P.members=cleanMembers(P.members);P.when=str(P.when,60);
-  const me=member("");joinCtx={P,me};
+  const saved=cleanMembers([store.get("me",null)].filter(Boolean))[0];
+  const me=P.members.find(m=>saved&&m.id===saved.id)||saved||member("");  // your picks from last time
+  joinCtx={P,me};
   openEditor(null,true,{host:P.members[0]?.n||"A friend",when:P.when||"the night",names:P.members.map(m=>m.n),me});
 }
 async function finishJoin(me){
+  store.set("me",me);
   const P=joinCtx.P;P.members=[...P.members.filter(m=>m.id!==me.id),me].slice(0,6);
   const url=baseUrl()+"#r="+await pack(P);
   $("editor").classList.add("hide");$("setup").classList.add("hide");
@@ -515,12 +549,12 @@ async function finishJoin(me){
   chatEl.appendChild(box);
   const send=()=>shareOut("My picks",`${me.n} is in. open this so my agent joins:`,url,$("sendBack"),"Copied");
   $("sendBack").onclick=send;
-  $("planHere").onclick=()=>{plan=P;savePlan();history.replaceState(null,"",location.pathname+location.search);renderSetup();$("setup").classList.remove("hide")};
+  $("planHere").onclick=async()=>{if(importCrew(P,true)==="full")return say("You have 12 crews. Delete one first.");await ownCity();history.replaceState(null,"",location.pathname+location.search);renderSetup();$("setup").classList.remove("hide")};
   send();
 }
 function mergeReply(P){
   P.members=cleanMembers(P.members);
-  if(plan.id!==P.id)plan={...P,members:[]};
+  if(plan.id!==P.id){if(typeof P.id==="string"&&Object.hasOwn(crews,P.id))useCrew(P.id);else if(importCrew({...P,members:[]})==="full")throw new Error("You have 12 crews. Delete one first.")}
   const before=new Set(plan.members.map(m=>m.id));
   for(const m of P.members){const i=plan.members.findIndex(x=>x.id===m.id);if(i<0)plan.members.push(m);else plan.members[i]=m}
   plan.members=plan.members.slice(0,6);savePlan();
@@ -905,7 +939,7 @@ $("ownBtn").onclick=async()=>{await ownCity();history.replaceState(null,"",locat
 /* ===================== flow ===================== */
 function setComposer(on){$("say").disabled=!on;$("sendBtn").disabled=!on;$("say").placeholder=on?"veto, or add a note for the agents…":"the agents are talking…"}
 /* after viewing someone else's link, switch back to the city of your own plan */
-async function ownCity(){if(CITY?.id!==plan.city)await loadCity(plan.city)}
+async function ownCity(){if(CITY?.id!==plan.city){await loadCity(plan.city);plan.city=CITY.id}}  // an unknown city falls back to NYC
 async function start(){
   await ownCity();
   if(!MOCK&&!providers().length){openQuickKey();return}
@@ -944,14 +978,21 @@ async function mockLLM(system,user,json,prefer){await sleep(200);
 
 /* ===================== start ===================== */
 async function handleHash(first){
-  const h=location.hash.match(/^#([jrpv])=(.+)$/);
+  const h=location.hash.match(/^#([jrpvc])=(.+)$/);
   if(!h){if(first&&MOCK&&params.has("auto"))start();else if(first&&!MOCK&&!store.get("onboarded",0)&&!providers().length)openOnboarding();return}
   if(busy)return;
   try{const data=await unpack(h[2]);
-    const want=h[1]==="p"?data?.c:h[1]==="v"?null:data?.city;  // open the link in its own city
+    const want=h[1]==="p"?data?.c:h[1]==="v"||h[1]==="c"?null:data?.city;  // open the link in its own city
     if(typeof want==="string"&&CITY_ID.test(want)&&want!==CITY.id)await loadCity(want);  // your own plan keeps its city (see ownCity)
     if(h[1]==="p"){if(REPLAY)return;await playReplay(data)}
     else if(h[1]==="j"){$("setup").classList.add("hide");openJoin(data)}
+    else if(h[1]==="c"){history.replaceState(null,"",location.pathname+location.search);REPLAY=null;$("app").classList.remove("replay");
+      store.set("onboarded",1);$("onboard").classList.add("hide");$("setup").classList.remove("hide");
+      const res=importCrew(data);
+      if(res==="full"){renderSetup();say("You have 12 crews. Delete one, then open the link again.");return}
+      if(res==="ask"){useCrew(data.id);await ownCity();renderSetup();
+        say(`This link has another version of your crew "${plan.name}" (${cleanMembers(data.members).map(m=>m.n).filter(Boolean).join(", ")||"no one"}). Replace yours with it?`,"Replace",async()=>{importCrew(data,true);await ownCity();renderSetup();say(`Updated "${plan.name}".`)});return}
+      await ownCity();renderSetup();say(`Saved the crew "${plan.name}". Anyone in it can start the next plan.`)}
     else if(h[1]==="v"){history.replaceState(null,"",location.pathname+location.search);recordVote(data)}
     else if(h[1]==="r"){const added=mergeReply(data);history.replaceState(null,"",location.pathname+location.search);REPLAY=null;$("app").classList.remove("replay");renderSetup();$("setup").classList.remove("hide");
       const n=$("notice");n.style.display="";n.textContent=added.length?`${added.join(", ")} just joined. Start when everyone's in.`:"Everyone in that link is already here.";}
@@ -1010,7 +1051,7 @@ async function loadCityList(){try{const r=await fetch("cities/index.json",{cache
 (async()=>{
   await Promise.all([loadCityList(),loadCity(params.get("city")||plan.city).catch(e=>console.warn(e))]);
   if(!CITY){sys("Couldn't load the city list. Check your connection and reload.",true);return}
-  plan.city=CITY.id;renderSetup();handleHash(true)})();
+  plan.city=CITY.id;fixPlan();savePlan();renderSetup();handleHash(true)})();
 window.addEventListener("hashchange",()=>handleHash(false));
 </script>
 </body>
