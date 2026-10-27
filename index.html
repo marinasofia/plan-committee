@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>The Plan Committee</title>
 <meta name="description" content="Your friends pick what they want. AI agents argue for each of you in a group chat and agree on one plan for a night out in NYC or London.">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-j1xi3JUP4wN31ism+bztRPV3Ds6KqFnTWi7VsS/rCiE='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https:; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-S9z4rruK45dFQ2kKcNmdWIsZZLR4GNNmmNbrfFX4e84='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https:; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
 <meta name="referrer" content="no-referrer">
 <meta name="theme-color" content="#fbf9f6">
 <link rel="manifest" href="manifest.webmanifest">
@@ -440,7 +440,7 @@ function stash(){if(isSample(plan))delete crews[plan.id];else savePlan()}
 /* your people: everyone you've planned with, saved on this phone so any plan is a few taps */
 const MAX_PEOPLE=60,same=(a,b)=>a.id===b.id||a.n.toLowerCase()===b.n.toLowerCase();
 let people=cleanMembers(store.get("people",[]),MAX_PEOPLE).filter(m=>m.n);
-function remember(list){for(const m of list){if(!m?.n)continue;const i=people.findIndex(x=>same(x,m)),c=JSON.parse(JSON.stringify(m));if(i<0)people.unshift(c);else people[i]=c}
+function remember(list){for(const m of list){if(!m?.n)continue;people=[JSON.parse(JSON.stringify(m)),...people.filter(x=>!same(x,m))]}  // newest first, one entry per person
   people=people.slice(0,MAX_PEOPLE);store.set("people",people)}
 if(store.get("people",null)===null)remember(Object.values(crews).filter(c=>!isSample(c)).flatMap(c=>c.members||[]));
 /* a typed name you've saved before brings their whole profile with it */
@@ -648,7 +648,7 @@ $("qzNext").onclick=qzNext;
 $("qzBack").onclick=e=>{e.preventDefault();if(qz.i>0){qz.i--;qzShow()}};
 async function collectProfiles(){const url=baseUrl()+"#f="+await pack({v:1,from:plan.members[0]?.n||"",city:plan.city});
   await shareOut("Your night out profile","answer 6 quick taps so my AI agents know your taste when we plan nights out:",url,$("profilesBtn"),"Link copied")}
-async function finishProfile(me){const url=baseUrl()+"#m="+await pack({v:1,m:me});
+async function finishProfile(me){const url=baseUrl()+"#m="+await pack({v:1,m:{id:me.id,n:me.n,ps:me.ps,c:me.c,b:me.b,v:me.v,d:me.d}});  // only what the quiz asked, never the private note
   history.replaceState(null,"",location.pathname+location.search);chatEl.innerHTML="";lastWho=null;
   const box=document.createElement("div");box.className="sys big";
   box.innerHTML=`<b>Done, ${esc(me.n)}.</b>Send it back once. From then on your agent knows you every time they plan.
@@ -662,7 +662,7 @@ function mergeReply(P){
   if(plan.id!==P.id){if(typeof P.id==="string"&&Object.hasOwn(crews,P.id))useCrew(P.id);else if(importCrew({...P,members:[]})==="full")throw new Error("You have 12 crews. Delete one first.")}
   const before=new Set(plan.members.map(m=>m.id));
   for(const m of P.members){const i=plan.members.findIndex(x=>x.id===m.id);if(i<0)plan.members.push(m);else plan.members[i]=m}
-  plan.members=plan.members.slice(0,6);remember(P.members);savePlan();
+  plan.members=plan.members.slice(0,6);remember(P.members.filter(m=>!before.has(m.id)));savePlan();
   return P.members.filter(m=>!before.has(m.id)).map(m=>m.n);
 }
 
@@ -1128,9 +1128,12 @@ async function handleHash(first){
     else if(h[1]==="f"){$("setup").classList.add("hide");openQuiz({title:`${str(data?.from,30)||"A friend"} is saving your taste for future plans`,done:finishProfile})}
     else if(h[1]==="m"){history.replaceState(null,"",location.pathname+location.search);REPLAY=null;$("app").classList.remove("replay");
       store.set("onboarded",1);$("onboard").classList.add("hide");
-      const m=cleanMembers([data?.m])[0];if(!m?.n)throw new Error("empty profile");
-      remember([m]);const i=plan.members.findIndex(x=>same(x,m));if(i>=0)plan.members[i]=JSON.parse(JSON.stringify(m));savePlan();renderSetup();$("setup").classList.remove("hide");
-      if(i>=0)say(`Updated ${m.n}'s profile.`);else if(plan.members.length<6)say(`Saved ${m.n} to your people.`,"Add to this plan",()=>{plan.members.push(JSON.parse(JSON.stringify(m)));savePlan();renderSetup();say(`${m.n} is in.`)});else say(`Saved ${m.n} to your people.`)}
+      const m=cleanMembers([data?.m])[0];if(!m?.n)throw new Error("empty profile");m.q="";m.m=[];  // the quiz never asks these, so a link can't carry them into prompts
+      // a link from anyone: never replace a saved person or the planner without a tap
+      const copy=()=>JSON.parse(JSON.stringify(m)),addBtn=()=>plan.members.length<6&&!plan.members.some(x=>same(x,m))?["Add to this plan",()=>{if(plan.members.length>=6)return say("6 people max per plan.");plan.members.push(copy());savePlan();renderSetup();say(`${m.n} is in.`)}]:[];
+      renderSetup();$("setup").classList.remove("hide");
+      if(people.some(x=>same(x,m)))say(`${m.n} sent a profile. Use it instead of the one you have?`,"Use it",()=>{remember([m]);plan.members=plan.members.map((x,i)=>i>0&&same(x,m)?copy():x);savePlan();renderSetup();say(`Updated ${m.n}'s profile.`,...addBtn())});
+      else{remember([m]);renderSetup();say(`Saved ${m.n} to your people.`,...addBtn())}}
     else if(h[1]==="c"){history.replaceState(null,"",location.pathname+location.search);REPLAY=null;$("app").classList.remove("replay");
       store.set("onboarded",1);$("onboard").classList.add("hide");$("setup").classList.remove("hide");
       const res=importCrew(data);
