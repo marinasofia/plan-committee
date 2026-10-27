@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>The Plan Committee</title>
 <meta name="description" content="Your friends pick what they want. AI agents argue for each of you in a group chat and agree on one plan for a night out in NYC or London.">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-Dh1oQmbBRTuhEW57N5i/Bd5G19o4SRX6wA6BMkUHJ74='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https:; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-v6h3wXUUE/zyYjzgTfjEdkLpXRNjtHq4VaL8ZLCI+eo='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https:; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
 <meta name="referrer" content="no-referrer">
 <meta name="theme-color" content="#fbf9f6">
 <link rel="manifest" href="manifest.webmanifest">
@@ -1084,7 +1084,7 @@ function demoNudge(){const d=document.createElement("div");d.className="sys";d.t
   const b=document.createElement("button");b.type="button";b.className="chip";b.textContent="Get my free key";b.onclick=openQuickKey;d.appendChild(b);chatEl.appendChild(d);lastWho=null;scroll()}
 async function go(rounds,startAt){
   DEMO=!MOCK&&!providers().length;busy=true;setComposer(false);
-  try{await runRounds(rounds,startAt);lastPlan=await makePlan();renderTicket(lastPlan,plan.members.map(m=>m.n),transcript.filter(m=>m.ai!=null).length);if(DEMO)demoNudge()}
+  try{demo={said:0,total:rounds*agents.length};await runRounds(rounds,startAt);lastPlan=await makePlan();renderTicket(lastPlan,plan.members.map(m=>m.n),transcript.filter(m=>m.ai!=null).length);if(DEMO)demoNudge()}
   catch(e){if(e.message==="NO_KEY"){sys("Add an AI key in settings first.",true);$("gearBtn").click()}else sys(e.message,true)}
   busy=false;setComposer(true);
 }
@@ -1095,7 +1095,15 @@ $("startBtn").onclick=start;
 $("newBtn").onclick=async()=>{if(busy)return;await ownCity();REPLAY=null;$("app").classList.remove("replay");history.replaceState(null,"",location.pathname+location.search);renderSetup();$("setup").classList.remove("hide")};
 
 /* ===================== scripted agents: the no key demo, and ?mock for testing ===================== */
-let mi=0,speaker=null;const mockUsed=new Set();
+let mi=0,speaker=null,demo=null;const mockUsed=new Set();
+/* the demo picks its plan first, so the chat argues about the places that end up in it */
+function demoPick(){if(demo.stops)return demo;
+  const of=(...t)=>SL.list.filter(s=>t.includes(s.t)),near=(from,list)=>list.slice().sort((x,y)=>(km(from,x)??99)-(km(from,y)??99))[0],
+    trip=d=>{const k=near(d,of("drinks").filter(s=>s!==d))||d,l=near(k,of("late","free").filter(s=>s!==d&&s!==k))||k;return {d,k,l,far:(km(d,k)??9)+(km(k,l)??9)}},
+    was=lastPlan?.stops.map(s=>s.spot.n)||[],all=(of("dinner").length?of("dinner"):SL.list).map(trip).sort((x,y)=>x.far-y.far),
+    fresh=all.filter(t=>!was.includes(t.d.n)),{d,k,l}=rand((fresh.length?fresh:all).slice(0,3));  // one of the tightest routes, like the real planner; a change gets a new dinner
+  const stops=[...new Set([d,k,l])],decoys=SL.list.filter(s=>!stops.includes(s)).sort(()=>Math.random()-.5).slice(0,2);
+  return Object.assign(demo,{d,k,l,stops,decoys:decoys.length?decoys:stops})}
 /* {a} and {b} are places from the shortlist, {n} is whoever spoke last */
 const MOCK_LINES={
   dramatic:["if we don't do {a} i will simply perish","{b}?? {n} that's a cry for help. {a}, final answer","i've been dreaming about {a} for WEEKS"],
@@ -1115,19 +1123,17 @@ const MOCK_LINES={
   therapist:["i hear you {n}, and i think {a} would make you feel seen","it sounds like {b} matters to you. but have we explored {a}?","let's all breathe. {a}"],
   wallet:["{a} fits the budget. {b} does not. i'm just the messenger","i ran the numbers on {b}. i'm crying","{a}, and we split the dessert"]};
 async function mockLLM(system,user,json,prefer){await sleep(200);
-  const names=SL.list.map(s=>s.n);const pickN=k=>names[(mi*3+k)%names.length];
-  if(json){if(!SL.list.length)throw new Error("No spots fit that time and place. Try another neighborhood or time.");
-    const of=(...t)=>SL.list.filter(s=>t.includes(s.t)),near=(from,list)=>list.slice().sort((x,y)=>(km(from,x)??99)-(km(from,y)??99))[0],
-      trip=d=>{const k=near(d,of("drinks").filter(s=>s!==d))||d,l=near(k,of("late","free").filter(s=>s!==d&&s!==k))||k;return {d,k,l,far:(km(d,k)??9)+(km(k,l)??9)}},
-      {d,k,l}=rand((of("dinner").length?of("dinner"):SL.list).map(trip).sort((x,y)=>x.far-y.far).slice(0,3));  // one of the tightest routes, like the real planner
-    return {text:JSON.stringify({title:rand(["The Peace Treaty","Night of Many Opinions","The Great Compromise","Nobody Fully Won","Democracy, Sort Of"]),
+  if(!SL.list.length)throw new Error("No spots fit that time and place. Try another neighborhood or time.");
+  const {d,k,l,stops,decoys}=demoPick(),i=demo.said,settled=i>=demo.total-agents.length;  // the last round only names places that make the plan
+  const A=stops[i%stops.length].n,B=(settled?stops[(i+1)%stops.length]:decoys[i%decoys.length]).n;
+  if(json){    return {text:JSON.stringify({title:rand(["The Peace Treaty","Night of Many Opinions","The Great Compromise","Nobody Fully Won","Democracy, Sort Of"]),
       stops:[{time:fmtMin(plan.start),name:d.n,note:"everyone could live with it"},{time:fmtMin(plan.start+120),name:k.n,note:"the compromise"},{time:fmtMin(plan.start+210),name:l.n,note:"the closer"}],
       drama:40+Math.floor(Math.random()*55),verdict:rand(["The loudest agent won, as usual.","Everyone lost a little, which means it's fair.","One agent caved for dessert. We won't say who."])}),model:"mock"}}
   const last=[...transcript].reverse().find(m=>m.ai!=null)?.who||"everyone";
-  if(/^The human/.test(transcript[transcript.length-1]?.who||"")){mi++;return {text:rand(["fine. heard. new idea: {a}","ok ok, the human has spoken. {a}?","respecting the veto. {a} though","noted. {a}, and nobody complain"]).replace("{a}",()=>pickN(0)),model:"mock"}}  // the first agent after a veto reacts to it
+  if(/final say/.test(transcript[transcript.length-1]?.who||"")){mi++;demo.said++;return {text:rand(["fine. heard. new idea: {a}","ok ok, the human has spoken. {a}?","respecting the veto. {a} though","noted. {a}, and nobody complain"]).replace("{a}",()=>A),model:"mock"}}  // the first agent after a veto reacts to it
   const all=MOCK_LINES[speaker?.wallet?"wallet":speaker?.ps]||MOCK_LINES.chill,fresh=all.filter(l=>!mockUsed.has(l)),line=rand(fresh.length?fresh:all);
   if(!fresh.length)all.forEach(l=>mockUsed.delete(l));mockUsed.add(line);
-  mi++;return {text:line.replace(/\{([abn])\}/g,(_,k)=>k==="a"?pickN(0):k==="b"?pickN(1):last),model:["llama-3.3-70b","gemini-flash-lite","nemotron-nano"][(prefer??mi)%3]}}
+  mi++;demo.said++;return {text:line.replace(/\{([abn])\}/g,(_,x)=>x==="a"?A:x==="b"?B:last),model:["llama-3.3-70b","gemini-flash-lite","nemotron-nano"][(prefer??mi)%3]}}
 
 /* ===================== start ===================== */
 async function handleHash(first){
