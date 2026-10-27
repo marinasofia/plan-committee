@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>The Plan Committee</title>
 <meta name="description" content="Your friends pick what they want. AI agents argue for each of you in a group chat and agree on one plan for a night out in NYC or London.">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-BvVJtr1xsGAOqdPOdgpq0CbZvN9zT1/dL22GbhyqcgE='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https:; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-TH0r+fApJhVstW6O6hpoqyXzO+ARO+EpMh3jW9UroTM='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https:; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
 <meta name="referrer" content="no-referrer">
 <meta name="theme-color" content="#fbf9f6">
 <link rel="manifest" href="manifest.webmanifest">
@@ -853,7 +853,8 @@ Use 3 stops in order (dinner, drinks, then a late or free stop), close to each o
   const p=parseJSON(res.text);
   p.stops=(p.stops||[]).map(s=>({...s,spot:findSpot(s.name)})).filter(s=>s.spot).slice(0,4);
   if(!p.stops.length)throw new Error("The agents couldn't agree on real places. Tap + to try again.");
-  hist=[...hist,...p.stops.map(s=>s.spot.n)].slice(-60);store.set("hist",hist);track("pick",p.stops.map(s=>s.spot.n));
+  if(!scripted()){hist=[...hist,...p.stops.map(s=>s.spot.n)].slice(-60);store.set("hist",hist)}  // demo picks never steer real runs
+  track("pick",p.stops.map(s=>s.spot.n));
   return p;
 }
 function parseJSON(t){t=t.replace(/```json|```/g,"").trim();try{return JSON.parse(t)}catch(e){const m=t.match(/\{[\s\S]*\}/);if(m)return JSON.parse(m[0]);throw new Error("Couldn't read the plan. Try again.")}}
@@ -940,7 +941,7 @@ async function sharePlan(p,btn){
   if(typeof p.id!=="string"||!/^[a-z0-9]{4,12}$/.test(p.id))p.id=uid();  // never trust an id the AI might have put in its JSON
   sent[p.id]={title:String(p.title||"The plan"),when:plan.when,stops:p.stops.map(s=>s.spot.n),votes:sent[p.id]?.votes||{},at:Date.now()};
   const ids=Object.keys(sent).sort((a,b)=>sent[b].at-sent[a].at);for(const k of ids.slice(20))delete sent[k];store.set("sent",sent);
-  const payload={v:2,id:p.id,c:CITY.id,m:plan.mode,w:plan.when,a:agents.map(a=>[a.n,a.color]),t:transcript.map(m=>[m.ai??-1,m.text,m.via||""]),
+  const payload={v:2,d:scripted()?1:0,id:p.id,c:CITY.id,m:plan.mode,w:plan.when,a:agents.map(a=>[a.n,a.color]),t:transcript.map(m=>[m.ai??-1,m.text,m.via||""]),
     p:{title:p.title,drama:p.drama,verdict:p.verdict,stops:p.stops.map(s=>[s.time,s.spot.n,s.note||""])}};
   const url=baseUrl()+"#p="+await pack(payload);
   await shareOut(p.title||"The plan",`our ${plan.when.toLowerCase()} plan: ${p.stops.map(s=>s.spot.n).join(", then ")}. our AI agents fought about it, watch:`,url,btn);
@@ -957,6 +958,7 @@ async function playReplay(R){
   chatEl.innerHTML="";lastWho=null;
   const humans=ag.filter(a=>a.n!=="The Wallet").map(a=>a.n);
   sys(`${humans.join(", ")} let AI agents plan their night. Here's how it went.`);
+  if(R.d===1)sys("This one was made in demo mode, with scripted agents.");
   for(let [i,text,via] of R.t){text=String(text??"");via=via?String(via):"";const a=i>=0?ag[i]:null;
     if(a){showTyping(a);await sleep(450+Math.min(text.length*13,1300));hideTyping()}else await sleep(450);
     addBubble(a,text,via||null)}
@@ -992,7 +994,7 @@ async function start(){
 function demoNudge(){const d=document.createElement("div");d.className="sys";d.textContent="That was the demo. With a free key (1 minute, no card) the agents really fight for each person's picks. ";
   const b=document.createElement("button");b.type="button";b.className="chip";b.textContent="Get my free key";b.onclick=openQuickKey;d.appendChild(b);chatEl.appendChild(d);lastWho=null;scroll()}
 async function go(rounds,startAt){
-  busy=true;setComposer(false);
+  DEMO=!MOCK&&!providers().length;busy=true;setComposer(false);
   try{await runRounds(rounds,startAt);lastPlan=await makePlan();renderTicket(lastPlan,plan.members.map(m=>m.n),transcript.filter(m=>m.ai!=null).length);if(DEMO)demoNudge()}
   catch(e){if(e.message==="NO_KEY"){sys("Add an AI key in settings first.",true);$("gearBtn").click()}else sys(e.message,true)}
   busy=false;setComposer(true);
@@ -1024,7 +1026,8 @@ const MOCK_LINES={
   wallet:["{a} fits the budget. {b} does not. i'm just the messenger","i ran the numbers on {b}. i'm crying","{a}, and we split the dessert"]};
 async function mockLLM(system,user,json,prefer){await sleep(200);
   const names=SL.list.map(s=>s.n);const pickN=k=>names[(mi*3+k)%names.length];
-  if(json){const of=(...t)=>SL.list.filter(s=>t.includes(s.t)),near=(from,list)=>list.slice().sort((x,y)=>(km(from,x)??99)-(km(from,y)??99))[0],
+  if(json){if(!SL.list.length)throw new Error("No spots fit that time and place. Try another neighborhood or time.");
+    const of=(...t)=>SL.list.filter(s=>t.includes(s.t)),near=(from,list)=>list.slice().sort((x,y)=>(km(from,x)??99)-(km(from,y)??99))[0],
       trip=d=>{const k=near(d,of("drinks").filter(s=>s!==d))||d,l=near(k,of("late","free").filter(s=>s!==d&&s!==k))||k;return {d,k,l,far:(km(d,k)??9)+(km(k,l)??9)}},
       {d,k,l}=rand((of("dinner").length?of("dinner"):SL.list).map(trip).sort((x,y)=>x.far-y.far).slice(0,3));  // one of the tightest routes, like the real planner
     return {text:JSON.stringify({title:rand(["The Peace Treaty","Night of Many Opinions","The Great Compromise","Nobody Fully Won","Democracy, Sort Of"]),
