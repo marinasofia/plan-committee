@@ -8,8 +8,8 @@
 </p>
 
 <p align="center">
-  <a href="https://marinasofia.github.io/plan-committee/"><b>Try it live</b></a> ·
-  <a href="https://marinasofia.github.io/plan-committee/?mock">Try it with no AI key</a> ·
+  <a href="https://plan-committee.pages.dev/"><b>Try it live</b></a> ·
+  <a href="https://plan-committee.pages.dev/?mock">Try it with no AI key</a> ·
   <a href="CONTRIBUTING.md">Contribute</a>
 </p>
 
@@ -55,8 +55,10 @@ Open http://localhost:8000/?mock for scripted agents with no AI key, or http://l
 ### Host your own copy (free)
 
 1. Fork the repo.
-2. Turn on **Settings > Pages > Deploy from branch > main / root**.
+2. In Cloudflare (free, no card): **Workers & Pages > Create > Pages > Connect to Git**, pick your fork. Framework preset **None**, no build command, output directory `/`. Every push to `main` deploys on its own, and `_headers` adds the security headers.
 3. For the daily spot updates, add a free `GROQ_API_KEY` (console.groq.com/keys) and/or `GEMINI_API_KEY` (aistudio.google.com/apikey) under **Settings > Secrets and variables > Actions**, then run **Actions > Update spots** once.
+
+GitHub Pages works too, but every repo on your `username.github.io` shares one origin, so any of them could read the AI keys people save in the app. Cloudflare gives the app its own address.
 
 Free limits: about 40 batches of 25 places per run fits inside Groq's free daily tokens. The first week fills the backlog, then each run only tags new openings.
 

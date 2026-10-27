@@ -1,7 +1,7 @@
 {
   "name": "The Plan Committee",
   "short_name": "Plan Committee",
-  "description": "Everyone picks what they want. AI agents argue for each of you and agree on one real NYC plan.",
+  "description": "Everyone picks what they want. AI agents argue for each of you and agree on one real plan for a night out in NYC or London.",
   "id": "./",
   "start_url": "./",
   "scope": "./",

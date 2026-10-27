@@ -3,14 +3,18 @@
    other cross origin request go straight to the network and are never cached. Pages and data are network
    first, so a fix pushed to GitHub reaches people on their next visit instead of being stuck in a cache. */
 const CACHE = "pc-v2";
-const SHELL = ["./", "index.html", "cities/index.json", "cities/nyc/city.json", "cities/nyc/spots.json", "manifest.webmanifest", "icons/icon.svg", "icons/icon-192.png", "icons/icon-512.png", "icons/apple-touch-icon.png"];
+const SHELL = ["cities/index.json", "cities/nyc/city.json", "cities/nyc/spots.json", "manifest.webmanifest", "icons/icon.svg", "icons/icon-192.png", "icons/icon-512.png", "icons/apple-touch-icon.png"];
 
 self.addEventListener("install", e => {
-  e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)).then(() => self.skipWaiting()));
+  // the app page is stored from "./" under "index.html": hosts like Cloudflare redirect /index.html to /,
+  // and a redirected response can't be used as the offline page
+  e.waitUntil(caches.open(CACHE).then(c => Promise.all([c.addAll(SHELL),
+    fetch("./").then(res => { if (res.ok && !res.redirected) return c.put("index.html", res); })]))
+    .then(() => self.skipWaiting()));
 });
 
 self.addEventListener("activate", e => {
-  // every repo on marinasofia.github.io shares this origin's caches, so only ever touch our own (pc-*)
+  // on shared hosts (like username.github.io) other apps can share this origin's caches, so only ever touch our own (pc-*)
   e.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(k => k.startsWith("pc-") && k !== CACHE).map(k => caches.delete(k))))
     .then(() => self.clients.claim()));
 });

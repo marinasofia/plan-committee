@@ -4,7 +4,7 @@ AI agents argue in a group chat and agree on one real NYC date night or friends 
 
 ## How it works
 
-* `index.html` is the whole app: one file, no build step, no server. It is installable as an app (`manifest.webmanifest`, `sw.js`, `icons/`); `og.png` is the link preview image. Users bring their own free AI key. 125 hand picked spots live inside it (`const RAW`) and always rank first. `index.html?mock` runs scripted agents with no key.
+* `index.html` is the whole app: one file, no build step, no server. It is hosted on Cloudflare Pages (https://plan-committee.pages.dev), which deploys every push to `main`; `_headers` sets the HTTP security headers. It is installable as an app (`manifest.webmanifest`, `sw.js`, `icons/`); `og.png` is the link preview image. Users bring their own free AI key. 125 hand picked spots live inside it (`const RAW`) and always rank first. `index.html?mock` runs scripted agents with no key.
 * Cities live in `cities/<id>/`: `city.json` (settings and hand picks, written by people) and `spots.json` (generated daily). `cities/index.json` lists them. The app loads the city at startup and validates every field; `tools/format_city.py` formats city files.
 * `spots.json` is the extra spot list the app loads on every visit. It is built daily by `pipeline/build_spots.py` via `.github/workflows/update-spots.yml`, and the Actions bot commits `spots.json` and `data/tagged.json`.
 * Pipeline: NYC Open Data restaurant inspections from the last 12 months (closed places drop out) plus OpenStreetMap places via Overpass. Restaurants must also be on OSM with a website or hours. Chains, takeout cuisines and curated spots are removed. A free AI (Groq, then Gemini) tags new places in batches; unknown places are skipped. Tags are cached in `data/tagged.json` so each place is tagged once.
@@ -25,7 +25,7 @@ Act as a senior security engineer and pen test every change before it is committ
 
 * Secrets: no keys, tokens, emails or personal paths in code, data files, logs or git history. Send the Gemini key in the `x-goog-api-key` header, never in the URL, and never log request headers or raw error bodies that could echo a key.
 * CSP: `index.html` only runs the inline script whose sha256 is in its Content Security Policy. After any edit to the script, run `python3 tools/csp.py`, or the app will not run. CI checks it.
-* Shared origin: every repo published on marinasofia.github.io shares this app's origin, so it can read users' saved keys. Never publish untrusted code to another Pages repo on this account; a custom domain would isolate the app.
+* Hosting: the app has its own origin on Cloudflare Pages. Don't move it back to GitHub Pages: every repo on a `username.github.io` shares one origin and could read users' saved keys. Keep `_headers` (frame blocking, nosniff, no-cache for `sw.js`).
 * Service worker (`sw.js`): only same origin GET requests, never AI calls or anything cross origin; keep pages network first so fixes reach people.
 * XSS in `index.html`: share links (`#j=`, `#r=`, `#p=`), `spots.json`, OpenStreetMap data and AI replies are all untrusted. Everything put into `innerHTML` goes through `esc()`, links through `safeUrl()` (http and https only), colors through `safeColor()`. Users' AI keys live in localStorage, so any XSS steals them.
 * GitHub Actions: no `pull_request_target` or comment triggers, least `permissions`, no `${{ }}` of untrusted input inside `run:`, secrets only in the step that needs them.
