@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>The Plan Committee</title>
 <meta name="description" content="Your friends pick what they want. AI agents argue for each of you in a group chat and agree on one plan for a night out in NYC or London.">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-F0ads9qLJJB4pW4K1WQGqiJYnWVUmzYabY6pvgZW+zI='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https:; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-vi0QCa5Fvfrz50YeyOTGej/au4+hnHVvdUAJnEv177U='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https:; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
 <meta name="referrer" content="no-referrer">
 <meta name="theme-color" content="#fbf9f6">
 <link rel="manifest" href="manifest.webmanifest">
@@ -704,7 +704,8 @@ const OUTDOOR=s=>s.t==="free"||s.f.includes("rooftop");
 function shortlist(){
   const C=constraints();
   const base=nightDate(plan.when),needs=plan.needs;
-  const slotOk=s=>{const m=plan.start+(SLOT[s.t]||0);return isOpen(s,new Date(base.getTime()+Math.floor(m/1440)*864e5),m%1440)!==false};
+  const slotOk=s=>{const m=plan.start+(SLOT[s.t]||0),o=isOpen(s,new Date(base.getTime()+Math.floor(m/1440)*864e5),m%1440);
+    return o!==false&&!(o==null&&s.t==="free"&&!s.cur&&m>=1200)};  // an auto-added free spot with no hours is usually a museum or gallery: not after 8 pm
   const ok=(s,strict)=>{if(!slotOk(s))return false;if(needs.includes("wheel")&&s.x.includes("nowheel"))return false;
     if(s.p>C.maxB+(strict?0:1))return false;if(!strict)return true;
     if(C.deals.has("wait")&&s.f.includes("wait"))return false;if(C.deals.has("loud")&&s.f.includes("loud"))return false;
