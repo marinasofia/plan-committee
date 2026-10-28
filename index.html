@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>The Plan Committee</title>
 <meta name="description" content="Your friends pick what they want. AI agents argue for each of you in a group chat and agree on one plan for a night out in NYC or London.">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-slaVtoZiNqKoV0HFXdVMJv6kO8rRNKnxSpa2RqnGks8='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https:; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-ailI8Ms1tTDTW+Z9apEK8d/QCtAXTR4BoUDzgjJGegM='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https:; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
 <meta name="referrer" content="no-referrer">
 <meta name="theme-color" content="#fbf9f6">
 <link rel="manifest" href="manifest.webmanifest">
@@ -715,7 +715,7 @@ function shortlist(){
   let anchor=null;  // keep the night in one area: everything is scored by distance to the best dinner pick
   const near=s=>{const d=km(anchor,s);return d==null?0:d<1.5?6:d<3?3:d<5?0:-6};
   const score=s=>plan.members.reduce((a,m)=>a+personScore(s,m),0)+(hoodMatch(s)?4:0)+(faves.includes(s.n)?2:0)+(s.cur?1:0)+(s.pop||0)-(recent.includes(s.n)&&!faves.includes(s.n)?6:0)
-    +needScore(s)+wxScore(s)+(anchor?near(s):0)+Math.random()*2.5;
+    +needScore(s)+wxScore(s)+(anchor?near(s):0)+((s.t==="dinner"||s.t==="drinks")&&s.p<C.maxB-1?-4:0)+Math.random()*2.5;  // a $$$ group gets $$ and $$$ dinners and drinks, not fast food
   const pick=(t,k)=>{let pool=SPOTS.filter(s=>s.t===t&&ok(s,true));if(pool.length<Math.min(k,3))pool=SPOTS.filter(s=>s.t===t&&ok(s,false));
     const ranked=pool.map(s=>({s,sc:score(s)})).sort((a,b)=>b.sc-a.sc).map(x=>x.s);
     // keep a few slots for newer auto-added spots so the list keeps discovering new places
@@ -1105,11 +1105,11 @@ function demoPick(){if(demo.stops)return demo;
     {d,k,l}=(fresh.length?fresh:all).slice(0,6).map(t=>({t,sc:agents.reduce((n,a)=>n+Math.max(...[t.d,t.k,t.l].map(s=>persFit(a,s))),0)+Math.random()})).sort((x,y)=>y.sc-x.sc)[0].t;  // a tight route, like the real planner, where every agent has a place that fits its personality; a change gets a new dinner
   const stops=[...new Set([d,k,l])],decoys=SL.list.filter(s=>!stops.includes(s)).sort(()=>Math.random()-.5).slice(0,2);
   return Object.assign(demo,{d,k,l,stops,decoys:decoys.length?decoys:stops})}
-/* demo only: tags each personality goes for, and ones it avoids (-), so a romantic never pitches a party pub. The Wallet goes for cheap */
+/* demo only: tags each personality goes for, and ones it avoids (-), so a romantic never pitches a party pub. The Wallet only minds spots over budget */
 const PERS_TAGS={"hopeless romantic":"romantic cozy views quiet dessert -loud -chaotic -dancing",dramatic:"fancy rooftop views music",chaotic:"chaotic dancing loud late",chill:"lowkey cozy -fancy -wait",
   "food snob":"fancy -lowkey -cash","main character":"photo rooftop fancy views",hype:"dancing music loud",overthinker:"quiet -wait -cash","early bird":"quiet cozy -late -dancing -loud",
   therapist:"cozy quiet","the mediator":"lowkey","sports commentator":"loud","conspiracy theorist":"nerdy"};
-const persFit=(a,s)=>a?.wallet?-(s.p||2):(PERS_TAGS[a?.ps]||"").split(" ").filter(Boolean).reduce((n,t)=>n+(t[0]==="-"?-s.f.includes(t.slice(1)):+s.f.includes(t)),0);
+const persFit=(a,s)=>a?.wallet?(s.p>SL.C.maxB?-2:0):(PERS_TAGS[a?.ps]||"").split(" ").filter(Boolean).reduce((n,t)=>n+(t[0]==="-"?-s.f.includes(t.slice(1)):+s.f.includes(t)),0);
 /* {a} and {b} are places from the shortlist, {n} is whoever spoke last */
 const MOCK_LINES={
   dramatic:["if we don't do {a} i will simply perish","{b}?? {n} that's a cry for help. {a}, final answer","i've been dreaming about {a} for WEEKS"],
