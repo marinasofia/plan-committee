@@ -638,9 +638,10 @@ def load_cities():
     return cities
 
 
-def curated_info(picks, osm, locate):
+def curated_info(picks, osm, locate, bbox):
     """Coordinates, hours and needs for the hand picked spots, from the one OSM place with the same name (in the
-    same area when the city has areas). Skipped when the match is ambiguous, so we never attach the wrong hours."""
+    same area when the city has areas). Skipped when the match is ambiguous, so we never attach the wrong hours.
+    Then a pick's own "lat"/"lon" (looked up on OpenStreetMap by hand) gives at least its location."""
     by_name = {}
     for o in osm:
         by_name.setdefault(norm(o["name"]), []).append(o)
@@ -653,6 +654,10 @@ def curated_info(picks, osm, locate):
             if len(hits) > 1:
                 hits = [o for o in hits if hood and hood.split(" ")[0].lower() in locate(o["lat"], o["lon"])[1].lower()]
         if len(hits) != 1:
+            lat, lon = row.get("lat"), row.get("lon")
+            if all(isinstance(v, (int, float)) and not isinstance(v, bool) for v in (lat, lon)) \
+                    and bbox[0] <= lat <= bbox[2] and bbox[1] <= lon <= bbox[3]:
+                info[name] = {"lat": round(lat, 5), "lon": round(lon, 5)}
             continue
         o = hits[0]
         info[name] = {k: v for k, v in {"lat": round(o["lat"], 5), "lon": round(o["lon"], 5), "hrs": o["hrs"],
@@ -696,7 +701,7 @@ def build_city(city, cache, stats, max_batches):
         live.append(f)
     live.sort(key=lambda s: (s["t"], s["n"]))
     cur_pop = {n: popularity(stats, n) for n in curated if popularity(stats, n)}
-    cur_info = curated_info(picks, osm, locate)
+    cur_info = curated_info(picks, osm, locate, city["bbox"])
     log(f"hand picked spots matched on OpenStreetMap: {len(cur_info)} of {len(curated)}")
     out = CITIES / city["id"] / "spots.json"
     out.write_text(json.dumps({"updated": dt.date.today().isoformat(), "count": len(live), "spots": live,
