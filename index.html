@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>The Plan Committee</title>
 <meta name="description" content="Your friends pick what they want. AI agents argue for each of you in a group chat and agree on one plan for a night out in NYC or London.">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-n8Myb3cYHWYfjUCDW1rGIRO2teQ5iGH6mzfth/cjwHY='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https:; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-vi0QCa5Fvfrz50YeyOTGej/au4+hnHVvdUAJnEv177U='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https:; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
 <meta name="referrer" content="no-referrer">
 <meta name="theme-color" content="#fbf9f6">
 <link rel="manifest" href="manifest.webmanifest">
@@ -1102,8 +1102,8 @@ function demoPick(){if(demo.stops)return demo;
   const of=(...t)=>SL.list.filter(s=>t.includes(s.t)),near=(from,list)=>list.slice().sort((x,y)=>(km(from,x)??99)-(km(from,y)??99))[0],
     trip=d=>{const k=near(d,of("drinks").filter(s=>s!==d))||d,l=near(k,of("late","free").filter(s=>s!==d&&s!==k))||k;return {d,k,l,far:(km(d,k)??9)+(km(k,l)??9)}},
     was=lastPlan?.stops.map(s=>s.spot.n)||[],all=(of("dinner").length?of("dinner"):SL.list).map(trip).sort((x,y)=>x.far-y.far),
-    fresh=all.filter(t=>!was.includes(t.d.n)),
-    {d,k,l}=(fresh.length?fresh:all).slice(0,6).map(t=>({t,sc:agents.reduce((n,a)=>n+Math.max(...[t.d,t.k,t.l].map(s=>persFit(a,s))),0)+Math.random()})).sort((x,y)=>y.sc-x.sc)[0].t;  // a tight route, like the real planner, where every agent has a place that fits its personality; a change gets a new dinner
+    tight=all.filter(t=>t.far<=all[0].far+1.5),fresh=[tight,all].map(p=>p.filter(t=>!was.includes(t.d.n))).find(p=>p.length)||all,  // only routes about as short as the best one, so personality never drags in a far dinner
+    {d,k,l}=fresh.slice(0,6).map(t=>({t,sc:agents.reduce((n,a)=>n+Math.max(...[t.d,t.k,t.l].map(s=>persFit(a,s))),0)+Math.random()})).sort((x,y)=>y.sc-x.sc)[0].t;  // a tight route, like the real planner, where every agent has a place that fits its personality; a change gets a new dinner
   const stops=[...new Set([d,k,l])],decoys=SL.list.filter(s=>!stops.includes(s)).sort(()=>Math.random()-.5).slice(0,2);
   return Object.assign(demo,{d,k,l,stops,decoys:decoys.length?decoys:stops})}
 /* demo only: tags each personality goes for, and ones it avoids (-), so a romantic never pitches a party pub. The Wallet only minds spots over budget */
@@ -1123,25 +1123,31 @@ const MOCK_LINES={
   "main character":["the scene opens at {a}. i walk in. everyone gasps","{b} doesn't fit my storyline. {a} does","this night needs a montage and it starts at {a}"],
   sarcastic:["oh {b}, groundbreaking. {a} please","love that for you {n}. anyway, {a}","wow another vote for {b}. bold. {a}"],
   hype:["{a}!!! {a}!!! do you understand how good {a} is","ok {b} just became my whole personality","{n} that's genius, {b}, LET'S GO"],
-  overthinker:["but what if {b} has a wait. and what if it rains. {a} is safer?","{a} is 6 minutes from {b}, i checked twice","is {a} too fancy? too casual? ok it's fine. {a}"],
+  overthinker:["but what if {b} has a wait. and what if it rains. {a} is safer?","{a} is close to everything else, i checked twice","is {a} too fancy? too casual? ok it's fine. {a}"],
   "sports commentator":["and {n} goes for {b}, a risky play! but here comes {a}","the crowd is on its feet for {a}","{b} takes an early lead, but never count out {a}"],
   "early bird":["{a} sounds lovely if we're home by 11","{b} is very late for me, how about {a} at 7","bring a jacket, then {a}"],
   "conspiracy theorist":["interesting that {n} keeps pushing {b}. who's paying you","{a} is the only place they can't track us","{b}? that's exactly what they want us to pick"],
   therapist:["i hear you {n}, and i think {a} would make you feel seen","it sounds like {b} matters to you. but have we explored {a}?","let's all breathe. {a}"],
-  wallet:["{a} fits the budget. {b} does not. i'm just the messenger","i ran the numbers on {b}. i'm crying","{a}, and we split the dessert"]};
+  wallet:["{a} fits the budget. i'm allowing it","ran the numbers on {b}. we survive. barely","{n}, love the energy. my vote is {a}"],
+  walletOver:["{a} fits the budget. {b} does not. i'm just the messenger","i ran the numbers on {b}. i'm crying"]};  // only when a place really is over budget
 async function mockLLM(system,user,json,prefer){await sleep(200);
   if(!SL.list.length)throw new Error("No spots fit that time and place. Try another neighborhood or time.");
   const {d,k,l,stops,decoys}=demoPick(),i=demo.said,settled=i>=demo.total-agents.length;  // the last round only names places that make the plan
-  const rot=stops.map((_,j)=>stops[(i+j)%stops.length]),best=rot.reduce((x,y)=>persFit(speaker,y)>persFit(speaker,x)?y:x);  // each agent pitches the stop that fits its personality
-  const A=best.n,B=(settled?rot.find(s=>s!==best)||best:decoys[i%decoys.length]).n;
+  const said=demo.pitched||(demo.pitched={}),mine=s=>said[speaker?.n+"|"+s.n]||0,fit=s=>speaker?.wallet?-s.p:persFit(speaker,s)-mine(s)*.6;
+  const rot=stops.map((_,j)=>stops[(i+j)%stops.length]),best=rot.reduce((x,y)=>fit(y)>fit(x)?y:x);  // each agent pitches the stop that fits its personality (The Wallet: the cheapest), and doesn't repeat itself forever
+  said[speaker?.n+"|"+best.n]=mine(best)+1;
+  const over=(settled?stops:[...stops,...decoys]).find(s=>s.p>SL.C.maxB),prev=demo.prev?.who!==speaker?.n?demo.prev?.s:null;demo.prev={who:speaker?.n,s:best};  // the place this agent names first
+  let B=speaker?.wallet?over||stops.reduce((x,y)=>y.p>x.p?y:x):settled?rot.find(s=>s!==best)||best:decoys[i%decoys.length];const A=best.n;
   if(json){    return {text:JSON.stringify({title:rand(["The Peace Treaty","Night of Many Opinions","The Great Compromise","Nobody Fully Won","Democracy, Sort Of"]),
       stops:[{time:fmtMin(plan.start),name:d.n,note:"everyone could live with it"},{time:fmtMin(plan.start+120),name:k.n,note:"the compromise"},{time:fmtMin(plan.start+210),name:l.n,note:"the closer"}],
       drama:40+Math.floor(Math.random()*55),verdict:rand(["The loudest agent won, as usual.","Everyone lost a little, which means it's fair.","One agent caved for dessert. We won't say who."])}),model:"mock"}}
   const last=[...transcript].reverse().find(m=>m.ai!=null)?.who||"everyone";
   if(/final say/.test(transcript[transcript.length-1]?.who||"")){mi++;demo.said++;return {text:rand(["fine. heard. new idea: {a}","ok ok, the human has spoken. {a}?","respecting the veto. {a} though","noted. {a}, and nobody complain"]).replace("{a}",()=>A),model:"mock"}}  // the first agent after a veto reacts to it
-  const all=MOCK_LINES[speaker?.wallet?"wallet":speaker?.ps]||MOCK_LINES.chill,fresh=all.filter(l=>!mockUsed.has(l)),line=rand(fresh.length?fresh:all);
+  const said2=prev&&prev!==best,ok=l=>said2||!l.includes("{n}");  // lines aimed at {n} ("{n} keeps pushing {b}") only when {n} really pitched another place
+  const lines=MOCK_LINES[speaker?.wallet?over?"walletOver":"wallet":speaker?.ps]||MOCK_LINES.chill,all=lines.filter(ok).length?lines.filter(ok):lines,fresh=all.filter(l=>!mockUsed.has(l)),line=rand(fresh.length?fresh:all);
   if(!fresh.length)all.forEach(l=>mockUsed.delete(l));mockUsed.add(line);
-  mi++;demo.said++;return {text:line.replace(/\{([abn])\}/g,(_,x)=>x==="a"?A:x==="b"?B:last),model:["llama-3.3-70b","gemini-flash-lite","nemotron-nano"][(prefer??mi)%3]}}
+  if(said2&&line.includes("{n}"))B=prev;if(!line.includes("{a}"))demo.prev.s=B;
+  mi++;demo.said++;return {text:line.replace(/\{([abn])\}/g,(_,x)=>x==="a"?A:x==="b"?B.n:last),model:["llama-3.3-70b","gemini-flash-lite","nemotron-nano"][(prefer??mi)%3]}}
 
 /* ===================== start ===================== */
 async function handleHash(first){
