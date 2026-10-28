@@ -146,7 +146,7 @@
     {"n": "Bethesda Terrace", "t": "free", "h": "Central Park", "b": "M", "p": 0, "c": "", "f": ["romantic", "photo"], "v": "the most romantic spot in Central Park", "lat": 40.77422, "lon": -73.97105},
     {"n": "Grand Central Whispering Gallery", "t": "free", "h": "Midtown", "b": "M", "p": 0, "c": "", "f": ["nerdy", "romantic"], "v": "whisper into a corner, they hear it across the arch", "lat": 40.75269, "lon": -73.97725},
     {"n": "Bryant Park", "t": "free", "h": "Midtown", "b": "M", "p": 0, "c": "", "f": ["lowkey"], "v": "park behind the library"},
-    {"n": "Brooklyn Bridge walk", "t": "free", "h": "DUMBO", "b": "BK", "p": 0, "c": "", "f": ["views", "romantic", "photo"], "v": "the walk everyone should do once", "lat": 40.70622, "lon": -73.99702},
+    {"n": "Brooklyn Bridge walk", "t": "free", "h": "DUMBO", "b": "BK", "p": 0, "c": "", "f": ["views", "romantic", "photo"], "v": "the walk everyone should do once", "lat": 40.70313, "lon": -73.99314},
     {"n": "Washington Street DUMBO", "t": "free", "h": "DUMBO", "b": "BK", "p": 0, "c": "", "f": ["photo"], "v": "the Manhattan Bridge photo spot", "lat": 40.70208, "lon": -73.98965},
     {"n": "Brooklyn Bridge Park", "t": "free", "h": "DUMBO", "b": "BK", "p": 0, "c": "", "f": ["views", "lowkey"], "v": "waterfront skyline views"},
     {"n": "Domino Park", "t": "free", "h": "Williamsburg", "b": "BK", "p": 0, "c": "", "f": ["views", "lowkey"], "v": "waterfront park, skyline views"},

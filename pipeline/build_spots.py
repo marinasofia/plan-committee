@@ -656,7 +656,7 @@ def curated_info(picks, osm, locate, bbox):
         if len(hits) != 1:
             lat, lon = row.get("lat"), row.get("lon")
             if all(isinstance(v, (int, float)) and not isinstance(v, bool) for v in (lat, lon)) \
-                    and bbox[0] <= lat <= bbox[2] and bbox[1] <= lon <= bbox[3]:
+                    and bbox[0] <= lat <= bbox[2] and bbox[1] <= lon <= bbox[3] and (not locate or locate(lat, lon)[0] == boro):
                 info[name] = {"lat": round(lat, 5), "lon": round(lon, 5)}
             continue
         o = hits[0]
