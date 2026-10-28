@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>The Plan Committee</title>
 <meta name="description" content="Your friends pick what they want. AI agents argue for each of you in a group chat and agree on one plan for a night out in NYC or London.">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-Q7Hffe03u4+e5MvyeYHmYwSgB5//fZ//l3ki1ycTzP0='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https:; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-F0ads9qLJJB4pW4K1WQGqiJYnWVUmzYabY6pvgZW+zI='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https:; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
 <meta name="referrer" content="no-referrer">
 <meta name="theme-color" content="#fbf9f6">
 <link rel="manifest" href="manifest.webmanifest">
@@ -1101,8 +1101,8 @@ function demoPick(){if(demo.stops)return demo;
   const of=(...t)=>SL.list.filter(s=>t.includes(s.t)),near=(from,list)=>list.slice().sort((x,y)=>(km(from,x)??99)-(km(from,y)??99))[0],
     trip=d=>{const k=near(d,of("drinks").filter(s=>s!==d))||d,l=near(k,of("late","free").filter(s=>s!==d&&s!==k))||k;return {d,k,l,far:(km(d,k)??9)+(km(k,l)??9)}},
     was=lastPlan?.stops.map(s=>s.spot.n)||[],all=(of("dinner").length?of("dinner"):SL.list).map(trip).sort((x,y)=>x.far-y.far),
-    fresh=all.filter(t=>!was.includes(t.d.n)),
-    {d,k,l}=(fresh.length?fresh:all).slice(0,6).map(t=>({t,sc:agents.reduce((n,a)=>n+Math.max(...[t.d,t.k,t.l].map(s=>persFit(a,s))),0)+Math.random()})).sort((x,y)=>y.sc-x.sc)[0].t;  // a tight route, like the real planner, where every agent has a place that fits its personality; a change gets a new dinner
+    tight=all.filter(t=>t.far<=all[0].far+1.5),fresh=[tight,all].map(p=>p.filter(t=>!was.includes(t.d.n))).find(p=>p.length)||all,  // only routes about as short as the best one, so personality never drags in a far dinner
+    {d,k,l}=fresh.slice(0,6).map(t=>({t,sc:agents.reduce((n,a)=>n+Math.max(...[t.d,t.k,t.l].map(s=>persFit(a,s))),0)+Math.random()})).sort((x,y)=>y.sc-x.sc)[0].t;  // a tight route, like the real planner, where every agent has a place that fits its personality; a change gets a new dinner
   const stops=[...new Set([d,k,l])],decoys=SL.list.filter(s=>!stops.includes(s)).sort(()=>Math.random()-.5).slice(0,2);
   return Object.assign(demo,{d,k,l,stops,decoys:decoys.length?decoys:stops})}
 /* demo only: tags each personality goes for, and ones it avoids (-), so a romantic never pitches a party pub. The Wallet only minds spots over budget */
