@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>The Plan Committee</title>
 <meta name="description" content="Your friends pick what they want. AI agents argue for each of you in a group chat and agree on one plan for a night out in NYC or London.">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-DTwzV3srYHO/d3J/+HAaEzaHZ6EzBsIeHdr2SMLK3aU='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https:; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-dY5mAx6ntZfvv2PzCeQpdySrdQQiKMZS2y5dWzoehlo='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https:; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
 <meta name="referrer" content="no-referrer">
 <meta name="theme-color" content="#fbf9f6">
 <link rel="manifest" href="manifest.webmanifest">
@@ -504,7 +504,7 @@ function renderSetup(){
   $("citySec").style.display=CITY_LIST.length>1?"":"none";
   chips("cityChips",CITY_LIST.map(c=>[c.name,c.id]),v=>CITY.id===v,async v=>{if(v===CITY.id)return;await loadCity(v);plan.city=CITY.id;plan.hood="Anywhere";savePlan();renderSetup()});
   $("addForm").style.display=plan.members.length>=6?"none":"";
-  $("startBtn").textContent=`Start the group chat (${plan.members.length} agents${plan.wallet?" + The Wallet":""})`;
+  $("startBtn").textContent=`Start the chat (${plan.members.length} agents${plan.wallet?" + The Wallet":""})`;  // short enough for one line on a 360px phone
   $("keyHint").style.display=providers().length||MOCK?"none":"";
   renderHead();
 }
