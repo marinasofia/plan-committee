@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>The Plan Committee</title>
 <meta name="description" content="Your friends pick what they want. AI agents argue for each of you in a group chat and agree on one plan for a night out in NYC or London.">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-ailI8Ms1tTDTW+Z9apEK8d/QCtAXTR4BoUDzgjJGegM='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https:; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-LwB9ISPLDBBhh0qcRES3Q7NUp1lK+nEZra9Pys7SrXU='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https:; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
 <meta name="referrer" content="no-referrer">
 <meta name="theme-color" content="#fbf9f6">
 <link rel="manifest" href="manifest.webmanifest">
@@ -690,7 +690,7 @@ const SLOT={dinner:0,drinks:120,late:210,free:180};  // minutes after the start 
 function km(a,b){if(a?.lat==null||b?.lat==null)return null;const r=Math.PI/180,dl=(b.lat-a.lat)*r,dn=(b.lon-a.lon)*r;
   const x=Math.sin(dl/2)**2+Math.cos(a.lat*r)*Math.cos(b.lat*r)*Math.sin(dn/2)**2;return 12742*Math.asin(Math.sqrt(x))}
 function travel(a,b){const d=km(a,b);if(d==null)return "";if(d<0.15)return "right next door";
-  return d<=2?`${Math.max(2,Math.round(d*1.3/4.8*60))} min walk`:`about ${Math.round(10+d*3)} min by subway or cab`}
+  return d<=2?`${Math.max(2,Math.round(d*1.3/4.8*60))} min walk`:`about ${Math.round(10+d*3)} min by transit or cab`}
 /* ---- weather (Open-Meteo: free, no key; we only send the city's center and the date) ---- */
 let WX=null;
 async function fetchWeather(date,startMin){WX=null;
@@ -978,7 +978,7 @@ function renderTicket(p,names,count){
     <div class="when">${names.map(esc).join(" · ")} · agreed after ${count} messages</div></div>
     <div class="perf"></div>
     <div class="stops">${p.stops.map((s,i)=>`${i?`<div class="hop">${esc(travel(p.stops[i-1].spot,s.spot))}</div>`:""}<div class="stop"><div class="tm">${esc(s.time||"")}</div><div><div class="nm">${esc(s.spot.n)}</div>
-      <div class="meta">${esc(s.spot.h)} · ${esc(PRICE[s.spot.p]||"")}${esc(stopInfo(s,p))}</div>${s.note?`<div class="why">${esc(s.note)}</div>`:""}
+      <div class="meta">${esc([s.spot.h,PRICE[s.spot.p]].filter(Boolean).join(" · "))}${esc(stopInfo(s,p))}</div>${s.note?`<div class="why">${esc(s.note)}</div>`:""}
       <div class="slinks"><a href="${gmapSpot(s.spot)}" target="_blank" rel="noopener">map</a>${safeUrl(s.spot.web)?`<a href="${safeUrl(s.spot.web)}" target="_blank" rel="noopener">site</a>`:""}${s.spot.t==="dinner"||s.spot.t==="drinks"?(s.spot.rsv==="walkin"?`<span class="walkin">walk in</span>`:`<a href="${reserve(s.spot)}" target="_blank" rel="noopener">reserve</a>`):""}<button type="button" data-fave="${esc(s.spot.n)}" class="${faves.includes(s.spot.n)?"on":""}">${faves.includes(s.spot.n)?"saved":"save"}</button></div></div></div>`).join("")}</div>
     <div class="drama"><div class="lbl"><span>drama meter</span><span>${drama}%</span></div><div class="meter"><span></span></div>${p.verdict?`<div class="verdict">${esc(p.verdict)}</div>`:""}</div>
     ${REPLAY?(VOTE_ID?`<div class="vote"><div class="lbl">are you in?</div><input class="field" data-a="vname" placeholder="your name" maxlength="30" autocomplete="off">
