@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>The Plan Committee</title>
 <meta name="description" content="Your friends pick what they want. AI agents argue for each of you in a group chat and agree on one plan for a night out in NYC or London.">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-dY5mAx6ntZfvv2PzCeQpdySrdQQiKMZS2y5dWzoehlo='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https:; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-CBkZYVMCkRjF822xiPQy4c/pkVmDb9A+UjdQ8ShUdGg='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https:; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
 <meta name="referrer" content="no-referrer">
 <meta name="theme-color" content="#fbf9f6">
 <link rel="manifest" href="manifest.webmanifest">
@@ -826,7 +826,7 @@ async function llm(system,user,json,prefer){
     const next=Math.min(...alive.map(p=>cool[p]||0));const wait=Math.max(1500,next-Date.now());if(wait>65000)break;
     setTypingNote(`busy, retrying in ${Math.round(wait/1000)}s`);await sleep(wait);setTypingNote("");
   }
-  throw new Error((lastErr?.message||"Your AI is busy")+(P.length<2?". Add a second free key in settings so the agents can switch.":". Try again in a minute."));
+  throw new Error((lastErr?.message||"Your AI is busy")+(lastErr?.kind==="auth"?". Check the key in settings.":P.length<2?". Add a second free key in settings so the agents can switch.":". Try again in a minute."));
 }
 
 /* ===================== settings UI ===================== */
@@ -1067,7 +1067,7 @@ async function start(){
   plan.members=plan.members.filter(m=>m.n);savePlan();
   $("setup").classList.add("hide");chatEl.innerHTML="";transcript=[];lastPlan=null;lastWho=null;mi=0;
   fixPlan();await fetchWeather(nightDate(plan.when),plan.start);
-  SL=shortlist();
+  SL=shortlist();if(!SL.list.length){sys("No spots fit that time and place. Try another neighborhood or time.",true);$("setup").classList.remove("hide");return}
   const taken=new Set(agentList().map(a=>a.ps)),draw=()=>{const left=REAL_PERS.filter(k=>!taken.has(k)),k=rand(left.length?left:REAL_PERS);taken.add(k);return k};  // no two agents draw the same one
   agents=agentList().map(a=>({...a,drew:!a.wallet&&!PERS[a.ps],ps:a.wallet||PERS[a.ps]?a.ps:draw(),favs:a.wallet?[]:SL.list.map(s=>({s,sc:personScore(s,a)+Math.random()})).sort((x,y)=>y.sc-x.sc).slice(0,3).map(x=>x.s.n)}));
   const now=new Date();const st=document.createElement("div");st.className="stamp";
