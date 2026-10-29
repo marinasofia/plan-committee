@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>The Plan Committee</title>
 <meta name="description" content="Your friends pick what they want. AI agents argue for each of you in a group chat and agree on one plan for a night out in NYC or London.">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-62nsj6QE+qxm72Hh30VyM7UikFVwqNCZtcNxmXhQiM4='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https:; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-CWAELL9JCET4ZzSCCEvYcl+aIth77y0czGXjGzO7jRU='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https:; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
 <meta name="referrer" content="no-referrer">
 <meta name="theme-color" content="#fbf9f6">
 <link rel="manifest" href="manifest.webmanifest">
@@ -585,7 +585,7 @@ async function unpack(str){if(str.length>MAX_LINK)throw new Error("link too big"
 const baseUrl=()=>location.href.split("#")[0].split("?")[0];
 const planPayload=()=>({id:plan.id,city:plan.city,mode:plan.mode,when:plan.when,start:plan.start,needs:plan.needs,hood:plan.hood,wallet:plan.wallet,members:plan.members});
 async function shareOut(title,text,url,btn,label,quiet){
-  if(location.protocol==="file:")sys("Heads up: links only open for friends once this page is hosted online, like on GitHub Pages.");
+  if(location.protocol==="file:")sys("Heads up: links only open for friends once this page is hosted online, like on Cloudflare Pages.");
   try{if(navigator.share){await navigator.share({title,text,url});return}}catch(e){if(e.name==="AbortError")return}
   try{await navigator.clipboard.writeText(text+" "+url);if(btn){const o=btn.textContent;btn.textContent=label||"Link copied";setTimeout(()=>btn.textContent=o,1800)}}catch(e){if(!quiet)prompt("Copy this link",url)}  // quiet: an automatic share, the button below does it on a tap
 }
