@@ -405,7 +405,10 @@ def post(url, body, headers):
         with urllib.request.urlopen(req, timeout=120) as r:
             return json.loads(r.read().decode())
     except urllib.error.HTTPError as e:
-        msg = e.read().decode()[:300]
+        try:  # only the provider's own message, never the raw body (it could echo request details into public logs)
+            msg = str(json.loads(e.read().decode()).get("error", {}).get("message", ""))[:200]
+        except Exception:
+            msg = ""
         if e.code == 429 or e.code >= 500:
             raise OutOfQuota(f"{url.split('/')[2]} {e.code}: {msg}")
         raise RuntimeError(f"{url.split('/')[2]} {e.code}: {msg}")
