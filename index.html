@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>The Plan Committee</title>
 <meta name="description" content="Your friends pick what they want. AI agents argue for each of you in a group chat and agree on one plan for a night out in NYC or London.">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-dY5mAx6ntZfvv2PzCeQpdySrdQQiKMZS2y5dWzoehlo='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https:; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-oBvWpdu3dUfC8ZUnpblVr6gFipHF1u+4zM9VUczrVvw='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https:; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
 <meta name="referrer" content="no-referrer">
 <meta name="theme-color" content="#fbf9f6">
 <link rel="manifest" href="manifest.webmanifest">
@@ -730,6 +730,7 @@ function shortlist(){
 const spotLine=s=>`${s.n} | ${s.t} | ${s.h} | ${PRICE[s.p]} | ${s.v}${s.x.includes("wheel")?" | wheelchair ok":""}${s.x.includes("vegan")?" | vegan options":""}${s.nw?" | fresh find, nobody has reviewed it yet":""}`;
 function norm(s){return (s||"").toLowerCase().replace(/[^a-z0-9]/g,"")}
 function findSpot(n){const k=norm(n);if(!k)return null;return SPOTS.find(s=>norm(s.n)===k)||SPOTS.find(s=>k.includes(norm(s.n))||(norm(s.n).includes(k)&&k.length>4))}
+const stubSpot=n=>({n:str(n,80),t:"dinner",h:"",b:"",p:2,c:"",f:[],v:"",nw:false,pop:0,web:"",x:[],cur:false});  // a shared plan's stop that is no longer in the list: still shown, map search only
 
 /* ===================== AI providers: spread across keys, fail over ===================== */
 class PErr extends Error{constructor(kind,msg,wait){super(msg);this.kind=kind;this.wait=wait}}
@@ -1016,7 +1017,7 @@ function nightDate(w){w=(w||"").toLowerCase();const d=new Date();d.setHours(0,0,
   const days=["sunday","monday","tuesday","wednesday","thursday","friday","saturday"];let t=days.findIndex(x=>w.includes(x));if(t<0)t=6;
   d.setDate(d.getDate()+((t-d.getDay()+7)%7));return d}
 function parseTime(t,base){const m=(t||"").toLowerCase().match(/(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/);const d=new Date(base);
-  if(!m){d.setHours(19);return d}let h=+m[1];if(m[3]==="pm"&&h<12)h+=12;if(!m[3]&&h<12&&h>=5)h+=12;if(m[3]==="am"&&h===12)h=0;
+  if(!m){if(/midnight/.test((t||"").toLowerCase())){d.setDate(d.getDate()+1);d.setHours(0,0,0,0);return d}d.setHours(19);return d}let h=+m[1];if(m[3]==="pm"&&h<12)h+=12;if(!m[3]&&h<12&&h>=5)h+=12;if(m[3]==="am"&&h===12)h=0;
   d.setHours(h,+(m[2]||0),0,0);if(h<6)d.setDate(d.getDate()+1);return d}
 function downloadICS(p){
   const base=nightDate(p.when||plan.when),pad=n=>String(n).padStart(2,"0"),f=d=>`${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}T${pad(d.getHours())}${pad(d.getMinutes())}00`;
@@ -1053,7 +1054,7 @@ async function playReplay(R){
     if(a){showTyping(a);await sleep(450+Math.min(text.length*13,1300));hideTyping()}else await sleep(450);
     addBubble(a,text,via||null)}
   await sleep(500);
-  renderTicket({...R.p,when:String(R.w??""),stops:R.p.stops.map(([time,name,note])=>({time:String(time??""),note,spot:findSpot(name)})).filter(s=>s.spot)},humans,R.t.filter(m=>m[0]>=0).length);
+  renderTicket({...R.p,when:String(R.w??""),stops:R.p.stops.filter(x=>Array.isArray(x)&&str(x[1],80)).slice(0,4).map(([time,name,note])=>({time:String(time??""),note,spot:findSpot(name)||stubSpot(name)}))},humans,R.t.filter(m=>m[0]>=0).length);
 }
 $("ownBtn").onclick=async()=>{await ownCity();history.replaceState(null,"",location.pathname+location.search);REPLAY=null;$("app").classList.remove("replay");chatEl.innerHTML="";renderSetup();$("setup").classList.remove("hide")};
 
@@ -1178,7 +1179,7 @@ async function handleHash(first){
     else if(h[1]==="v"){history.replaceState(null,"",location.pathname+location.search);recordVote(data)}
     else if(h[1]==="r"){const added=mergeReply(data);history.replaceState(null,"",location.pathname+location.search);REPLAY=null;$("app").classList.remove("replay");renderSetup();$("setup").classList.remove("hide");
       const n=$("notice");n.style.display="";n.textContent=added.length?`${added.join(", ")} just joined. Start when everyone's in.`:"Everyone in that link is already here.";}
-  }catch(e){console.warn(e);sys("This link looks broken. Plan your own night instead.",true)}
+  }catch(e){console.warn(e);["quiz","setup","onboard"].forEach(i=>$(i).classList.add("hide"));sys("This link looks broken. Plan your own night instead.",true)}
 }
 /* ===================== group vote: friends answer a shared plan with a link, nothing goes through a server ===================== */
 function recordVote(V){
