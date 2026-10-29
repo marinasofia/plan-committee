@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>The Plan Committee</title>
 <meta name="description" content="Your friends pick what they want. AI agents argue for each of you in a group chat and agree on one plan for a night out in NYC or London.">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-dY5mAx6ntZfvv2PzCeQpdySrdQQiKMZS2y5dWzoehlo='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https:; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-wUw0StGhodgeWAxR9I+fCyXGfj8NK9N/2eJQ3R1kQXk='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https:; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
 <meta name="referrer" content="no-referrer">
 <meta name="theme-color" content="#fbf9f6">
 <link rel="manifest" href="manifest.webmanifest">
@@ -115,7 +115,7 @@ button,input,select,textarea{font:inherit;color:inherit}
 .send svg{width:16px;height:16px}
 .replaybar{position:absolute;left:0;right:0;bottom:0;padding:12px 14px calc(12px + env(safe-area-inset-bottom));background:var(--paper);border-top:1px solid var(--line);display:none;z-index:3}
 .replaybar button{width:100%;padding:14px;border-radius:16px;border:0;background:var(--ink);color:#fff;font-weight:600;font-size:15px;cursor:pointer}
-.app.replay .composer{visibility:hidden}.app.replay .replaybar{display:block}
+.app.replay .composer,.composer.off{visibility:hidden}.app.replay .replaybar{display:block}
 
 .sheet{position:absolute;inset:0;background:var(--paper);z-index:5;overflow-y:auto;padding:22px 20px 34px;transition:transform .45s cubic-bezier(.3,1,.4,1)}
 .sheet.hide{transform:translateY(105%);visibility:hidden;transition:transform .45s cubic-bezier(.3,1,.4,1),visibility 0s .45s}
@@ -603,10 +603,13 @@ function openJoin(P){
 }
 async function finishJoin(me){
   store.set("me",me);
-  const P=joinCtx.P;P.members=[...P.members.filter(m=>m.id!==me.id),me].slice(0,6);
+  const P=joinCtx.P;P.members=[...P.members.filter((m,i)=>!(m.id===me.id||(i>0&&same(m,me)))),me].slice(0,6);  // replaces the name the planner typed for you
   const url=baseUrl()+"#r="+await pack(P);
   $("editor").classList.add("hide");$("setup").classList.add("hide");
-  chatEl.innerHTML="";
+  chatEl.innerHTML="";$("composer").classList.add("off");  // nothing to say here: the chat runs on the planner's phone
+  const ag=P.members.map((m,i)=>({...m,color:COLORS[i%COLORS.length]}));if(P.wallet)ag.push({n:"The Wallet",color:WALLET_COLOR});  // the planner's committee, not this phone's
+  $("stack").innerHTML=ag.slice(0,5).map(a=>`<div class="av" style="background:${a.color}">${initials(a.n)}</div>`).join("");
+  $("title").textContent=P.mode==="girls"?"friends night committee":"date night committee";$("subtitle").textContent=`${ag.length} AI agents · 1 plan · 0 chill`;
   const box=document.createElement("div");box.className="sys big";
   box.innerHTML=`<b>You're in, ${esc(me.n)}.</b>Send your link back to ${esc(P.members[0]?.n||"the planner")} in the group chat. When they open it, your agent joins the committee.
     <div class="bt"><button class="pri" type="button" id="sendBack">Send my picks back</button></div>
@@ -614,7 +617,7 @@ async function finishJoin(me){
   chatEl.appendChild(box);
   const send=()=>shareOut("My picks",`${me.n} is in. open this so my agent joins:`,url,$("sendBack"),"Copied");
   $("sendBack").onclick=send;
-  $("planHere").onclick=async()=>{if(importCrew(P,true)==="full")return say("You have 12 crews. Delete one first.");await ownCity();history.replaceState(null,"",location.pathname+location.search);renderSetup();$("setup").classList.remove("hide")};
+  $("planHere").onclick=async()=>{if(importCrew(P,true)==="full")return say("You have 12 crews. Delete one first.");$("composer").classList.remove("off");await ownCity();history.replaceState(null,"",location.pathname+location.search);renderSetup();$("setup").classList.remove("hide")};
   send();
 }
 /* ===================== profile quiz: one tap per question, answers saved on the friend's phone for next time ===================== */
@@ -649,7 +652,7 @@ $("qzBack").onclick=e=>{e.preventDefault();if(qz.i>0){qz.i--;qzShow()}};
 async function collectProfiles(){const url=baseUrl()+"#f="+await pack({v:1,from:plan.members[0]?.n||"",city:plan.city});
   await shareOut("Your night out profile","answer 6 quick taps so my AI agents know your taste when we plan nights out:",url,$("profilesBtn"),"Link copied")}
 async function finishProfile(me){const url=baseUrl()+"#m="+await pack({v:1,m:{id:me.id,n:me.n,ps:me.ps,c:me.c,b:me.b,v:me.v,d:me.d}});  // only what the quiz asked, never the private note
-  history.replaceState(null,"",location.pathname+location.search);chatEl.innerHTML="";lastWho=null;
+  history.replaceState(null,"",location.pathname+location.search);chatEl.innerHTML="";lastWho=null;$("composer").classList.add("off");
   // the header is about the friend now, not the planner's committee on this phone
   $("stack").innerHTML=`<div class="av" style="background:${COLORS[0]}">${initials(me.n)}</div>`;$("title").textContent="your night out profile";$("subtitle").textContent="saved on this phone";
   const box=document.createElement("div");box.className="sys big";
@@ -663,7 +666,7 @@ function mergeReply(P){
   P.members=cleanMembers(P.members);
   if(plan.id!==P.id){if(typeof P.id==="string"&&Object.hasOwn(crews,P.id))useCrew(P.id);else if(importCrew({...P,members:[]})==="full")throw new Error("You have 12 crews. Delete one first.")}
   const before=new Set(plan.members.map(m=>m.id));
-  for(const m of P.members){const i=plan.members.findIndex(x=>x.id===m.id);if(i<0)plan.members.push(m);else plan.members[i]=m}
+  for(const m of P.members){const i=plan.members.findIndex((x,j)=>x.id===m.id||(j>0&&same(x,m)));if(i<0)plan.members.push(m);else plan.members[i]=m}  // a friend the planner typed by name gets their picks, not a twin
   plan.members=plan.members.slice(0,6);remember(P.members.filter(m=>!before.has(m.id)));savePlan();
   return P.members.filter(m=>!before.has(m.id)).map(m=>m.n);
 }
@@ -1065,7 +1068,7 @@ async function start(){
   await ownCity();
   DEMO=!MOCK&&!providers().length;
   plan.members=plan.members.filter(m=>m.n);savePlan();
-  $("setup").classList.add("hide");chatEl.innerHTML="";transcript=[];lastPlan=null;lastWho=null;mi=0;
+  $("setup").classList.add("hide");$("composer").classList.remove("off");chatEl.innerHTML="";transcript=[];lastPlan=null;lastWho=null;mi=0;
   fixPlan();await fetchWeather(nightDate(plan.when),plan.start);
   SL=shortlist();
   const taken=new Set(agentList().map(a=>a.ps)),draw=()=>{const left=REAL_PERS.filter(k=>!taken.has(k)),k=rand(left.length?left:REAL_PERS);taken.add(k);return k};  // no two agents draw the same one
