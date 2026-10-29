@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>The Plan Committee</title>
 <meta name="description" content="Your friends pick what they want. AI agents argue for each of you in a group chat and agree on one plan for a night out in NYC or London.">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-dY5mAx6ntZfvv2PzCeQpdySrdQQiKMZS2y5dWzoehlo='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https:; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-VJGSHxoVHU7k2z5SGr+dfjXHG6wn2a0Ney58GzIDX3o='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https:; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
 <meta name="referrer" content="no-referrer">
 <meta name="theme-color" content="#fbf9f6">
 <link rel="manifest" href="manifest.webmanifest">
@@ -463,7 +463,7 @@ let hist=store.get("hist",[]), faves=store.get("faves",[]), sent=store.get("sent
 
 /* ===================== helpers ===================== */
 function esc(s){return String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
-function initials(n){return esc((n||"?").trim().split(/\s+/).map(w=>w[0]).join("").slice(0,2).toUpperCase())}
+function initials(n){return esc([...(n||"?").trim().split(/\s+/).map(w=>[...w][0]).join("")].slice(0,2).join("").toUpperCase())}  // whole characters, so an emoji name doesn't become a broken glyph
 /* links and colors can come from share links or OpenStreetMap, so only allow safe values into HTML */
 function safeUrl(u){return /^https?:\/\//i.test(u||"")?esc(u):""}
 function safeColor(c,i){return /^#[0-9a-f]{3,8}$/i.test(c||"")?c:COLORS[i%COLORS.length]}
@@ -1226,7 +1226,7 @@ function openOnboarding(){renderInstall();paintOb();$("onboard").classList.remov
 function doneOb(){store.set("onboarded",1);$("onboard").classList.add("hide")}
 $("obForm").onsubmit=async e=>{e.preventDefault();const me=$("obMe").value.trim().slice(0,20);
   if(!me){$("obMe").focus();$("obMe").style.borderColor="#b4413c";return}
-  const names=[me,...$("obOthers").value.split(",").map(n=>n.trim().slice(0,20)).filter(Boolean)].slice(0,6),mode=obGuess();
+  const names=[me,...$("obOthers").value.split(",").map(n=>n.trim().slice(0,20)).filter(Boolean)].filter((n,i,a)=>a.findIndex(x=>x.toLowerCase()===n.toLowerCase())===i).slice(0,6),mode=obGuess();  // "Sam, Sam" is one Sam
   stash();plan={...defaultPlan(mode),id:uid(),name:mode==="girls"?"Friends night":"Date night",city:plan.city,members:names.map(known)};remember(plan.members.filter(m=>!people.some(p=>same(p,m))));
   store.set("myname",me);savePlan();doneOb();renderSetup();await start()};
 $("obSkip").onclick=e=>{e.preventDefault();doneOb()};
