@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>The Plan Committee</title>
 <meta name="description" content="Your friends pick what they want. AI agents argue for each of you in a group chat and agree on one plan for a night out in NYC or London.">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-wUw0StGhodgeWAxR9I+fCyXGfj8NK9N/2eJQ3R1kQXk='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https:; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-nq+xFycEnD8flf4nY8Mz/CUPvgp36iib09gIylUjliA='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https:; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
 <meta name="referrer" content="no-referrer">
 <meta name="theme-color" content="#fbf9f6">
 <link rel="manifest" href="manifest.webmanifest">
@@ -446,7 +446,7 @@ if(store.get("people",null)===null)remember(Object.values(crews).filter(c=>!isSa
 /* a typed name you've saved before brings their whole profile with it */
 const known=n=>{const me=store.get("me",null),k=people.find(p=>p.n.toLowerCase()===n.toLowerCase())||(me?.n?.toLowerCase()===n.toLowerCase()?cleanMembers([me])[0]:null);return k?JSON.parse(JSON.stringify(k)):member(n)};
 function useCrew(id){if(!Object.hasOwn(crews,id))return;savePlan();plan=crews[id];fixPlan();savePlan()}
-function newCrew(){if(crewsFull())return say("You have 12 crews. Delete one first.");savePlan();plan={...defaultPlan(plan.mode),id:uid(),name:"New crew",city:plan.city,members:[cleanMembers([store.get("me",null)].filter(Boolean))[0]||member("You")]};savePlan()}
+function newCrew(){if(crewsFull())return say("You have 12 crews. Delete one first.");savePlan();plan={...defaultPlan(plan.mode),id:uid(),name:"New crew",city:plan.city,members:[cleanMembers([store.get("me",null)].filter(Boolean))[0]||known(store.get("myname","")||"You")]};savePlan()}
 /* a crew link (#c=) saves the whole group on a friend's phone, so anyone in it can start the next plan */
 function importCrew(P,confirmed){if(!P||typeof P!=="object")throw new Error("bad crew");
   const id=typeof P.id==="string"&&CREW_ID.test(P.id)?P.id:uid(),had=Object.hasOwn(crews,id);
@@ -584,10 +584,10 @@ async function unpack(str){if(str.length>MAX_LINK)throw new Error("link too big"
   return JSON.parse(new TextDecoder().decode(raw))}
 const baseUrl=()=>location.href.split("#")[0].split("?")[0];
 const planPayload=()=>({id:plan.id,city:plan.city,mode:plan.mode,when:plan.when,start:plan.start,needs:plan.needs,hood:plan.hood,wallet:plan.wallet,members:plan.members});
-async function shareOut(title,text,url,btn,label){
+async function shareOut(title,text,url,btn,label,quiet){
   if(location.protocol==="file:")sys("Heads up: links only open for friends once this page is hosted online, like on GitHub Pages.");
   try{if(navigator.share){await navigator.share({title,text,url});return}}catch(e){if(e.name==="AbortError")return}
-  try{await navigator.clipboard.writeText(text+" "+url);if(btn){const o=btn.textContent;btn.textContent=label||"Link copied";setTimeout(()=>btn.textContent=o,1800)}}catch(e){prompt("Copy this link",url)}
+  try{await navigator.clipboard.writeText(text+" "+url);if(btn){const o=btn.textContent;btn.textContent=label||"Link copied";setTimeout(()=>btn.textContent=o,1800)}}catch(e){if(!quiet)prompt("Copy this link",url)}  // quiet: an automatic share, the button below does it on a tap
 }
 async function invite(){
   const url=baseUrl()+"#j="+await pack(planPayload());
@@ -603,7 +603,7 @@ function openJoin(P){
 }
 async function finishJoin(me){
   store.set("me",me);
-  const P=joinCtx.P;P.members=[...P.members.filter((m,i)=>!(m.id===me.id||(i>0&&same(m,me)))),me].slice(0,6);  // replaces the name the planner typed for you
+  const P=joinCtx.P;P.members=[...P.members.filter((m,i)=>!(m.id===me.id||(i>0&&same(m,me)))).slice(0,5),me];  // replaces the name the planner typed for you; never dropped from a full plan
   const url=baseUrl()+"#r="+await pack(P);
   $("editor").classList.add("hide");$("setup").classList.add("hide");
   chatEl.innerHTML="";$("composer").classList.add("off");  // nothing to say here: the chat runs on the planner's phone
@@ -615,10 +615,10 @@ async function finishJoin(me){
     <div class="bt"><button class="pri" type="button" id="sendBack">Send my picks back</button></div>
     <div class="bt"><button type="button" id="planHere">Run the plan on this phone instead</button></div>`;
   chatEl.appendChild(box);
-  const send=()=>shareOut("My picks",`${me.n} is in. open this so my agent joins:`,url,$("sendBack"),"Copied");
-  $("sendBack").onclick=send;
+  const send=(auto)=>shareOut("My picks",`${me.n} is in. open this so my agent joins:`,url,$("sendBack"),"Copied",auto===true);
+  $("sendBack").onclick=()=>send();
   $("planHere").onclick=async()=>{if(importCrew(P,true)==="full")return say("You have 12 crews. Delete one first.");$("composer").classList.remove("off");await ownCity();history.replaceState(null,"",location.pathname+location.search);renderSetup();$("setup").classList.remove("hide")};
-  send();
+  send(true);
 }
 /* ===================== profile quiz: one tap per question, answers saved on the friend's phone for next time ===================== */
 let qz=null;
@@ -660,11 +660,11 @@ async function finishProfile(me){const url=baseUrl()+"#m="+await pack({v:1,m:{id
     <div class="bt"><button class="pri" type="button" id="sendProfile">Send my profile back</button></div>
     <div class="bt"><button type="button" id="planOwn">Plan your own night</button></div>`;
   chatEl.appendChild(box);
-  const send=()=>shareOut("My profile",`${me.n}'s night out profile. open it to save me:`,url,$("sendProfile"),"Copied");
-  $("sendProfile").onclick=send;$("planOwn").onclick=()=>{$("obMe").value=me.n;openOnboarding()};send()}
+  const send=(auto)=>shareOut("My profile",`${me.n}'s night out profile. open it to save me:`,url,$("sendProfile"),"Copied",auto===true);
+  $("sendProfile").onclick=()=>send();$("planOwn").onclick=()=>{$("obMe").value=me.n;openOnboarding()};send(true)}
 function mergeReply(P){
   P.members=cleanMembers(P.members);
-  if(plan.id!==P.id){if(typeof P.id==="string"&&Object.hasOwn(crews,P.id))useCrew(P.id);else if(importCrew({...P,members:[]})==="full")throw new Error("You have 12 crews. Delete one first.")}
+  if(plan.id!==P.id){if(typeof P.id==="string"&&Object.hasOwn(crews,P.id))useCrew(P.id);else if(importCrew(P)==="full")throw new Error("You have 12 crews. Delete one first.")}
   const before=new Set(plan.members.map(m=>m.id));
   for(const m of P.members){const i=plan.members.findIndex((x,j)=>x.id===m.id||(j>0&&same(x,m)));if(i<0)plan.members.push(m);else plan.members[i]=m}  // a friend the planner typed by name gets their picks, not a twin
   plan.members=plan.members.slice(0,6);remember(P.members.filter(m=>!before.has(m.id)));savePlan();
