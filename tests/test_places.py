@@ -49,6 +49,13 @@ class ToSpot(unittest.TestCase):
         self.assertEqual(s["web"], "")
 
 
+class CleanUrl(unittest.TestCase):
+    def test_drops_query_and_fragment(self):
+        self.assertEqual(bp.clean_url("https://rezto.app/reservation/piano?rwg_token=AFd1x&x=1#top"), "https://rezto.app/reservation/piano")
+        self.assertEqual(bp.clean_url("javascript:alert(1)"), "")
+        self.assertEqual(bp.clean_url("https://"), "")
+
+
 class Pick(unittest.TestCase):
     def test_three_in_town_is_a_chain_and_names_are_unique(self):
         rows = [row(name="Taco Spot", lat=38.7 + i / 1000) for i in range(3)] + [row(), row(name="bar alto")]
