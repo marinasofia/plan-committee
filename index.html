@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>The Plan Committee</title>
 <meta name="description" content="Your friends pick what they want. AI agents argue for each of you in a group chat and agree on one plan for a night out in NYC or London.">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-z8EZwyLDxTCYfh0Q0OJWb6sRIftA4oPUOzdHx33q2CY='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https:; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-7HP15dHSEn8/y0CPGg7kgqeLBmFZgsL9RqwOlI92qb0='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https:; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
 <meta name="referrer" content="no-referrer">
 <meta name="theme-color" content="#fbf9f6">
 <link rel="manifest" href="manifest.webmanifest">
@@ -90,7 +90,7 @@ button,input,select,textarea{font:inherit;color:inherit}
 .stop{display:grid;grid-template-columns:62px 1fr;gap:10px;padding:11px 0;border-bottom:1px solid #f1ede7}
 .stop:last-child{border-bottom:0}
 .stop .tm{font-family:"DM Mono",monospace;font-size:12px;color:var(--accent);padding-top:2px}
-.stop .nm{font-weight:600;font-size:15.5px}
+.stop .nm{font-weight:600;font-size:15.5px}.stop .loc{font-size:12.5px;color:var(--muted);margin-top:1px}
 .stop .meta{font-size:11.5px;color:var(--muted);margin-top:2px}
 .stop .why{font-size:13px;margin-top:4px;color:#4a4541}
 .slinks{display:flex;gap:6px;margin-top:7px;flex-wrap:wrap}
@@ -362,10 +362,11 @@ let CITY=null, SPOTS=[], HOODS=["Anywhere"], DEALS=[], PRICE=["free","$","$$","$
 const TYPES=["dinner","drinks","late","free"];
 const ALL_TAGS=["romantic","cozy","fancy","chaotic","artsy","lowkey","dancing","nerdy","rooftop","music","views","photo","dessert","wait","loud","quiet","cash","veg","late"];
 const str=(v,n)=>typeof v==="string"?v.slice(0,n):"";
+const nonLatin=s=>/[^\u0000-\u024f\u1e00-\u1eff\u2000-\u206f\u20a0-\u20cf]/.test(s||"");  // 東京, Москва, القاهرة: names many visitors can't read
 const CITY_ID=/^[a-z][a-z-]{1,23}$/, CREW_ID=/^[a-z0-9]{4,16}$/;
 function cleanSpot(o,cur){if(!o||typeof o!=="object")return null;const n=str(o.n,80).trim(),t=TYPES.includes(o.t)?o.t:null;if(!n||!t)return null;
   return {n,t,h:str(o.h,40),b:str(o.b,4),p:Number.isInteger(o.p)&&o.p>=0&&o.p<=4?o.p:2,c:str(o.c,20),f:Array.isArray(o.f)?o.f.filter(x=>ALL_TAGS.includes(x)):[],
-    v:str(o.v,90),nw:o.nw===1,pop:typeof o.pop==="number"&&isFinite(o.pop)?Math.max(-3,Math.min(5,o.pop)):0,web:str(o.web,200),x:[],cur}}
+    v:str(o.v,90),ne:nonLatin(n)&&!nonLatin(o.ne)?str(o.ne,80).trim():"",nw:o.nw===1,pop:typeof o.pop==="number"&&isFinite(o.pop)?Math.max(-3,Math.min(5,o.pop)):0,web:str(o.web,200),x:[],cur}}
 async function loadCity(id){
   const g=geoParse(id);if(g)return loadGeoCity(id,g);
   if(!CITY_ID.test(id||""))id="nyc";
@@ -503,7 +504,7 @@ function osmSpot(e){
   if(hrs&&hrs.some(d=>d.some(([,b])=>b>=1500)))f.add("late");  // open past 1 am
   const x=[];if(t.wheelchair==="yes")x.push("wheel");if(t.wheelchair==="no")x.push("nowheel");
   if(["yes","only"].includes(t["diet:vegan"]))x.push("vegan");if(["yes","only"].includes(t["diet:vegetarian"]))x.push("veg");if(["yes","only"].includes(t["diet:gluten_free"]))x.push("gf");
-  return {n:t.name.slice(0,80),t:type,h:String(t["addr:suburb"]||t["addr:neighbourhood"]||t["addr:quarter"]||t["addr:district"]||"").slice(0,40),
+  return {n:t.name.slice(0,80),ne:nonLatin(t.name)&&typeof t["name:en"]==="string"&&!nonLatin(t["name:en"])?t["name:en"].slice(0,80):"",t:type,h:String(t["addr:suburb"]||t["addr:neighbourhood"]||t["addr:quarter"]||t["addr:district"]||"").slice(0,40),
     p:type==="free"?0:kind==="ice_cream"?1:2,c:type==="dinner"?(OSM_CUISINE.find(([re])=>re.test(cu))?.[1]||""):"",f:[...f],
     v:cu?cu.split(";")[0].replace(/_/g," ").slice(0,40):"",web:/^https?:\/\//i.test(web)?web.slice(0,200):"",pop:(t.wikidata?1:0)+(web?0.5:0),
     lat:+lat.toFixed(5),lon:+lon.toFixed(5),hrs:hrs||undefined,x};
@@ -531,13 +532,14 @@ async function aiTag(raw,city){
   const top=raw.slice().sort((a,b)=>b.pop-a.pop).slice(0,60);
   const list=top.map((s,i)=>`${i}. ${s.n} (${s.t}${s.v?", "+s.v:""})`).join("\n");
   const res=await Promise.race([llm("You know restaurants, bars and nights out in cities around the world. Reply with JSON only.",
-    `City: ${city}. For each place you actually know, give price 1 to 4 (1 cheap, 4 splurge), up to 3 tags from this list: ${ALL_TAGS.join(", ")}, and why it's good for a night out in max 8 words. Skip places you don't know.\nReturn {"items":[{"i":0,"price":2,"tags":["cozy"],"why":"..."}]}\nPlaces:\n${list}`,true),
+    `City: ${city}. For each place you actually know, give price 1 to 4 (1 cheap, 4 splurge), up to 3 tags from this list: ${ALL_TAGS.join(", ")}, and why it's good for a night out in max 8 words. For a name not written in Latin letters, add "en": its English name, or the name in Latin letters. Skip places you don't know.\nReturn {"items":[{"i":0,"price":2,"tags":["cozy"],"why":"...","en":"..."}]}\nPlaces:\n${list}`,true),
     sleep(25000).then(()=>{throw new Error("slow")})]);
   const items=parseJSON(res.text)?.items;if(!Array.isArray(items))return;
   for(const it of items.slice(0,60)){const s=Number.isInteger(it?.i)?top[it.i]:null;if(!s)continue;
     if(Number.isInteger(it.price)&&it.price>=1&&it.price<=4&&s.t!=="free")s.p=it.price;
     if(Array.isArray(it.tags))s.f=[...new Set([...s.f,...it.tags.filter(x=>ALL_TAGS.includes(x)).slice(0,3)])];
-    if(typeof it.why==="string"&&it.why.trim())s.v=it.why.trim().slice(0,70);s.pop+=1}  // places the AI knows rank a little higher
+    if(typeof it.why==="string"&&it.why.trim())s.v=it.why.trim().slice(0,70);
+    if(nonLatin(s.n)&&typeof it.en==="string"&&it.en.trim()&&!nonLatin(it.en))s.ne=it.en.trim().slice(0,80);s.pop+=1}  // places the AI knows rank a little higher
 }
 /* a typed city -> a pack id ("NYC", "London") or an anywhere id, via OpenStreetMap's search (one request) */
 const cityMemo={};
@@ -1150,11 +1152,12 @@ async function makePlan(){
   showTyping(null,"writing the plan");
   const sys=`You turn a group chat into a final night out plan. Only use places from this list, exact names:\n${SL.list.map(spotLine).join("\n")}\nReturn only JSON.`;
   const user=`${brief()}\n\nGROUP CHAT:\n${chatText()}\n\nReturn JSON exactly like:
-{"title":"a short cute name for the night, max 5 words","stops":[{"time":"7:30 pm","name":"exact place name","note":"why it won, max 12 words"}],"drama":0,"verdict":"one funny sentence about who won the argument"}
+{"title":"a short cute name for the night, max 5 words","stops":[{"time":"7:30 pm","name":"exact place name","en":"only if the name isn't in Latin letters: its English or Latin letter name","note":"why it won, max 12 words"}],"drama":0,"verdict":"one funny sentence about who won the argument"}
 Use 3 stops in order (dinner, drinks, then a late or free stop), ${plan.move==="ride"?"each within about 20 minutes by car or transit of the one before":"all on foot: each within about a 15 minute walk of the one before, no transit"}, first stop at ${fmtMin(plan.start)}, realistic ${CITY.short} times${SL.C.early?", ending by 10:30 pm":""}. drama is 0 to 100 for how much they fought.`;
   let res;try{res=await llm(sys,user,true)}finally{hideTyping()}
   const p=parseJSON(res.text);
-  p.stops=(p.stops||[]).map(s=>({...s,spot:findSpot(s.name)})).filter(s=>s.spot).slice(0,4);
+  p.stops=(p.stops||[]).map(s=>({...s,spot:findSpot(s.name)})).filter(s=>s.spot).slice(0,4)
+    .map(s=>({...s,en:nonLatin(s.spot.n)&&typeof s.en==="string"&&!nonLatin(s.en)?s.en.trim().slice(0,80):""}));
   if(!p.stops.length)throw new Error("The agents couldn't agree on real places. Tap + to try again.");
   if(!scripted()){hist=[...hist,...p.stops.map(s=>s.spot.n)].slice(-60);store.set("hist",hist)}  // demo picks never steer real runs
   track("pick",p.stops.map(s=>s.spot.n));
@@ -1195,13 +1198,14 @@ function stopInfo(s,p){const base=nightDate(p.when||plan.when),t=parseTime(s.tim
   if(open===false)bits.push("may be closed then, check hours");else if(until!=null)bits.push(`open till ${fmtMin(until)}`);
   if(s.spot.nw)bits.push("fresh find");if(s.spot.x.includes("wheel"))bits.push("wheelchair ok");if(s.spot.x.includes("vegan"))bits.push("vegan options");if(s.spot.x.includes("gf"))bits.push("gluten free options");
   return bits.length?" · "+bits.join(" · "):""}
+const stopName=s=>(typeof s.en==="string"&&s.en)||s.spot.ne||s.spot.n;
 function renderTicket(p,names,count){
   const d=document.createElement("div");d.className="ticket";
   const drama=Math.max(0,Math.min(100,parseInt(p.drama)||0));
   d.innerHTML=`<div class="top"><div class="eyebrow">the plan · ${esc(p.when||plan.when)}</div><h2>${esc(p.title||"The Plan")}</h2>
     <div class="when">${names.map(esc).join(" · ")} · agreed after ${count} messages</div></div>
     <div class="perf"></div>
-    <div class="stops">${p.stops.map((s,i)=>`${i?`<div class="hop">${esc(travel(p.stops[i-1].spot,s.spot))}</div>`:""}<div class="stop"><div class="tm">${esc(s.time||"")}</div><div><div class="nm">${esc(s.spot.n)}</div>
+    <div class="stops">${p.stops.map((s,i)=>`${i?`<div class="hop">${esc(travel(p.stops[i-1].spot,s.spot))}</div>`:""}<div class="stop"><div class="tm">${esc(s.time||"")}</div><div><div class="nm">${esc(stopName(s))}</div>${stopName(s)!==s.spot.n?`<div class="loc">${esc(s.spot.n)}</div>`:nonLatin(s.spot.n)&&s.spot.v?`<div class="loc">${esc(s.spot.v)}</div>`:""}
       <div class="meta">${esc([s.spot.h,PRICE[s.spot.p]].filter(Boolean).join(" · "))}${esc(stopInfo(s,p))}</div>${s.note?`<div class="why">${esc(s.note)}</div>`:""}
       <div class="slinks"><a href="${gmapSpot(s.spot)}" target="_blank" rel="noopener">map</a>${safeUrl(s.spot.web)?`<a href="${safeUrl(s.spot.web)}" target="_blank" rel="noopener">site</a>`:""}${s.spot.t==="dinner"||s.spot.t==="drinks"?(s.spot.rsv==="walkin"?`<span class="walkin">walk in</span>`:`<a href="${reserve(s.spot)}" target="_blank" rel="noopener">reserve</a>`):""}<button type="button" data-fave="${esc(s.spot.n)}" class="${faves.includes(s.spot.n)?"on":""}">${faves.includes(s.spot.n)?"saved":"save"}</button></div></div></div>`).join("")}</div>
     <div class="drama"><div class="lbl"><span>drama meter</span><span>${drama}%</span></div><div class="meter"><span></span></div>${p.verdict?`<div class="verdict">${esc(p.verdict)}</div>`:""}</div>
@@ -1255,7 +1259,7 @@ async function sharePlan(p,btn){
   sent[p.id]={title:String(p.title||"The plan"),when:plan.when,stops:p.stops.map(s=>s.spot.n),votes:sent[p.id]?.votes||{},at:Date.now()};
   const ids=Object.keys(sent).sort((a,b)=>sent[b].at-sent[a].at);for(const k of ids.slice(20))delete sent[k];store.set("sent",sent);
   const payload={v:2,d:scripted()?1:0,id:p.id,c:CITY.id,m:plan.mode,w:plan.when,a:agents.map(a=>[a.n,a.color]),t:transcript.map(m=>[m.ai??-1,m.text,m.via||""]),
-    p:{title:p.title,drama:p.drama,verdict:p.verdict,stops:p.stops.map(s=>[s.time,s.spot.n,s.note||""])}};
+    p:{title:p.title,drama:p.drama,verdict:p.verdict,stops:p.stops.map(s=>[s.time,s.spot.n,s.note||"",s.en||""])}};
   const url=baseUrl()+"#p="+await pack(payload);
   await shareOut(p.title||"The plan",`our ${plan.when.toLowerCase()} plan: ${p.stops.map(s=>s.spot.n).join(", then ")}. our AI agents fought about it, watch:`,url,btn);
 }
@@ -1276,7 +1280,7 @@ async function playReplay(R){
     if(a){showTyping(a);await sleep(450+Math.min(text.length*13,1300));hideTyping()}else await sleep(450);
     addBubble(a,text,via||null)}
   await sleep(500);
-  renderTicket({...R.p,when:String(R.w??""),stops:R.p.stops.filter(x=>Array.isArray(x)&&str(x[1],80)).slice(0,4).map(([time,name,note])=>({time:String(time??""),note,spot:findSpot(name)||stubSpot(name)}))},humans,R.t.filter(m=>m[0]>=0).length);
+  renderTicket({...R.p,when:String(R.w??""),stops:R.p.stops.filter(x=>Array.isArray(x)&&str(x[1],80)).slice(0,4).map(([time,name,note,en])=>{const spot=findSpot(name)||stubSpot(name);return {time:String(time??""),note,spot,en:nonLatin(spot.n)&&str(en,80).trim()&&!nonLatin(en)?str(en,80).trim():""}})},humans,R.t.filter(m=>m[0]>=0).length);
 }
 $("ownBtn").onclick=async()=>{await ownCity();history.replaceState(null,"",location.pathname+location.search);REPLAY=null;$("app").classList.remove("replay");chatEl.innerHTML="";renderSetup();$("setup").classList.remove("hide")};
 
