@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>The Plan Committee</title>
 <meta name="description" content="Your friends pick what they want. AI agents argue for each of you in a group chat and agree on one plan for a night out in NYC or London.">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-AnNX4z+nxIL7xHXq5s4k2oM4a5shoiO8OusmOjXMLYU='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https:; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-Qdk9ugOlEhG0sBihrGtoFELkSqvW+3MbqAKQ+Bkv6g0='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https:; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
 <meta name="referrer" content="no-referrer">
 <meta name="theme-color" content="#fbf9f6">
 <link rel="manifest" href="manifest.webmanifest">
@@ -617,9 +617,9 @@ let DEMO=false;const scripted=()=>MOCK||DEMO;
 let plan=store.get("plan",null)||defaultPlan(params.get("mode")==="girls"?"girls":"date");
 /* plans also arrive from share links, so clamp the fields we compute with */
 /* members also arrive in links from strangers: keep only the fields we use, with the right types */
-function cleanMembers(list,max=6){const arr=v=>Array.isArray(v)?v.filter(x=>typeof x==="string").map(x=>x.slice(0,30)).slice(0,20):[];
+function cleanMembers(list,max=6){const seen=new Set(),uniq=m=>{if(seen.has(m.id))m.id=uid();seen.add(m.id);return m};const arr=v=>Array.isArray(v)?v.filter(x=>typeof x==="string").map(x=>x.slice(0,30)).slice(0,20):[];
   return (Array.isArray(list)?list:[]).slice(0,max).filter(m=>m&&typeof m==="object").map(m=>({id:str(String(m.id??uid()),16),n:str(m.n,30),c:arr(m.c),v:arr(m.v),m:arr(m.m),
-    d:arr(m.d).map(x=>x==="onlyM"?"only:M":x==="onlyBK"?"only:BK":x),b:[1,2,3,4].includes(m.b)?m.b:2,ps:Object.hasOwn(PERS,m.ps)?m.ps:"chill",pk:m.pk===true||(m.pk===undefined&&Object.hasOwn(PERS,m.ps)&&m.ps!=="surprise me"),q:str(m.q,90)}))}
+    d:arr(m.d).map(x=>x==="onlyM"?"only:M":x==="onlyBK"?"only:BK":x),b:[1,2,3,4].includes(m.b)?m.b:2,ps:Object.hasOwn(PERS,m.ps)?m.ps:"chill",pk:m.pk===true||(m.pk===undefined&&Object.hasOwn(PERS,m.ps)&&m.ps!=="surprise me"),q:str(m.q,90)})).map(uniq)}
 function fixPlan(){plan.hood=str(plan.hood,30)||"Anywhere";if(typeof plan.id!=="string"||!CREW_ID.test(plan.id))plan.id=uid();plan.name=str(plan.name,30)||(plan.mode==="girls"?"Friends night":"Date night");plan.when=String(plan.when??"Saturday night").slice(0,60)||"Saturday night";plan.start=STARTS.includes(+plan.start)?+plan.start:1140;plan.needs=(Array.isArray(plan.needs)?plan.needs:[]).filter(v=>NEEDS.some(n=>n[1]===v));
   plan.city=cityOk(plan.city)?plan.city:"nyc";plan.move=TRAVEL.includes(plan.move)?plan.move:plan.move==="ride"?"transit":"walk";
   plan.members=cleanMembers(plan.members);
@@ -650,7 +650,7 @@ function importCrew(P,confirmed){if(!P||typeof P!=="object")throw new Error("bad
   if(had&&!confirmed)return "ask";  // a link can't replace a crew you already have without a tap
   if(!had&&crewsFull())return "full";
   stash();plan={id,name:str(P.name,30)||"Shared crew",city:cityOk(P.city)?P.city:"nyc",mode:P.mode==="girls"?"girls":"date",
-    when:P.when,start:P.start,needs:P.needs,hood:str(P.hood,30)||"Anywhere",wallet:P.wallet===true,move:TRAVEL.includes(P.move)?P.move:"walk",members:cleanMembers(P.members)};
+    when:P.when,start:P.start,needs:P.needs,hood:str(P.hood,30)||"Anywhere",wallet:P.wallet===true,move:P.move,members:cleanMembers(P.members)};
   fixPlan();savePlan();return had}
 let cfg={pool:"smart",gKey:"",gModel:"",qKey:"",qModel:"",oKey:"",oModel:"openrouter/free",cBase:"",cKey:"",cModel:"",...store.get("cfg2",{})};
 delete cfg.ol;delete cfg.olModel;delete cfg.olUrl;  /* Ollama support was removed */
@@ -836,7 +836,7 @@ const QSTEPS=[{k:"n",q:"What's your name?",sub:"So everyone knows whose agent is
   {k:"v",q:"Your kind of night?",sub:"Pick a few.",opts:()=>VIBES},
   {k:"d",q:"Any hard no's?",sub:"Skip if nothing bugs you.",opts:()=>DEALS}];
 function openQuiz(ctx){const saved=cleanMembers([store.get("me",null)].filter(Boolean))[0];
-  qz={ctx,me:JSON.parse(JSON.stringify(ctx.me||saved||member("",{ps:""}))),i:0};if(qz.me.n)qz.i=-1;  // known friends just confirm; a new one picks their own agent
+  qz={ctx,me:JSON.parse(JSON.stringify(ctx.me||saved||member("",{ps:""}))),i:0};if(qz.me.n)qz.i=qz.me.pk?-1:1;  // known friends just confirm, unless they never picked their agent; a new one picks their own agent
   $("quiz").classList.remove("hide");qzShow()}
 function qzShow(){const st=QSTEPS[qz.i],me=qz.me,body=$("qzBody");$("quiz").scrollTop=0;
   $("qzEyebrow").textContent=qz.ctx.title;$("qzBar").style.width=qz.i<0?"100%":`${(qz.i+1)/QSTEPS.length*100}%`;$("qzBack").style.visibility=qz.i>0?"":"hidden";
