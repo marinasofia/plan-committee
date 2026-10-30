@@ -16,7 +16,7 @@ export default {
     if (req.method === "POST" && url.pathname === "/e") {
       if (Number(req.headers.get("content-length") || 0) > MAX_BODY) return json({ ok: false }, 413);
       const raw = await req.text();
-      if (raw.length > MAX_BODY) return json({ ok: false }, 413);
+      if (new TextEncoder().encode(raw).length > MAX_BODY) return json({ ok: false }, 413);
       let body; try { body = JSON.parse(raw); } catch { return json({ ok: false }, 400); }
       if (!body || typeof body !== "object") return json({ ok: false }, 400);
       const kind = String(body.kind || "");
