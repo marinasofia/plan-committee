@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>The Plan Committee</title>
 <meta name="description" content="Your friends pick what they want. AI agents argue for each of you in a group chat and agree on one plan for a night out in NYC or London.">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-7HP15dHSEn8/y0CPGg7kgqeLBmFZgsL9RqwOlI92qb0='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https:; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-kLy4CsvVZTy4RXGbTdkFDD03W7//lBZwd8ruyPSh0+A='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https:; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
 <meta name="referrer" content="no-referrer">
 <meta name="theme-color" content="#fbf9f6">
 <link rel="manifest" href="manifest.webmanifest">
@@ -137,6 +137,7 @@ button,input,select,textarea{font:inherit;color:inherit}
 .member .mn{font-weight:600;font-size:15.5px}
 .member .ms{font-size:12.5px;color:var(--muted);margin-top:2px;line-height:1.35}
 .member .x{border:0;background:none;color:var(--muted);font-size:20px;cursor:pointer;padding:4px 6px}
+.member .pers.pick{border-style:dashed;background:#fff}
 .member .pers{display:inline-block;margin-top:5px;border:1px solid var(--accent);background:var(--accent-soft);color:#8c3d5a;border-radius:99px;padding:3px 10px;font-size:12px;font-weight:600;cursor:pointer}
 .more{margin-top:20px;border-top:1px solid var(--line)}
 .more>summary{list-style:none;cursor:pointer;display:flex;justify-content:space-between;gap:10px;align-items:baseline;padding:14px 2px 2px;font-weight:600;font-size:14.5px}
@@ -211,13 +212,13 @@ button,input,select,textarea{font:inherit;color:inherit}
         <p class="small" id="geoStatus">Any city. Places come straight from OpenStreetMap.</p></div></div>
     <div class="sec" id="crewSec"><span class="lab">Your crews</span><div class="chips" id="crewChips"></div></div>
     <div class="sec"><div class="seg" id="modeSeg"><button type="button" data-mode="date">Date night</button><button type="button" data-mode="girls">Friends night</button></div></div>
-    <div class="sec"><span class="lab">Getting around</span><div class="seg" id="moveSeg"><button type="button" data-move="walk">All on foot</button><button type="button" data-move="ride">Car or transit is fine</button></div></div>
+    <div class="sec"><span class="lab">Getting around</span><div class="seg" id="moveSeg"><button type="button" data-move="walk">On foot</button><button type="button" data-move="transit" id="transitBtn">Subway or bus</button><button type="button" data-move="car">Car or cab</button></div></div>
 
     <div class="sec"><span class="lab">The committee</span>
       <p class="small" id="notice" style="display:none;color:var(--ok);margin:0 0 8px"></p>
       <div id="members"></div>
       <form class="btnrow" id="addForm"><input class="field" id="quickName" placeholder="add a name, or a few: Sam, Lee" maxlength="80" autocomplete="off" style="flex:1"><button class="chip" id="addHere" type="submit">Add</button></form>
-      <p class="small" style="margin:6px 2px 0">Tap the personality to reroll it. Tap a person to set their picks, or skip it and their agent improvises.</p>
+      <p class="small" style="margin:6px 2px 0">Every agent argues like its person: pick their personality for them, or tap Invite so each friend picks their own. Tap a person to set their tastes too.</p>
       <div id="peopleSec" style="display:none;margin-top:14px"><span class="lab">Your people: tap to add <a href="#" id="peopleEdit" style="float:right;color:inherit">edit</a></span><div class="chips" id="peopleChips"></div></div>
       <div class="btnrow" style="margin-top:12px"><button class="ghost" id="profilesBtn" type="button">Get friends' profiles</button><button class="ghost" id="inviteBtn" type="button">Invite to this plan</button></div>
       <p class="small" style="margin:6px 2px 0">Friends answer 6 quick taps once. Their profile is saved on this phone, so next time you just tap who's coming.</p>
@@ -319,6 +320,16 @@ button,input,select,textarea{font:inherit;color:inherit}
     <div class="sec" id="qzBody"></div>
     <button class="cta" id="qzNext" type="button">Next</button>
     <p class="small" style="text-align:center"><a href="#" id="qzBack">Back</a></p>
+  </div>
+
+  <!-- choose an agent: for yourself, or for a friend who'd rather you pick -->
+  <div class="sheet hide top" id="picker" style="z-index:7">
+    <button class="iconbtn close" id="closePicker" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    <div class="eyebrow" id="pkEyebrow"></div>
+    <h2 id="pkQ"></h2>
+    <p class="lead" id="pkSub"></p>
+    <button class="ghost" id="pkAsk" type="button" style="width:100%;margin:2px 0 12px">Send them a link to choose</button>
+    <div id="pkTiles"></div>
   </div>
 
   <!-- quick key: the one minute path for people with no key yet -->
@@ -585,7 +596,8 @@ const COLORS=["#c8b6e2","#b9d3c2","#f4c3b0","#a9c8e8","#e7c9a0","#d7b9d5"];
 const WALLET_COLOR="#f1d58a";
 
 const uid=()=>Math.random().toString(36).slice(2,9);
-const member=(n,o={})=>({id:uid(),n,c:[],b:2,v:[],m:[],d:[],ps:"surprise me",q:"",...o});
+const TRAVEL=["walk","transit","car"];
+const member=(n,o={})=>({id:uid(),n,c:[],b:2,v:[],m:[],d:[],ps:"surprise me",pk:false,q:"",...o});
 function defaultPlan(mode){
   return mode==="girls"
     ?{id:uid(),mode,when:"Saturday night",hood:"Anywhere",wallet:false,members:[
@@ -607,11 +619,11 @@ let DEMO=false;const scripted=()=>MOCK||DEMO;
 let plan=store.get("plan",null)||defaultPlan(params.get("mode")==="girls"?"girls":"date");
 /* plans also arrive from share links, so clamp the fields we compute with */
 /* members also arrive in links from strangers: keep only the fields we use, with the right types */
-function cleanMembers(list,max=6){const arr=v=>Array.isArray(v)?v.filter(x=>typeof x==="string").map(x=>x.slice(0,30)).slice(0,20):[];
+function cleanMembers(list,max=6){const seen=new Set(),uniq=m=>{if(seen.has(m.id))m.id=uid();seen.add(m.id);return m};const arr=v=>Array.isArray(v)?v.filter(x=>typeof x==="string").map(x=>x.slice(0,30)).slice(0,20):[];
   return (Array.isArray(list)?list:[]).slice(0,max).filter(m=>m&&typeof m==="object").map(m=>({id:str(String(m.id??uid()),16),n:str(m.n,30),c:arr(m.c),v:arr(m.v),m:arr(m.m),
-    d:arr(m.d).map(x=>x==="onlyM"?"only:M":x==="onlyBK"?"only:BK":x),b:[1,2,3,4].includes(m.b)?m.b:2,ps:Object.hasOwn(PERS,m.ps)?m.ps:"chill",q:str(m.q,90)}))}
+    d:arr(m.d).map(x=>x==="onlyM"?"only:M":x==="onlyBK"?"only:BK":x),b:[1,2,3,4].includes(m.b)?m.b:2,ps:Object.hasOwn(PERS,m.ps)?m.ps:"chill",pk:m.pk===true||(m.pk===undefined&&Object.hasOwn(PERS,m.ps)&&m.ps!=="surprise me"),q:str(m.q,90)})).map(uniq)}
 function fixPlan(){plan.hood=str(plan.hood,30)||"Anywhere";if(typeof plan.id!=="string"||!CREW_ID.test(plan.id))plan.id=uid();plan.name=str(plan.name,30)||(plan.mode==="girls"?"Friends night":"Date night");plan.when=String(plan.when??"Saturday night").slice(0,60)||"Saturday night";plan.start=STARTS.includes(+plan.start)?+plan.start:1140;plan.needs=(Array.isArray(plan.needs)?plan.needs:[]).filter(v=>NEEDS.some(n=>n[1]===v));
-  plan.city=cityOk(plan.city)?plan.city:"nyc";plan.move=plan.move==="ride"?"ride":"walk";
+  plan.city=cityOk(plan.city)?plan.city:"nyc";plan.move=TRAVEL.includes(plan.move)?plan.move:plan.move==="ride"?"transit":"walk";
   plan.members=cleanMembers(plan.members);
   if(!plan.members.length)plan.members=[member("You")];
   if(CITY&&CITY.id===plan.city){if(!HOODS.includes(plan.hood))plan.hood="Anywhere";const ok=new Set(DEALS.map(d=>d[1]));plan.members.forEach(m=>m.d=m.d.filter(x=>ok.has(x)))}}
@@ -640,7 +652,7 @@ function importCrew(P,confirmed){if(!P||typeof P!=="object")throw new Error("bad
   if(had&&!confirmed)return "ask";  // a link can't replace a crew you already have without a tap
   if(!had&&crewsFull())return "full";
   stash();plan={id,name:str(P.name,30)||"Shared crew",city:cityOk(P.city)?P.city:"nyc",mode:P.mode==="girls"?"girls":"date",
-    when:P.when,start:P.start,needs:P.needs,hood:str(P.hood,30)||"Anywhere",wallet:P.wallet===true,move:P.move==="ride"?"ride":"walk",members:cleanMembers(P.members)};
+    when:P.when,start:P.start,needs:P.needs,hood:str(P.hood,30)||"Anywhere",wallet:P.wallet===true,move:P.move,members:cleanMembers(P.members)};
   fixPlan();savePlan();return had}
 let cfg={pool:"smart",gKey:"",gModel:"",qKey:"",qModel:"",oKey:"",oModel:"openrouter/free",cBase:"",cKey:"",cModel:"",...store.get("cfg2",{})};
 delete cfg.ol;delete cfg.olModel;delete cfg.olUrl;  /* Ollama support was removed */
@@ -675,10 +687,11 @@ function renderSetup(){
   fixPlan();renderCrews();$("crewName").value=plan.name;
   document.querySelectorAll("#modeSeg button").forEach(b=>b.classList.toggle("on",b.dataset.mode===plan.mode));
   document.querySelectorAll("#moveSeg button").forEach(b=>b.classList.toggle("on",b.dataset.move===plan.move));
+  $("transitBtn").textContent=transitName().replace(/^./,c=>c.toUpperCase());
   $("members").innerHTML=plan.members.map((m,i)=>`<div class="member" data-i="${i}"><div class="av" style="background:${COLORS[i%COLORS.length]}">${initials(m.n)}</div>
-    <div><div class="mn">${esc(m.n)}</div><div class="ms">${esc(summary(m))}</div><button class="pers" data-p="${i}" type="button" aria-label="reroll personality">agent: ${esc(m.ps)} ↻</button></div><button class="x" data-x="${i}" type="button" aria-label="remove">×</button></div>`).join("");
+    <div><div class="mn">${esc(m.n)}</div><div class="ms">${esc(summary(m))}</div><button class="pers${m.pk?"":" pick"}" data-p="${i}" type="button" aria-label="choose personality">${m.pk?`agent: ${esc(m.ps)}`:"pick their agent"} ›</button></div><button class="x" data-x="${i}" type="button" aria-label="remove">×</button></div>`).join("");
   $("members").querySelectorAll(".member").forEach(el=>el.onclick=e=>{if(e.target.dataset.x!==undefined||e.target.dataset.p!==undefined)return;openEditor(+el.dataset.i)});
-  $("members").querySelectorAll("[data-p]").forEach(b=>b.onclick=()=>{const m=plan.members[+b.dataset.p];m.ps=rand(Object.keys(PERS).filter(k=>k!==m.ps));savePlan();renderSetup()});
+  $("members").querySelectorAll("[data-p]").forEach(b=>b.onclick=()=>{const m=plan.members[+b.dataset.p];if(m)openPicker([m.id])});
   $("crewSec").style.display=Object.keys(crews).length>1?"":"none";
   renderPeople();
   moreSum();
@@ -750,7 +763,7 @@ function openEditor(i,isNew,joinInfo){
   chips("edVibe",VIBES,v=>edDraft.v.includes(v),v=>edDraft.v=tog(edDraft.v,v));
   chips("edMust",MUSTS,v=>edDraft.m.includes(v),v=>edDraft.m=tog(edDraft.m,v));
   chips("edDeal",DEALS,v=>edDraft.d.includes(v),v=>edDraft.d=tog(edDraft.d,v));
-  chips("edPers",Object.keys(PERS),v=>edDraft.ps===v,v=>edDraft.ps=v);
+  chips("edPers",Object.keys(PERS),v=>edDraft.pk&&edDraft.ps===v,v=>{edDraft.ps=v;edDraft.pk=true});
   $("edNote").value=edDraft.q||"";$("edMore").open=!!(edDraft.m.length||edDraft.d.length||edDraft.q);
   $("edSave").textContent=joinInfo?"Join and send my picks back":"Save";
   $("closeEditor").style.display=joinInfo?"none":"";
@@ -825,7 +838,7 @@ const QSTEPS=[{k:"n",q:"What's your name?",sub:"So everyone knows whose agent is
   {k:"v",q:"Your kind of night?",sub:"Pick a few.",opts:()=>VIBES},
   {k:"d",q:"Any hard no's?",sub:"Skip if nothing bugs you.",opts:()=>DEALS}];
 function openQuiz(ctx){const saved=cleanMembers([store.get("me",null)].filter(Boolean))[0];
-  qz={ctx,me:JSON.parse(JSON.stringify(ctx.me||saved||member(""))),i:0};if(qz.me.n)qz.i=-1;  // known friends just confirm
+  qz={ctx,me:JSON.parse(JSON.stringify(ctx.me||saved||member("",{ps:""}))),i:0};if(qz.me.n)qz.i=qz.me.pk?-1:1;  // known friends just confirm, unless they never picked their agent; a new one picks their own agent
   $("quiz").classList.remove("hide");qzShow()}
 function qzShow(){const st=QSTEPS[qz.i],me=qz.me,body=$("qzBody");$("quiz").scrollTop=0;
   $("qzEyebrow").textContent=qz.ctx.title;$("qzBar").style.width=qz.i<0?"100%":`${(qz.i+1)/QSTEPS.length*100}%`;$("qzBack").style.visibility=qz.i>0?"":"hidden";
@@ -835,11 +848,13 @@ function qzShow(){const st=QSTEPS[qz.i],me=qz.me,body=$("qzBody");$("quiz").scro
   $("qzQ").textContent=st.q;$("qzSub").textContent=st.sub||"";$("qzNext").textContent=qz.i===QSTEPS.length-1?"Done":"Next";
   if(st.k==="n"){body.innerHTML=`<input class="field" id="qzName" placeholder="your name" maxlength="20" autocomplete="given-name">`;$("qzName").value=me.n;
     $("qzName").onkeydown=e=>{if(e.key==="Enter")qzNext()};setTimeout(()=>$("qzName")?.focus(),350);return}
-  if(st.tiles){const keys=Object.keys(PERS);body.innerHTML=keys.map((k,i)=>`<button type="button" class="qztile${me.ps===k?" on":""}" data-i="${i}"><b>${esc(k)}</b><span>${esc(PERS[k]||"A different personality every night.")}</span></button>`).join("");
-    body.querySelectorAll(".qztile").forEach(b=>b.onclick=()=>{me.ps=keys[+b.dataset.i];qzNext()});return}
+  if(st.tiles){const keys=Object.keys(PERS);body.innerHTML=keys.map((k,i)=>`<button type="button" class="qztile${me.pk&&me.ps===k?" on":""}" data-i="${i}"><b>${esc(k)}</b><span>${esc(PERS[k]||"A different personality every night.")}</span></button>`).join("");
+    body.querySelectorAll(".qztile").forEach(b=>b.onclick=()=>{me.ps=keys[+b.dataset.i];me.pk=true;qzNext()});return}
   body.innerHTML=`<div class="chips" id="qzChips"></div>`;
   chips("qzChips",st.opts(),v=>st.one?me[st.k]===v:me[st.k].includes(v),v=>{if(st.one){me[st.k]=v;setTimeout(qzNext,180)}else me[st.k]=tog(me[st.k],v)})}
 function qzNext(){
+  if(QSTEPS[qz.i]?.tiles&&!qz.me.pk){$("qzSub").textContent="Tap the one that's most you. Your agent argues exactly like it.";$("qzSub").style.color="#b4413c";return}
+  $("qzSub").style.color="";
   if(qz.i===0){const n=$("qzName").value.trim().slice(0,20);if(!n){$("qzName").focus();$("qzName").style.borderColor="#b4413c";return}qz.me.n=n}
   if(qz.i>=0&&qz.i<QSTEPS.length-1){qz.i++;qzShow();return}
   $("quiz").classList.add("hide");store.set("me",qz.me);qz.ctx.done(qz.me)}
@@ -847,7 +862,7 @@ $("qzNext").onclick=qzNext;
 $("qzBack").onclick=e=>{e.preventDefault();if(qz.i>0){qz.i--;qzShow()}};
 async function collectProfiles(){const url=baseUrl()+"#f="+await pack({v:1,from:plan.members[0]?.n||"",city:plan.city});
   await shareOut("Your night out profile","answer 6 quick taps so my AI agents know your taste when we plan nights out:",url,$("profilesBtn"),"Link copied")}
-async function finishProfile(me){const url=baseUrl()+"#m="+await pack({v:1,m:{id:me.id,n:me.n,ps:me.ps,c:me.c,b:me.b,v:me.v,d:me.d}});  // only what the quiz asked, never the private note
+async function finishProfile(me){const url=baseUrl()+"#m="+await pack({v:1,m:{id:me.id,n:me.n,ps:me.ps,pk:true,c:me.c,b:me.b,v:me.v,d:me.d}});  // only what the quiz asked, never the private note
   history.replaceState(null,"",location.pathname+location.search);chatEl.innerHTML="";lastWho=null;$("composer").classList.add("off");
   // the header is about the friend now, not the planner's committee on this phone
   $("stack").innerHTML=`<div class="av" style="background:${COLORS[0]}">${initials(me.n)}</div>`;$("title").textContent="your night out profile";$("subtitle").textContent="saved on this phone";
@@ -889,7 +904,10 @@ const SLOT={dinner:0,drinks:120,late:210,free:180};  // minutes after the start 
 function km(a,b){if(a?.lat==null||b?.lat==null)return null;const r=Math.PI/180,dl=(b.lat-a.lat)*r,dn=(b.lon-a.lon)*r;
   const x=Math.sin(dl/2)**2+Math.cos(a.lat*r)*Math.cos(b.lat*r)*Math.sin(dn/2)**2;return 12742*Math.asin(Math.sqrt(x))}
 function travel(a,b){const d=km(a,b);if(d==null)return "";if(d<0.15)return "right next door";
-  return d<=2?`${Math.max(2,Math.round(d*1.3/4.8*60))} min walk`:plan.move==="ride"?`about ${Math.round(6+d*2.5)} min by car or transit`:`${Math.round(d*1.3/4.8*60)} min walk, or a short ride`}
+  const walkMin=Math.max(2,Math.round(d*1.3/4.8*60));if(d<=1.2||plan.move==="walk"&&d<=2)return `${walkMin} min walk`;
+  return plan.move==="transit"?`about ${Math.round(9+d*2.6)} min by ${transitName()}`:plan.move==="car"?`about ${Math.round(5+d*2.2)} min by car or cab`:`${walkMin} min walk, or a short ride`}
+/* what locals call public transport: the Tube in London, the subway in New York */
+const transitName=()=>({london:"Tube or bus",nyc:"subway or bus"})[CITY?.id]||"metro or bus";
 /* ---- weather (Open-Meteo: free, no key; we only send the city's center and the date) ---- */
 let WX=null;
 async function fetchWeather(date,startMin){WX=null;
@@ -913,8 +931,8 @@ function shortlist(){
   const needScore=s=>needs.reduce((a,n)=>a+(s.x.includes(n)||(n==="veg"&&s.f.includes("veg"))?(n==="wheel"||s.t==="dinner"?5:0):0),0);
   const wxScore=s=>!WX||!OUTDOOR(s)?0:WX.bad?-6:WX.nice?2:0;
   let anchor=null;  // keep the night in one area: everything is scored by distance to the best dinner pick
-  const walk=plan.move!=="ride";
-  const near=s=>{const d=km(anchor,s);return d==null?0:walk?(d<1?8:d<2?4:-12):(d<4?4:d<10?1:-6)};
+  const walk=plan.move==="walk";
+  const near=s=>{const d=km(anchor,s);return d==null?0:walk?(d<1?8:d<2?4:-12):plan.move==="transit"?(d<3?5:d<7?2:-8):(d<4?4:d<10?1:-6)};
   const within=s=>!walk||!anchor||(km(anchor,s)??0)<=2;  // on foot: everything within about 25 minutes' walk of dinner
   const score=s=>plan.members.reduce((a,m)=>a+personScore(s,m),0)+(hoodMatch(s)?4:0)+(faves.includes(s.n)?2:0)+(s.cur?1:0)+(s.pop||0)-(recent.includes(s.n)&&!faves.includes(s.n)?6:0)
     +needScore(s)+wxScore(s)+(anchor?near(s):0)+((s.t==="dinner"||s.t==="drinks")&&s.p<C.maxB-1?-4:0)+Math.random()*2.5;  // a $$$ group gets $$ and $$$ dinners and drinks, not fast food
@@ -1113,7 +1131,7 @@ $("qkInput").addEventListener("paste",()=>setTimeout(quickKeyGo,50));
 
 /* ===================== the agents ===================== */
 let transcript=[], agents=[], SL=null, busy=false, lastPlan=null, round=0;
-function brief(){const C=SL.C;return `Plan: ${plan.when} in ${CITY.name}, starting at ${fmtMin(plan.start)}. Neighborhood preference: ${plan.hood}. Group max budget: ${PRICE[C.maxB]} per place. Getting around: ${plan.move==="ride"?"car or transit is fine":"all on foot, keep every stop walkable"}.${C.early?" Someone must be home by 11pm.":""}`
+function brief(){const C=SL.C;return `Plan: ${plan.when} in ${CITY.name}, starting at ${fmtMin(plan.start)}. Neighborhood preference: ${plan.hood}. Group max budget: ${PRICE[C.maxB]} per place. Getting around: ${plan.move==="transit"?`${transitName()} between stops is fine`:plan.move==="car"?"car or cab is fine":"all on foot, keep every stop walkable"}.${C.early?" Someone must be home by 11pm.":""}`
   +(plan.needs.length?` The group needs: ${plan.needs.map(v=>labelOf(NEEDS,v)).join(", ")}.`:"")
   +(WX?` Forecast: ${temp(WX.temp)}, ${WX.rain}% chance of rain${WX.bad?", so outdoor spots and rooftops are a bad idea":WX.nice?", perfect for outdoors":""}.`:"")
   +" Keep the stops close to each other."}
@@ -1153,7 +1171,7 @@ async function makePlan(){
   const sys=`You turn a group chat into a final night out plan. Only use places from this list, exact names:\n${SL.list.map(spotLine).join("\n")}\nReturn only JSON.`;
   const user=`${brief()}\n\nGROUP CHAT:\n${chatText()}\n\nReturn JSON exactly like:
 {"title":"a short cute name for the night, max 5 words","stops":[{"time":"7:30 pm","name":"exact place name","en":"only if the name isn't in Latin letters: its English or Latin letter name","note":"why it won, max 12 words"}],"drama":0,"verdict":"one funny sentence about who won the argument"}
-Use 3 stops in order (dinner, drinks, then a late or free stop), ${plan.move==="ride"?"each within about 20 minutes by car or transit of the one before":"all on foot: each within about a 15 minute walk of the one before, no transit"}, first stop at ${fmtMin(plan.start)}, realistic ${CITY.short} times${SL.C.early?", ending by 10:30 pm":""}. drama is 0 to 100 for how much they fought.`;
+Use 3 stops in order (dinner, drinks, then a late or free stop), ${plan.move==="transit"?`each within about 20 minutes by ${transitName()} of the one before, close to a station`:plan.move==="car"?"each within about 20 minutes by car or cab of the one before":"all on foot: each within about a 15 minute walk of the one before, no transit"}, first stop at ${fmtMin(plan.start)}, realistic ${CITY.short} times${SL.C.early?", ending by 10:30 pm":""}. drama is 0 to 100 for how much they fought.`;
   let res;try{res=await llm(sys,user,true)}finally{hideTyping()}
   const p=parseJSON(res.text);
   p.stops=(p.stops||[]).map(s=>({...s,spot:findSpot(s.name)})).filter(s=>s.spot).slice(0,4)
@@ -1288,7 +1306,26 @@ $("ownBtn").onclick=async()=>{await ownCity();history.replaceState(null,"",locat
 function setComposer(on){$("say").disabled=!on;$("sendBtn").disabled=!on;$("say").placeholder=on?"change something, or add a note…":"the agents are talking…"}
 /* after viewing someone else's link, switch back to the city of your own plan */
 async function ownCity(){if(CITY?.id===plan.city)return true;const ok=await loadCity(plan.city).then(()=>true,e=>{say(e.message);return false});plan.city=CITY.id;return ok}  // an unknown city falls back to NYC
+/* every agent argues like its person, so a personality is picked, not drawn: by the friend (link) or for them (here) */
+let pkFlow=null;
+function openPicker(ids,then){pkFlow={queue:[...ids],then};pkShow()}
+function pkShow(){const m=plan.members.find(x=>x.id===pkFlow?.queue[0]);
+  if(!m){$("picker").classList.add("hide");const then=pkFlow?.then;pkFlow=null;then?.();return}
+  const self=plan.members[0]?.id===m.id,left=pkFlow.queue.length;
+  $("pkEyebrow").textContent=left>1?`${left} agents to pick`:"";
+  $("pkQ").textContent=self?"How do you argue about plans?":`How does ${m.n} argue about plans?`;
+  $("pkSub").textContent=self?"Your agent argues exactly like this.":"Their agent argues exactly like this, so pick what's really them. Not sure? Let them pick.";
+  $("pkAsk").style.display=self?"none":"";$("pkAsk").textContent=`Let ${m.n} pick: send them a link`;
+  const keys=Object.keys(PERS);
+  $("pkTiles").innerHTML=keys.map((k,i)=>`<button type="button" class="qztile${m.pk&&m.ps===k?" on":""}" data-i="${i}"><b>${esc(k)}</b><span>${esc(PERS[k]||"A different personality every night.")}</span></button>`).join("");
+  $("pkTiles").querySelectorAll(".qztile").forEach(b=>b.onclick=()=>{m.ps=keys[+b.dataset.i];m.pk=true;remember([m]);savePlan();renderSetup();pkFlow.queue.shift();pkShow()});
+  $("picker").classList.remove("hide");$("picker").scrollTop=0}
+$("pkAsk").onclick=async()=>{$("picker").classList.add("hide");pkFlow=null;renderSetup();$("setup").classList.remove("hide");await invite();
+  say("Invite ready. Each friend taps the link, picks their agent and sends theirs back. Open their replies here and start once everyone's in.")};
+$("closePicker").onclick=()=>{$("picker").classList.add("hide");pkFlow=null};
 async function start(){
+  const todo=plan.members.filter(m=>m.n&&!m.pk).map(m=>m.id);
+  if(todo.length&&!MOCK)return openPicker(todo,start);  // pick (or invite) first, then the chat runs
   const g=CITY?.id!==plan.city?geoParse(plan.city):null;
   if(g){$("setup").classList.add("hide");chatEl.innerHTML="";sys(`Finding places in ${g.name} on OpenStreetMap. The first time can take up to a minute, then it's saved on this phone.`)}
   if(!await ownCity()&&g){chatEl.innerHTML="";renderSetup();$("setup").classList.remove("hide");return}
@@ -1332,7 +1369,7 @@ function demoPick(){if(demo.stops)return demo;
   const of=(...t)=>SL.list.filter(s=>t.includes(s.t)),near=(from,list)=>list.slice().sort((x,y)=>(km(from,x)??99)-(km(from,y)??99))[0],
     trip=d=>{const k=near(d,of("drinks").filter(s=>s!==d))||d,l=near(k,of("late","free").filter(s=>s!==d&&s!==k))||k;return {d,k,l,far:(km(d,k)??9)+(km(k,l)??9)}},
     was=lastPlan?.stops.map(s=>s.spot.n)||[],all=(of("dinner").length?of("dinner"):SL.list).map(trip).sort((x,y)=>x.far-y.far),
-    tight=all.filter(t=>t.far<=all[0].far+(plan.move==="ride"?6:1.5)),fresh=[tight,all].map(p=>p.filter(t=>!was.includes(t.d.n))).find(p=>p.length)||all,  // only routes about as short as the best one, so personality never drags in a far dinner
+    tight=all.filter(t=>t.far<=all[0].far+(plan.move==="walk"?1.5:plan.move==="transit"?4:6)),fresh=[tight,all].map(p=>p.filter(t=>!was.includes(t.d.n))).find(p=>p.length)||all,  // only routes about as short as the best one, so personality never drags in a far dinner
     {d,k,l}=fresh.slice(0,6).map(t=>({t,sc:agents.reduce((n,a)=>n+Math.max(...[t.d,t.k,t.l].map(s=>persFit(a,s))),0)+Math.random()})).sort((x,y)=>y.sc-x.sc)[0].t;  // a tight route, like the real planner, where every agent has a place that fits its personality; a change gets a new dinner
   const stops=[...new Set([d,k,l])],decoys=SL.list.filter(s=>!stops.includes(s)).sort(()=>Math.random()-.5).slice(0,2);
   return Object.assign(demo,{d,k,l,stops,decoys:decoys.length?decoys:stops})}
@@ -1407,7 +1444,8 @@ async function handleHash(first){
       await ownCity();renderSetup();say(`Saved the crew "${plan.name}". Anyone in it can start the next plan.`)}
     else if(h[1]==="v"){history.replaceState(null,"",location.pathname+location.search);recordVote(data)}
     else if(h[1]==="r"){const added=mergeReply(data);history.replaceState(null,"",location.pathname+location.search);REPLAY=null;$("app").classList.remove("replay");renderSetup();$("setup").classList.remove("hide");
-      const n=$("notice");n.style.display="";n.textContent=added.length?`${added.join(", ")} just joined. Start when everyone's in.`:"Everyone in that link is already here.";}
+      const waiting=plan.members.filter(m=>m.n&&!m.pk).map(m=>m.n),head=added.length?`${added.join(", ")} just joined.`:"Everyone in that link is already here.";
+      if(waiting.length)say(`${head} Still picking: ${waiting.join(", ")}.`);else say(`${head} Everyone's in.`,"Start the chat",start);}
   }catch(e){console.warn(e);["quiz","setup","onboard"].forEach(i=>$(i).classList.add("hide"));sys("This link looks broken. Plan your own night instead.",true)}
 }
 /* ===================== group vote: friends answer a shared plan with a link, nothing goes through a server ===================== */
