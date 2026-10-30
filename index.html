@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>The Plan Committee</title>
 <meta name="description" content="Your friends pick what they want. AI agents argue for each of you in a group chat and agree on one plan for a night out in NYC or London.">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-m4wsGkO6BPQj0eMSQnfSw8B/luIMpRhBAZBf8hslaHg='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https:; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-6KM7q74aopZrPPfSoF+4ms395oBI5/IUFg/HAiD0CJw='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https:; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
 <meta name="referrer" content="no-referrer">
 <meta name="theme-color" content="#fbf9f6">
 <link rel="manifest" href="manifest.webmanifest">
@@ -365,7 +365,7 @@ const nonLatin=s=>/[^\u0000-\u024f\u1e00-\u1eff\u2000-\u206f\u20a0-\u20cf]/.test
 const CITY_ID=/^[a-z][a-z-]{1,23}$/, CREW_ID=/^[a-z0-9]{4,16}$/;
 function cleanSpot(o,cur){if(!o||typeof o!=="object")return null;const n=str(o.n,80).trim(),t=TYPES.includes(o.t)?o.t:null;if(!n||!t)return null;
   return {n,t,h:str(o.h,40),b:str(o.b,4),p:Number.isInteger(o.p)&&o.p>=0&&o.p<=4?o.p:2,c:str(o.c,20),f:Array.isArray(o.f)?o.f.filter(x=>ALL_TAGS.includes(x)):[],
-    v:str(o.v,90),ne:str(o.ne,80),nw:o.nw===1,pop:typeof o.pop==="number"&&isFinite(o.pop)?Math.max(-3,Math.min(5,o.pop)):0,web:str(o.web,200),x:[],cur}}
+    v:str(o.v,90),ne:nonLatin(n)&&!nonLatin(o.ne)?str(o.ne,80).trim():"",nw:o.nw===1,pop:typeof o.pop==="number"&&isFinite(o.pop)?Math.max(-3,Math.min(5,o.pop)):0,web:str(o.web,200),x:[],cur}}
 async function loadCity(id){
   const g=geoParse(id);if(g)return loadGeoCity(id,g);
   if(!CITY_ID.test(id||""))id="nyc";
@@ -1275,7 +1275,7 @@ async function playReplay(R){
     if(a){showTyping(a);await sleep(450+Math.min(text.length*13,1300));hideTyping()}else await sleep(450);
     addBubble(a,text,via||null)}
   await sleep(500);
-  renderTicket({...R.p,when:String(R.w??""),stops:R.p.stops.filter(x=>Array.isArray(x)&&str(x[1],80)).slice(0,4).map(([time,name,note,en])=>{const spot=findSpot(name)||stubSpot(name);return {time:String(time??""),note,spot,en:nonLatin(spot.n)&&typeof en==="string"&&!nonLatin(en)?en.slice(0,80):""}})},humans,R.t.filter(m=>m[0]>=0).length);
+  renderTicket({...R.p,when:String(R.w??""),stops:R.p.stops.filter(x=>Array.isArray(x)&&str(x[1],80)).slice(0,4).map(([time,name,note,en])=>{const spot=findSpot(name)||stubSpot(name);return {time:String(time??""),note,spot,en:nonLatin(spot.n)&&str(en,80).trim()&&!nonLatin(en)?str(en,80).trim():""}})},humans,R.t.filter(m=>m[0]>=0).length);
 }
 $("ownBtn").onclick=async()=>{await ownCity();history.replaceState(null,"",location.pathname+location.search);REPLAY=null;$("app").classList.remove("replay");chatEl.innerHTML="";renderSetup();$("setup").classList.remove("hide")};
 
