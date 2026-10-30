@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>The Plan Committee</title>
 <meta name="description" content="Your friends pick what they want. AI agents argue for each of you in a group chat and agree on one plan for a night out in NYC or London.">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-TfvSBPmqd4Gtuzjw6W1EgV+ycGz2/sbKI9X2S8VkfRQ='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https:; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-pz5sDj5tD8JzGpoA34bIaJkJ1DBn/7AxGQ1NsWhr3zw='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https:; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
 <meta name="referrer" content="no-referrer">
 <meta name="theme-color" content="#fbf9f6">
 <link rel="manifest" href="manifest.webmanifest">
@@ -368,6 +368,8 @@ async function loadCity(id){
 }
 /* Optional: URL of your Cloudflare Worker (see worker/README). Leave empty to turn usage counts off. */
 const STATS_URL="";
+/* Optional: URL of the places cache Worker (see places-worker/README). Leave empty to ask OpenStreetMap directly. */
+const PLACES_URL="";
 function track(kind,names){if(!STATS_URL||scripted()||!names?.length)return;try{fetch(STATS_URL.replace(/\/$/,"")+"/e",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({kind,names:names.slice(0,4)}),keepalive:true}).catch(()=>{})}catch(e){}}
 /* More spots, added automatically every day by the GitHub Action (pipeline/build_spots.py) */
 /* coordinates, opening hours, needs and booking info come from spots.json: only accept well formed values */
@@ -428,10 +430,14 @@ async function overpass(g,size){
   for(const half of size<4?[size,4]:[4]){  // km from the center, sized to the city; a sparse result gets one wider try
     const dy=half/111,dx=dy/Math.cos(g.lat*Math.PI/180),b=[g.lat-dy,g.lon-dx,g.lat+dy,g.lon+dx].map(v=>v.toFixed(4)).join(",");
     const q=`[out:json][timeout:40];(nw["amenity"~"^(restaurant|bar|pub|biergarten|nightclub|cinema|theatre|ice_cream|arts_centre)$"]["name"](${b});nw["tourism"~"^(museum|gallery|viewpoint)$"]["name"](${b});nwr["leisure"~"^(park|garden)$"]["name"]["wikidata"](${b}););out center tags 2500;`;
-    const els=await overpassAsk(q);
+    const els=await placesAsk(g,half).catch(()=>overpassAsk(q));  // the shared cache first, OpenStreetMap itself if it's down
     if(els.length>=40||half===4)return els;
   }
 }
+/* the shared cache: instant for any city someone opened before. The same slim OSM elements as Overpass */
+async function placesAsk(g,half){if(!PLACES_URL)throw 0;
+  const r=await fetch(`${PLACES_URL.replace(/\/$/,"")}/places?`+new URLSearchParams({lat:g.lat.toFixed(2),lon:g.lon.toFixed(2),km:String(Math.round(half*2)/2)}),{signal:AbortSignal.timeout(95000)});
+  const j=r.ok?await r.json():null;if(!Array.isArray(j?.elements))throw 0;return j.elements.slice(0,8000)}
 /* the public servers are often slow: ask the main one, and the mirror too if it hasn't answered in 8 seconds; first answer wins */
 async function overpassAsk(q){const ctl=new AbortController(),timer=setTimeout(()=>ctl.abort(),60000);
   const ask=(h,wait)=>sleep(wait).then(()=>{if(ctl.signal.aborted)throw 0;return fetch(h,{method:"POST",body:new URLSearchParams({data:q}),signal:ctl.signal})})
@@ -453,8 +459,8 @@ function osmSpot(e){
   const kind=t.amenity||t.tourism||t.leisure,cu=String(t.cuisine||"").toLowerCase(),web=String(t.website||t["contact:website"]||"");
   if(["restaurant","bar","pub","biergarten","nightclub"].includes(kind)&&!web&&!t.opening_hours)return null;
   if(kind==="restaurant"&&OSM_SKIP.test(cu))return null;
-  const type=OSM_TYPE[kind]||((kind==="museum"||kind==="gallery")?(t.fee==="no"?"free":"late"):null);if(!type)return null;
-  const hrs=parseHours(t.opening_hours),f=new Set(OSM_TAGS[kind]||[]);
+  const type=(Object.hasOwn(OSM_TYPE,kind)&&OSM_TYPE[kind])||((kind==="museum"||kind==="gallery")?(t.fee==="no"?"free":"late"):null);if(!type)return null;
+  const hrs=parseHours(t.opening_hours),f=new Set(Object.hasOwn(OSM_TAGS,kind)?OSM_TAGS[kind]:[]);
   if(t.live_music==="yes")f.add("music");
   if(t.rooftop==="yes"||/rooftop/i.test(t.name)){f.add("rooftop");f.add("views")}
   if(/vegan|vegetarian/.test(cu)||["yes","only"].includes(t["diet:vegan"])||t["diet:vegetarian"]==="only")f.add("veg");
