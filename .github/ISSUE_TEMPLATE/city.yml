@@ -1,0 +1,25 @@
+name: Request a city
+description: Ask for a curated city pack (the app already works anywhere through "Somewhere else")
+labels: [city]
+body:
+  - type: input
+    id: city
+    attributes:
+      label: City and country
+      placeholder: Lisbon, Portugal
+    validations:
+      required: true
+  - type: textarea
+    id: picks
+    attributes:
+      label: A few places you'd send a friend to
+      description: Optional, but it's what makes a pack good. Name and neighborhood is enough. Real places that are open now, no chains.
+      placeholder: |
+        Taberna da Rua das Flores, Chiado
+        Park Bar, Bairro Alto
+  - type: checkboxes
+    id: help
+    attributes:
+      label: Want to help?
+      options:
+        - label: I can review the neighborhood list and hand picks for this city
