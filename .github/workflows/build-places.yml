@@ -1,0 +1,56 @@
+name: Build open places
+
+# Monthly: rebuild the open place lists for "Somewhere else" cities from Overture Maps Places
+# (pipeline/build_places.py) and publish them on the places-data branch, which jsDelivr serves to the app.
+on:
+  schedule:
+    - cron: "40 4 3 * *"   # the 3rd of every month, after Overture's monthly release
+  workflow_dispatch:        # run it by hand from the Actions tab
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-places
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    permissions:
+      contents: write   # only to publish the places-data branch
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.12"
+      - name: Install DuckDB (version and file hash pinned)
+        run: |
+          echo "duckdb==2.0.0 --hash=sha256:ab51ec57d329d6f3df37c0287b55d71c3fc07bb54b61d1afed09104f953b1431" > "$RUNNER_TEMP/requirements.txt"
+          python -m pip install --quiet --no-deps --only-binary=:all: --require-hashes -r "$RUNNER_TEMP/requirements.txt"
+      - name: Build the city files from Overture
+        run: python pipeline/build_places.py --out "$RUNNER_TEMP/places"
+      - name: Publish to the places-data branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          test -s "$RUNNER_TEMP/places/index.json"
+          url="https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          if git clone -q --depth 1 --branch places-data "$url" "$RUNNER_TEMP/pub" 2>/dev/null; then
+            find "$RUNNER_TEMP/pub" -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
+          else
+            git init -q -b places-data "$RUNNER_TEMP/pub"   # first run: a branch with no history from main
+          fi
+          cp -R "$RUNNER_TEMP/places/." "$RUNNER_TEMP/pub/"
+          cd "$RUNNER_TEMP/pub"
+          git config user.name "places-builder"
+          git config user.email "actions@users.noreply.github.com"
+          git add -A
+          git diff --cached --quiet && echo "no changes" && exit 0
+          git commit -q -m "Open places $(date -u +%F)"
+          git push -q "$url" HEAD:places-data
+      - name: Refresh jsDelivr's copy of the city list
+        run: curl -fsS "https://purge.jsdelivr.net/gh/${GITHUB_REPOSITORY}@places-data/index.json" > /dev/null || echo "purge failed; jsDelivr refreshes on its own within 12 hours"
