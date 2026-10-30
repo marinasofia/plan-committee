@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>The Plan Committee</title>
 <meta name="description" content="Your friends pick what they want. AI agents argue for each of you in a group chat and agree on one plan for a night out in NYC or London.">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-CWAELL9JCET4ZzSCCEvYcl+aIth77y0czGXjGzO7jRU='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https:; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-qaEchrcJ3JbKF8fLVCjEAYwJij7NQ/9S6hzGUhDOLsA='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https:; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
 <meta name="referrer" content="no-referrer">
 <meta name="theme-color" content="#fbf9f6">
 <link rel="manifest" href="manifest.webmanifest">
@@ -319,7 +319,7 @@ button,input,select,textarea{font:inherit;color:inherit}
     <div class="sec"><span class="lab">2. Tap "Create API key" and copy it</span></div>
     <div class="sec"><span class="lab">3. Paste it here</span>
       <input class="field" id="qkInput" type="password" placeholder="paste your key" autocomplete="off" spellcheck="false">
-      <p class="small" id="qkStatus">It stays in this browser and only goes to Google or Groq.</p></div>
+      <p class="small" id="qkStatus">It stays in this browser and is sent only to the provider you chose.</p></div>
     <button class="cta" id="qkGo" type="button">Start the group chat</button>
     <p class="small"><a href="#" id="qkMore">More options (OpenRouter, other APIs)</a></p>
     <p class="small">Keys and picks stay on this device and go only to the AI you chose. Google's free Gemini tier may use prompts to improve its models.</p>
@@ -327,7 +327,7 @@ button,input,select,textarea{font:inherit;color:inherit}
 </div>
 
 <script>
-/* never run inside someone else's frame (clickjacking): GitHub Pages can't send frame-ancestors */
+/* never run inside someone else's frame (clickjacking): _headers on Cloudflare Pages already blocks framing, this is defense in depth */
 if(window.top!==window.self){document.documentElement.innerHTML="";throw new Error("framed")}
 /* ===================== city packs: cities/<id>/city.json (settings + hand picks) and spots.json (daily list) =====================
    City files come from contributors and spots.json from OpenStreetMap, so every field is checked here and escaped when shown. */
@@ -863,7 +863,7 @@ $("testKeys").onclick=async()=>{
 /* quick key: paste any key, we work out whose it is */
 /* Google has two key formats (AIza… and the newer AQ.…). Anything unrecognized is tried on each service in turn. */
 const KEY_TYPES=[[/^(AIza[\w-]{30,}|AQ\.[\w.-]{20,})$/,"gemini","gKey","Gemini"],[/^gsk_\w{20,}$/,"groq","qKey","Groq"],[/^sk-or-[\w-]{20,}$/,"openrouter","oKey","OpenRouter"]];
-function openQuickKey(){$("qkInput").value="";qkSay("It stays in this browser and only goes to Google or Groq.");$("quickKey").classList.remove("hide")}
+function openQuickKey(){$("qkInput").value="";qkSay("It stays in this browser and is sent only to the provider you chose.");$("quickKey").classList.remove("hide")}
 function qkSay(t,cls){const el=$("qkStatus");el.textContent=t;el.style.color=cls==="bad"?"#b4413c":cls==="ok"?"var(--ok)":""}
 $("closeQuick").onclick=()=>$("quickKey").classList.add("hide");
 $("qkMore").onclick=e=>{e.preventDefault();$("quickKey").classList.add("hide");$("gearBtn").click()};

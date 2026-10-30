@@ -20,6 +20,7 @@ MAX_BATCHES (default 40 per run, to stay inside free daily limits), BATCH_SIZE (
 import datetime as dt
 import gzip
 import http.client
+import itertools
 import json
 import math
 import os
@@ -29,12 +30,17 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
+from collections.abc import Callable, Sequence
 from pathlib import Path
+from typing import Any
 
 ROOT = Path(__file__).resolve().parent.parent
 CACHE = ROOT / "data" / "tagged.json"
 BLOCKLIST = ROOT / "data" / "blocklist.txt"
 CITIES = ROOT / "cities"
+
+# locate(lat, lon) -> (area code, neighborhood), built from NYC's official map
+Locate = Callable[[float, float], tuple[str, str]]
 
 MAX_BATCHES = int(os.environ.get("MAX_BATCHES", "40"))
 BATCH_SIZE = int(os.environ.get("BATCH_SIZE", "25"))
@@ -60,11 +66,11 @@ SKIP_CUISINES = ["donuts", "hotdogs", "juice", "smoothies", "bagels", "pretzels"
 BORO = {"Manhattan": "M", "Brooklyn": "BK", "Queens": "Q"}
 
 
-def log(*a):
+def log(*a: object) -> None:
     print(*a, flush=True)
 
 
-def get_json(url, data=None, headers=None, timeout=180, tries=4):
+def get_json(url: str, data: bytes | None = None, headers: dict[str, str] | None = None, timeout: int = 180, tries: int = 4) -> Any:
     req = urllib.request.Request(url, data=data, headers={**UA, "Accept-Encoding": "gzip", **(headers or {})})
     for attempt in range(tries):
         try:
@@ -83,11 +89,11 @@ def get_json(url, data=None, headers=None, timeout=180, tries=4):
         time.sleep(30 * 2 ** attempt)  # Overpass asks for exponential backoff when busy
 
 
-def norm(s):
+def norm(s: str | None) -> str:
     return re.sub(r"[^a-z0-9]", "", (s or "").lower().replace("&", "and"))
 
 
-def nice_name(s):
+def nice_name(s: str | None) -> str:
     """Inspection data is ALL CAPS. Turn 'JOE'S PIZZA' into "Joe's Pizza"."""
     s = re.sub(r"\s+", " ", s or "").strip()
     if s.upper() != s:
@@ -100,23 +106,24 @@ def nice_name(s):
     return re.sub(r"'S\b", "'s", out)
 
 
-def is_chain(name, place=None):
+def is_chain(name: str, place: dict | None = None) -> bool:
     """Known chain words, or an OSM brand tag (works in every city, no list to maintain)."""
     n = name.lower()
     return bool(place and place.get("chain")) or any(c in n for c in CHAIN_WORDS)
 
 
-def km(a, b):
+def km(a: Sequence[float], b: Sequence[float]) -> float:
     lat1, lon1, lat2, lon2 = map(math.radians, (a[0], a[1], b[0], b[1]))
     d = math.sin((lat2 - lat1) / 2) ** 2 + math.cos(lat1) * math.cos(lat2) * math.sin((lon2 - lon1) / 2) ** 2
     return 6371 * 2 * math.asin(math.sqrt(d))
 
 
 # ---------------------------------------------------------------- sources
-def fetch_inspections():
+def fetch_inspections() -> list[dict]:
     since = (dt.date.today() - dt.timedelta(days=365)).isoformat() + "T00:00:00"
     params = {
         "$select": "camis,dba,boro,building,street,zipcode,cuisine_description,latitude,longitude,max(inspection_date) as last",
+        # `since` is a date this script computed just above, never user input, so it is safe inside the SoQL string
         "$where": f"inspection_date > '{since}' AND boro in('Manhattan','Brooklyn','Queens')",
         "$group": "camis,dba,boro,building,street,zipcode,cuisine_description,latitude,longitude",
         "$order": "camis",
@@ -165,7 +172,7 @@ OSM_KINDS = set(re.findall(r"[a-z_]+", "|".join(re.findall(r'~"\^\(([^)]*)\)\$"'
 BOOKING = re.compile(r"^https://(www\.)?(resy\.com|opentable\.com|exploretock\.com|sevenrooms\.com)/[^\s<>\"']{1,200}$", re.I)
 
 
-def booking(t):
+def booking(t: dict[str, str]) -> str:
     """Direct booking page from OSM tags, 'walkin' if OSM says no reservations, else ''."""
     for k in ("reservation:website", "website:booking", "website:reservation", "reservation", "website", "contact:website"):
         v = (t.get(k) or "").strip().replace("http://", "https://", 1)
@@ -177,7 +184,7 @@ def booking(t):
 DAYS = ["mo", "tu", "we", "th", "fr", "sa", "su"]
 
 
-def parse_hours(oh):
+def parse_hours(oh: str | None) -> list[list[list[int]]] | None:
     """OSM opening_hours -> 7 lists (Mon..Sun) of [open, close] minutes; close can pass 1440 (after midnight).
     Handles the common forms ("Mo-Fr 11:00-23:00; Sa,Su 10:00-02:00; Mo off", "24/7"). Anything fancier
     (holidays, months, sunset) returns None, which the app treats as "hours unknown", never as closed."""
@@ -227,7 +234,7 @@ def parse_hours(oh):
     return week if any(week) else None  # "closed every day" is more likely a bad edit than a real place: treat as unknown
 
 
-def needs(t):
+def needs(t: dict[str, str]) -> list[str]:
     """Accessibility and diet info from OSM tags, only when the tag says yes."""
     out = []
     if t.get("wheelchair") == "yes":
@@ -240,7 +247,7 @@ def needs(t):
     return out
 
 
-def fetch_osm(city):
+def fetch_osm(city: dict) -> list[dict]:
     bbox = ",".join(str(x) for x in city["bbox"])
     data = urllib.parse.urlencode({"data": OSM_QUERY.replace("BBOX", bbox)}).encode()
     j = get_json(OVERPASS, data=data, timeout=300)
@@ -268,7 +275,7 @@ def fetch_osm(city):
 NTA_URL = "https://data.cityofnewyork.us/resource/9nt8-h7nd.geojson?$limit=1000"
 
 
-def fetch_neighborhoods():
+def fetch_neighborhoods() -> Locate:
     """NYC's official neighborhood shapes (2020 Neighborhood Tabulation Areas). Returns locate(lat, lon) -> (boro, hood)."""
     areas = []
     for f in get_json(NTA_URL).get("features", []):
@@ -283,7 +290,7 @@ def fetch_neighborhoods():
                       (min(xs), min(ys), max(xs), max(ys)), rings))
     log(f"neighborhoods: {len(areas)} areas")
 
-    def inside(x, y, rings):  # even-odd rule over all rings, so holes work too
+    def inside(x: float, y: float, rings: list) -> bool:  # even-odd rule over all rings, so holes work too
         hit = False
         for ring in rings:
             for (x1, y1), (x2, y2) in zip(ring, ring[1:] + ring[:1]):
@@ -291,7 +298,7 @@ def fetch_neighborhoods():
                     hit = not hit
         return hit
 
-    def locate(lat, lon):
+    def locate(lat: float, lon: float) -> tuple[str, str]:
         for boro, hood, (x0, y0, x1, y1), rings in areas:
             if x0 <= lon <= x1 and y0 <= lat <= y1 and inside(lon, lat, rings):
                 return boro, hood
@@ -303,7 +310,7 @@ def fetch_neighborhoods():
 OSM_SKIP_CUISINE = re.compile(r"coffee|sandwich|bubble_tea|donut|juice|bagel|kebab|fried_chicken|burger|chicken", re.I)
 
 
-def build_candidates(city, insp, osm, curated, locate):
+def build_candidates(city: dict, insp: list[dict], osm: list[dict], curated: list[str], locate: Locate | None) -> dict[str, dict]:
     """Notable places for one city. With restaurant inspection data (NYC), a restaurant must be both inspected
     recently (so it is open) and on OpenStreetMap with a website or hours. Without it, OSM alone decides."""
     blocked = BLOCKLIST.read_text(encoding="utf-8").splitlines() if BLOCKLIST.exists() else []
@@ -312,7 +319,7 @@ def build_candidates(city, insp, osm, curated, locate):
     for o in osm:
         grid.setdefault((round(o["lat"], 3), round(o["lon"], 3)), []).append(o)
 
-    def nearby(lat, lon):
+    def nearby(lat: float, lon: float):
         for dy in (-0.001, 0, 0.001):
             for dx in (-0.001, 0, 0.001):
                 yield from grid.get((round(lat + dy, 3), round(lon + dx, 3)), [])
@@ -364,7 +371,7 @@ PLACES (id | name | kind | cuisine hint | address | area | neighborhood):
 """
 
 
-def prompt_for(city):
+def prompt_for(city: dict) -> str:
     areas = city.get("areas") or []
     cur = city.get("currency") or "$"
     # fixed lists first, then the contributor's text, and no % formatting (a "%" in a city name must not break it)
@@ -383,7 +390,7 @@ class OutOfQuota(Exception):
 _dead = set()
 
 
-def ai_call(prompt):
+def ai_call(prompt: str) -> str:
     errors = []
     for name, fn in (("GROQ_API_KEY", groq), ("GEMINI_API_KEY", gemini)):
         if not os.environ.get(name) or name in _dead:
@@ -399,7 +406,7 @@ def ai_call(prompt):
     raise OutOfQuota("; ".join(errors) or "no AI key set (add GROQ_API_KEY or GEMINI_API_KEY as a repo secret)")
 
 
-def post(url, body, headers):
+def post(url: str, body: dict, headers: dict[str, str]) -> Any:
     req = urllib.request.Request(url, data=json.dumps(body).encode(), headers={"Content-Type": "application/json", **UA, **headers})
     try:
         with urllib.request.urlopen(req, timeout=120) as r:
@@ -417,7 +424,7 @@ def post(url, body, headers):
 _groq_model = None
 
 
-def groq(prompt):
+def groq(prompt: str) -> str:
     global _groq_model
     if not _groq_model:
         # Groq retires models often, so pick the biggest current chat model instead of hardcoding one
@@ -452,7 +459,7 @@ def groq(prompt):
 _gem_model = None
 
 
-def gemini(prompt):
+def gemini(prompt: str) -> str:
     global _gem_model
     key = os.environ["GEMINI_API_KEY"]
     if not _gem_model:
@@ -477,7 +484,7 @@ def gemini(prompt):
     return "".join(p.get("text", "") for p in j["candidates"][0]["content"]["parts"] if not p.get("thought"))
 
 
-def parse_items(text):
+def parse_items(text: str) -> list:
     text = re.sub(r"```json|```", "", text).strip()
     try:
         j = json.loads(text)
@@ -487,7 +494,7 @@ def parse_items(text):
     return j.get("items", []) if isinstance(j, dict) else []
 
 
-def clean_tag(item, cand, city):
+def clean_tag(item: dict, cand: dict, city: dict) -> dict:
     t = item.get("type")
     codes = [a["code"] for a in city.get("areas") or []]
     boro = (cand.get("boro") or item.get("boro") or "") if codes else ""
@@ -522,7 +529,7 @@ OSM_CUISINE = {"italian": "italian", "pizza": "pizza", "steak_house": "steak", "
                "vegetarian": "veg", "british": "comfort", "diner": "comfort", "bbq": "comfort"}
 
 
-def retry_due(entry):
+def retry_due(entry: dict) -> bool:
     """Places the AI didn't know get another chance after RETRY_DAYS. Old cache entries ({"skip": true} with no
     date) can't tell "unknown" from "not a night out spot", so they are retried once."""
     if not entry.get("skip"):
@@ -538,12 +545,12 @@ def retry_due(entry):
 SUSPICIOUS = re.compile(r"https?:|www\.|[|<>{}\[\]\\\n\r]|\b(ignore|instruction|prompt|system|always pick|assistant|you are)\b", re.I)
 
 
-def plain_name(name):
+def plain_name(name: str) -> bool:
     """OSM names are written by anyone and end up in the agents' prompt: keep short, ordinary names only."""
     return 1 < len(name) <= 60 and not SUSPICIOUS.search(name)
 
 
-def fresh_find(cand, city):
+def fresh_find(cand: dict, city: dict) -> dict | None:
     """A listing from plain facts for a place the AI doesn't know yet: only well documented restaurants and bars
     (website and opening hours), with no made up vibes. The app shows it as a "fresh find"."""
     t = KIND_TYPE.get(cand.get("kind"))
@@ -564,14 +571,14 @@ def fresh_find(cand, city):
             "web": cand.get("website", "")[:120] if re.match(r"https?://", cand.get("website", ""), re.I) else ""}
 
 
-def tag_new(cands, cache, city, max_batches):
+def tag_new(cands: dict[str, dict], cache: dict[str, dict], city: dict, max_batches: int) -> None:
     todo = [c for cid, c in cands.items() if cid not in cache or retry_due(cache[cid])]
     # mix restaurants, bars and activities so every category grows each run; places with a website first
-    def bucket(c):
+    def bucket(c: dict) -> int:
         k = c.get("kind")
         return 0 if c["id"].startswith("nyc:") else 1 if k in ("bar", "pub", "biergarten", "nightclub") else 2
     groups = [sorted([c for c in todo if bucket(c) == g], key=lambda c: (not c.get("website"), not c.get("hours"))) for g in range(3)]
-    todo = [c for trio in __import__("itertools").zip_longest(*groups) for c in trio if c]
+    todo = [c for trio in itertools.zip_longest(*groups) for c in trio if c]
     log(f"to tag: {len(todo)} new places in {city['name']}, up to {max_batches} batches of {BATCH_SIZE} this run")
     done, prompt = 0, prompt_for(city)
     for b in range(max_batches):
@@ -597,13 +604,13 @@ def tag_new(cands, cache, city, max_batches):
     log(f"tagged {done} places this run")
 
 
-def save_cache(cache):
+def save_cache(cache: dict) -> None:
     CACHE.parent.mkdir(exist_ok=True)
     CACHE.write_text(json.dumps(cache, ensure_ascii=False, separators=(",", ":"), sort_keys=True))
 
 
 # ---------------------------------------------------------------- popularity
-def fetch_stats():
+def fetch_stats() -> dict:
     url = os.environ.get("STATS_URL")
     if not url:
         return {}
@@ -614,7 +621,7 @@ def fetch_stats():
         return {}
 
 
-def popularity(stats, name):
+def popularity(stats: dict, name: str) -> float:
     s = stats.get(name) or {}
     raw = 1.0 * s.get("pick", 0) + 2.0 * s.get("save", 0) - 1.5 * s.get("veto", 0)
     return round(max(-3, min(5, math.copysign(math.log1p(abs(raw)), raw))), 2)
@@ -624,7 +631,7 @@ def popularity(stats, name):
 CITY_ID = re.compile(r"^[a-z][a-z-]{1,23}$")
 
 
-def load_cities():
+def load_cities() -> list[dict]:
     """Every cities/<id>/city.json. Contributors add cities, so check the fields the pipeline relies on."""
     cities = []
     for p in sorted(CITIES.glob("*/city.json")):
@@ -641,7 +648,7 @@ def load_cities():
     return cities
 
 
-def curated_info(picks, osm, locate, bbox):
+def curated_info(picks: list[dict], osm: list[dict], locate: Locate | None, bbox: Sequence[float]) -> dict[str, dict]:
     """Coordinates, hours and needs for the hand picked spots, from the one OSM place with the same name (in the
     same area when the city has areas). Skipped when the match is ambiguous, so we never attach the wrong hours.
     Then a pick's own "lat"/"lon" (looked up on OpenStreetMap by hand) gives at least its location."""
@@ -668,7 +675,7 @@ def curated_info(picks, osm, locate, bbox):
     return info
 
 
-def build_city(city, cache, stats, max_batches):
+def build_city(city: dict, cache: dict, stats: dict, max_batches: int) -> None:
     src = city.get("sources") or {}
     picks = city.get("picks") or []
     curated = [p.get("n", "") for p in picks]
@@ -713,7 +720,7 @@ def build_city(city, cache, stats, max_batches):
     log(f"{city['id']}/spots.json: {len(live)} live spots {by_type} ({min(len(finds), FRESH_PER_CITY)} fresh finds), {len([c for c in cands if c not in cache])} still waiting to be tagged")
 
 
-def main():
+def main() -> None:
     cache = json.loads(CACHE.read_text()) if CACHE.exists() else {}
     cities = load_cities()
     only = os.environ.get("CITY")

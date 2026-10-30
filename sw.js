@@ -14,7 +14,7 @@ self.addEventListener("install", e => {
 });
 
 self.addEventListener("activate", e => {
-  // on shared hosts (like username.github.io) other apps can share this origin's caches, so only ever touch our own (pc-*)
+  // the app has its own origin on Cloudflare Pages (_headers blocks framing too), but only ever touch our own caches (pc-*): defense in depth for shared hosts
   e.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(k => k.startsWith("pc-") && k !== CACHE).map(k => caches.delete(k))))
     .then(() => self.clients.claim()));
 });

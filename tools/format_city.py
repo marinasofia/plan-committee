@@ -1,7 +1,6 @@
 """Rewrites cities/*/city.json in the house style: one setting per line, one hand picked spot per line.
 Run `python3 tools/format_city.py` after editing a city file; CI checks every city file is valid."""
 import json
-import sys
 from pathlib import Path
 
 
@@ -20,4 +19,3 @@ if __name__ == "__main__":
     for p in sorted(Path(__file__).resolve().parent.parent.glob("cities/*/city.json")):
         p.write_text(dump(json.loads(p.read_text(encoding="utf-8"))), encoding="utf-8")
         print("formatted", p.parent.name)
-    sys.exit(0)

@@ -5,10 +5,9 @@ Every agent working in this repository follows these rules. They apply to code, 
 ## Secrets
 
 1. Never write a real key, token, password, connection string, or webhook URL into any file. Read secrets from environment variables.
-2. `.env` files stay local and are ignored by git. Only `.env.example` is committed, and it holds placeholders such as `ANTHROPIC_API_KEY=your-key-here`.
+2. `.env` files stay local and are ignored by git. The pipeline reads `GROQ_API_KEY` and `GEMINI_API_KEY` from repo secrets; users' keys stay in their own browser.
 3. Never print a secret in logs, error messages, test output, or a README example.
 4. If a secret was ever committed, treat it as leaked: tell the user to rotate it first. Rewriting history comes second and does not make the key safe again.
-5. Supabase: the anon key may appear in client code only when row level security is on for every table. The service role key never leaves the server.
 
 ## Data
 

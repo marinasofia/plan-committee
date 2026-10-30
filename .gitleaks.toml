@@ -2,11 +2,12 @@
 [extend]
 useDefault = true
 
-# Add a rule for a provider gitleaks does not know yet:
-# [[rules]]
-# id = "example-provider-key"
-# description = "Example provider API key"
-# regex = '''exk_[A-Za-z0-9]{32}'''
+# Groq keys (the pipeline's tagging provider) start with gsk_ and are not in the default rules.
+[[rules]]
+id = "plan-committee-groq-api-key"
+description = "Groq API key"
+regex = '''gsk_[A-Za-z0-9]{20,}'''
+keywords = ["gsk_"]
 
 # Allow a known false positive by path, never by disabling a rule:
 # [[allowlists]]
