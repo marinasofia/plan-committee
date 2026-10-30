@@ -42,6 +42,7 @@ TZ = {"gb": "Europe/London", "ie": "Europe/Dublin", "fr": "Europe/Paris", "de": 
       "pe": "America/Lima", "cl": "America/Santiago", "nz": "Pacific/Auckland"}
 TZ_RE = re.compile(r"^[A-Za-z_]+(/[A-Za-z0-9_+-]+){1,2}$")  # what the app accepts
 ID_RE = re.compile(r"^[a-z][a-z-]{1,23}$")
+CTRL = re.compile(r"[\x00-\x1f\x7f]")
 
 
 def slug(name: str) -> str:
@@ -68,10 +69,10 @@ def pick_hoods(places: list[dict], center: tuple[float, float], n: int = 9) -> l
         return math.hypot(p["lat"] - center[0], (p["lon"] - center[1]) * math.cos(math.radians(center[0])))
     seen, out = set(), []
     for p in sorted(places, key=lambda p: (not p.get("wikidata"), dist(p))):
-        label = (p.get("name_en") or p["name"]).strip()[:30]
+        label = CTRL.sub("", p.get("name_en") or p["name"]).strip()[:30]
         if label and label.lower() not in seen:
             seen.add(label.lower())
-            local = p["name"].strip()[:30]  # spots carry the local name ("7e Arrondissement"), the chip the English one
+            local = CTRL.sub("", p["name"]).strip()[:30]  # spots carry the local name ("7e Arrondissement"), the chip the English one
             out.append({"label": label, "match": [label] + ([local] if local.lower() != label.lower() else [])})
         if len(out) == n:
             break
@@ -82,7 +83,7 @@ def build_city(hit: dict, places: list[dict], city_id: str, tz: str | None) -> d
     """The city.json for one Nominatim result plus OSM neighborhoods. Raises ValueError with a fix when unsure."""
     addr = hit.get("address") or {}
     cc = str(addr.get("country_code") or "").lower()
-    name = str(addr.get("city") or addr.get("town") or hit.get("name") or "").strip()[:40]
+    name = CTRL.sub("", str(addr.get("city") or addr.get("town") or hit.get("name") or "")).strip()[:40]
     if not name:
         raise ValueError("Nominatim gave no city name; try a more specific name, like 'Paris, France'")
     tz = tz or TZ.get(cc)
@@ -93,10 +94,13 @@ def build_city(hit: dict, places: list[dict], city_id: str, tz: str | None) -> d
     if not ID_RE.match(city_id):
         raise ValueError("--id must be 2 to 24 lowercase letters or dashes, like 'sao-paulo'")
     lat, lon = round(float(hit["lat"]), 3), round(float(hit["lon"]), 3)
-    country = str(addr.get("country") or "").strip()
+    s, w, n, e = box = city_box(hit)
+    if not (s < n and w < e and (n - s) * (e - w) < 1.0):  # the daily build stops on a bad box, for every city
+        raise ValueError(f"OpenStreetMap's outline for {name} is too small or odd; try 'Name, Country'")
+    country = CTRL.sub("", str(addr.get("country") or "")).strip()
     return {
         "id": city_id, "name": name, "short": name[:20], "search": f"{name}, {country}" if country else name,
-        "bbox": city_box(hit), "center": [lat, lon], "tz": tz, "units": "f" if cc in ("us", "lr", "mm") else "c",
+        "bbox": box, "center": [lat, lon], "tz": tz, "units": "f" if cc in ("us", "lr", "mm") else "c",
         "currency": CURRENCY.get(cc) or ("€" if cc in EURO else "$"), "sources": {}, "areas": [], "stayIn": [],
         "hoods": pick_hoods(places, (lat, lon)), "picks": [],
     }

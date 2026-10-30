@@ -61,6 +61,11 @@ class BuildCity(unittest.TestCase):
         c = nc.build_city(austin, [], "austin", "America/Chicago")
         self.assertEqual((c["units"], c["currency"]), ("f", "$"))
 
+    def test_rejects_a_box_the_daily_build_would_refuse(self):
+        dot = {**PARIS, "boundingbox": ["10", "10", "10", "10"], "lat": "10", "lon": "10"}
+        with self.assertRaises(ValueError):
+            nc.build_city(dot, [], "dot", None)
+
     def test_rejects_bad_id_and_tz(self):
         with self.assertRaises(ValueError):
             nc.build_city(PARIS, [], "Paris!", None)
