@@ -19,12 +19,13 @@ Open http://localhost:8000/?mock. Mock mode runs scripted agents, so you don't n
   * `f`, from: romantic cozy fancy chaotic artsy lowkey dancing nerdy rooftop music views photo dessert wait loud quiet cash veg late
   * Optional `lat`, `lon`: only needed when the daily build can't find the place on OpenStreetMap by its exact name. Copy them from OpenStreetMap, never from Google Maps.
   * Only real places that are open now, and no chains. Run `python3 tools/format_city.py` to tidy the file.
-* **Add your city.** Copy `cities/london/` to `cities/<your-city>/` (lowercase, dashes), then edit `city.json`:
-  * `id` (same as the folder), `name`, `short`, `search` (what to add to a map search, like "London, UK")
-  * `bbox`: `[south, west, north, east]` around the city, `center`, `tz` (like `Europe/Paris`), `units` (`c` or `f`), `currency`
-  * `hoods`: up to 9 neighborhood chips, and 10 to 30 hand picks to start
+* **Add your city.** The app already works anywhere ("Somewhere else" pulls places live from OpenStreetMap), but a city pack is faster, curated and refreshed daily. Run:
+  `python3 tools/new_city.py "Paris"` (add `--tz America/Chicago` for countries with several time zones, `--dry-run` to preview)
+  It looks the city up on OpenStreetMap and writes `cities/<id>/city.json` (outline, center, time zone, currency, 9 neighborhood chips), an empty `spots.json`, and the line in `cities/index.json`. Then:
+  * Check the neighborhood chips: keep the ones locals would pick, rename or drop the rest.
+  * Add 10 to 30 hand picks you'd actually send a friend to (format above), run `python3 tools/format_city.py`, and open a pull request.
   * Text in city files (names, `v` blurbs, neighborhood labels) is shown to people and given to the AI, so keep it short and factual. Maintainers review it like code.
-  * Add the city to `cities/index.json` and set `cities/<your-city>/spots.json` to `{"spots": []}`. The daily pipeline fills it from OpenStreetMap, and a free AI tags it over the next few days.
+  * The daily pipeline fills `spots.json` from OpenStreetMap, and a free AI tags it over the next few days. Every city shares the same free daily AI quota, so new cities grow a little slower than the first two.
 * **Report a closed place.** Open an issue, or add its exact name to `data/blocklist.txt`.
 * **Better agent banter** in mock mode, so the no key demo is more fun.
 
