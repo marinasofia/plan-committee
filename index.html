@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>The Plan Committee</title>
 <meta name="description" content="Your friends pick what they want. AI agents argue for each of you in a group chat and agree on one plan for a night out in NYC or London.">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-qaEchrcJ3JbKF8fLVCjEAYwJij7NQ/9S6hzGUhDOLsA='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https:; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-IqbpjhoYIgBD54fcUg3pnecAxAxCJRX+pYQQOm5AJBA='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https:; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
 <meta name="referrer" content="no-referrer">
 <meta name="theme-color" content="#fbf9f6">
 <link rel="manifest" href="manifest.webmanifest">
@@ -197,7 +197,9 @@ button,input,select,textarea{font:inherit;color:inherit}
     <h2>Let the agents<br>plan your night.</h2>
     <p class="lead">Add names and hit start. Each person gets an AI agent with its own personality that fights for them.</p>
 
-    <div class="sec" id="citySec" style="display:none"><span class="lab">City</span><div class="chips" id="cityChips"></div></div>
+    <div class="sec" id="citySec"><span class="lab">City</span><div class="chips" id="cityChips"></div>
+      <div id="geoRow" style="display:none;margin-top:8px"><form class="btnrow" id="geoForm"><input class="field" id="geoInput" placeholder="your city: Paris, Tokyo, Austin" maxlength="80" autocomplete="address-level2"><button class="chip" type="submit" id="geoGo">Find</button></form>
+        <p class="small" id="geoStatus">Any city. Places come straight from OpenStreetMap.</p></div></div>
     <div class="sec" id="crewSec"><span class="lab">Your crews</span><div class="chips" id="crewChips"></div></div>
     <div class="sec"><div class="seg" id="modeSeg"><button type="button" data-mode="date">Date night</button><button type="button" data-mode="girls">Friends night</button></div></div>
 
@@ -289,6 +291,7 @@ button,input,select,textarea{font:inherit;color:inherit}
     <p class="lead">Each person gets an AI agent with its own personality. They fight it out in a group chat and agree on one real plan.</p>
     <form id="obForm">
       <div class="sec"><span class="lab">Your name</span><input class="field" id="obMe" placeholder="your name" maxlength="20" autocomplete="given-name"></div>
+      <div class="sec"><span class="lab">City</span><input class="field" id="obCity" placeholder="your city" maxlength="80" autocomplete="address-level2"><p class="small" id="obCityNote" style="margin-top:4px">Any city in the world.</p></div>
       <div class="sec"><span class="lab">Who's coming</span><input class="field" id="obOthers" placeholder="their names: Sam, Lee" maxlength="120" autocomplete="off"></div>
       <div class="sec"><div class="seg" id="obMode"><button type="button" data-mode="date">Date night</button><button type="button" data-mode="girls">Friends night</button></div></div>
       <button class="cta" id="obGo" type="submit">Let the agents plan</button>
@@ -340,6 +343,7 @@ function cleanSpot(o,cur){if(!o||typeof o!=="object")return null;const n=str(o.n
   return {n,t,h:str(o.h,40),b:str(o.b,4),p:Number.isInteger(o.p)&&o.p>=0&&o.p<=4?o.p:2,c:str(o.c,20),f:Array.isArray(o.f)?o.f.filter(x=>ALL_TAGS.includes(x)):[],
     v:str(o.v,90),nw:o.nw===1,pop:typeof o.pop==="number"&&isFinite(o.pop)?Math.max(-3,Math.min(5,o.pop)):0,web:str(o.web,200),x:[],cur}}
 async function loadCity(id){
+  const g=geoParse(id);if(g)return loadGeoCity(id,g);
   if(!CITY_ID.test(id||""))id="nyc";
   const r=await fetch(`cities/${id}/city.json`,{cache:"no-cache"});if(!r.ok){if(id!=="nyc")return loadCity("nyc");throw new Error("city missing")}
   const c=await r.json();
@@ -376,10 +380,142 @@ async function loadMoreSpots(){
     for(const [n,pop] of Object.entries(j.curatedPop||{})){const c=SPOTS.find(s=>s.cur&&s.n===n);if(c&&typeof pop==="number"&&isFinite(pop))c.pop=Math.max(-3,Math.min(5,pop))}
   }catch(e){}
 }
+/* ===================== anywhere: any city in the world, live from OpenStreetMap =====================
+   A city without a pack gets its places from OpenStreetMap around its center. The id carries everything a
+   friend's phone needs to load the same city from a link: "@lat,lon,country,Name". OSM data is untrusted
+   like spots.json: every place goes through cleanSpot()/extra() and is escaped when shown. */
+const GEO_ID=/^@(-?\d{1,2}(?:\.\d{1,4})?),(-?\d{1,3}(?:\.\d{1,4})?),([a-z]{2}),([^<>&"'`@,]{1,40})$/u;
+function geoParse(id){const m=GEO_ID.exec(typeof id==="string"?id:"");if(!m)return null;const lat=+m[1],lon=+m[2],name=m[4].trim();
+  return Math.abs(lat)<=85&&Math.abs(lon)<=180&&name?{lat,lon,cc:m[3],name}:null}
+const cityOk=id=>typeof id==="string"&&(CITY_ID.test(id)||!!geoParse(id));
+const geoId=(lat,lon,cc,name)=>`@${lat.toFixed(3)},${lon.toFixed(3)},${/^[a-z]{2}$/.test(cc)?cc:"xx"},${String(name).replace(/[<>&"'`@,]/g," ").trim().slice(0,40)||"Here"}`;
+const EURO="at be cy de ee es fi fr gr hr ie it lt lu lv mt nl pt si sk".split(" ");
+const CURRENCY={us:"$",ca:"$",au:"$",nz:"$",mx:"$",sg:"$",hk:"$",gb:"£",jp:"¥",cn:"¥",in:"₹",kr:"₩",th:"฿",ph:"₱",tr:"₺",il:"₪",ng:"₦",vn:"₫",ua:"₴",br:"R$",za:"R"};
+async function loadGeoCity(id,g){
+  const spots=await geoSpots(g,id);
+  CITY={id,geo:true,name:g.name,short:g.name.slice(0,20),search:g.name,center:[g.lat,g.lon],tz:"auto",units:["us","lr","mm"].includes(g.cc)?"f":"c",
+    currency:CURRENCY[g.cc]||(EURO.includes(g.cc)?"€":"$"),areas:[],hoods:[]};
+  PRICE=["free",...[1,2,3,4].map(k=>CITY.currency.repeat(k))];HOODS=["Anywhere"];
+  DEALS=[["no lines","wait"],["nothing loud","loud"],["no cash only","cash"],["home by 11","early"]];
+  document.title=`The Plan Committee · ${CITY.short}`;
+  SPOTS=spots;
+}
+/* ---- places: cached on this phone for a week, so a city loads instantly the second time ---- */
+const GEO_TTL=30*864e5,geoMemo={},GEO_KM={},geoClean=o=>{const s=cleanSpot(o,false);return s?extra(s,o):null};
+const geoSpots=(g,id)=>geoMemo[id]||=geoFetch(g,id).catch(e=>{delete geoMemo[id];throw e});  // one lookup per city, even if prefetch and start both ask
+async function geoFetch(g,id){
+  const cache=store.get("geo",{}),hit=cache&&typeof cache==="object"?cache[id]:null;
+  if(hit&&Date.now()-hit.at<GEO_TTL&&Array.isArray(hit.s)&&hit.s.length){
+    if(!hit.ai&&providers().length&&!scripted()){const raw=hit.s.map(geoClean).filter(Boolean);if(await aiTag(raw,g.name).then(()=>true,()=>false))store.set("geo",{...cache,[id]:{...hit,ai:true,s:raw}});return raw}
+    return hit.s.map(geoClean).filter(Boolean)}
+  const els=await overpass(g,GEO_KM[id]||2.5),seen=new Set();
+  const raw=els.map(osmSpot).filter(s=>s&&!seen.has(s.n.toLowerCase())&&seen.add(s.n.toLowerCase()))
+    .sort((a,b)=>km(g,a)-km(g,b)).slice(0,900);  // the 900 places nearest the center
+  if(!raw.length)throw new Error(`OpenStreetMap has no restaurants or bars mapped around ${g.name} yet.`);
+  const ai=await aiTag(raw,g.name).then(()=>providers().length>0&&!scripted(),()=>false);  // with a key, the AI adds prices and vibes it knows; without, OSM tags are enough
+  const keep=Object.fromEntries(Object.entries(cache&&typeof cache==="object"?cache:{}).filter(([k,v])=>k!==id&&v?.at).sort((a,b)=>b[1].at-a[1].at).slice(0,2));
+  store.set("geo",{...keep,[id]:{at:Date.now(),ai,s:raw}});  // the last 3 cities, if there's room
+  return raw.map(geoClean).filter(Boolean);
+}
+const OVERPASS=["https://overpass-api.de/api/interpreter","https://overpass.private.coffee/api/interpreter"];
+async function overpass(g,size){
+  for(const half of size<4?[size,4]:[4]){  // km from the center, sized to the city; a sparse result gets one wider try
+    const dy=half/111,dx=dy/Math.cos(g.lat*Math.PI/180),b=[g.lat-dy,g.lon-dx,g.lat+dy,g.lon+dx].map(v=>v.toFixed(4)).join(",");
+    const q=`[out:json][timeout:40];(nw["amenity"~"^(restaurant|bar|pub|biergarten|nightclub|cinema|theatre|ice_cream|arts_centre)$"]["name"](${b});nw["tourism"~"^(museum|gallery|viewpoint)$"]["name"](${b});nwr["leisure"~"^(park|garden)$"]["name"]["wikidata"](${b}););out center tags 2500;`;
+    const els=await overpassAsk(q);
+    if(els.length>=40||half===4)return els;
+  }
+}
+/* the public servers are often slow: ask the main one, and the mirror too if it hasn't answered in 8 seconds; first answer wins */
+async function overpassAsk(q){const ctl=new AbortController(),timer=setTimeout(()=>ctl.abort(),60000);
+  const ask=(h,wait)=>sleep(wait).then(()=>{if(ctl.signal.aborted)throw 0;return fetch(h,{method:"POST",body:new URLSearchParams({data:q}),signal:ctl.signal})})
+    .then(r=>r.ok?r.json():Promise.reject(r.status)).then(j=>Array.isArray(j?.elements)?j.elements.slice(0,8000):Promise.reject(0));
+  try{return await Promise.any(OVERPASS.map((h,i)=>ask(h,i*8000)))}
+  catch(e){throw new Error("OpenStreetMap is busy right now. Try again in a minute.")}finally{clearTimeout(timer);ctl.abort()}}
+/* ---- an OSM place -> a spot. Same rules as the daily build: no chains, no takeout, and a restaurant or bar
+   must have a website or opening hours on the map (a sign someone keeps it up to date) ---- */
+const OSM_SKIP=/coffee|sandwich|bubble_tea|donut|juice|bagel|kebab|fried_chicken|burger|chicken|fast_food/;
+const OSM_TYPE={restaurant:"dinner",bar:"drinks",pub:"drinks",biergarten:"drinks",nightclub:"late",cinema:"late",theatre:"late",arts_centre:"late",ice_cream:"late",viewpoint:"free",park:"free",garden:"free"};
+const OSM_TAGS={nightclub:["dancing","loud","late"],pub:["lowkey","cozy"],biergarten:["lowkey"],cinema:["nerdy"],theatre:["artsy"],arts_centre:["artsy"],museum:["artsy","quiet"],gallery:["artsy"],ice_cream:["dessert"],viewpoint:["views","photo"],garden:["romantic","quiet"],park:["lowkey"]};
+const OSM_CUISINE=[[/italian/,"italian"],[/pizza/,"pizza"],[/steak/,"steak"],[/french/,"french"],[/japanese|sushi|ramen|chinese|thai|korean|vietnamese|indian|asian|dim_sum|noodle|malaysian|indonesian|filipino|nepal/,"asian"],
+  [/mexican|peruvian|latin|brazil|argentin|colombian|cuban|taco/,"latin"],[/american|bbq|barbecue|diner/,"american"],[/greek|lebanese|turkish|spanish|tapas|mediterranean|middle_eastern|moroccan|israeli|portuguese/,"mediterranean"],
+  [/seafood|fish|oyster/,"seafood"],[/vegan|vegetarian/,"veg"],[/british|german|polish|regional|local|austrian|irish|russian|georgian|czech|hungarian/,"comfort"]];
+function osmSpot(e){
+  const t=e?.tags,lat=e?.lat??e?.center?.lat,lon=e?.lon??e?.center?.lon;
+  if(!t||typeof t.name!=="string"||typeof lat!=="number"||typeof lon!=="number")return null;
+  if(t.brand||t["brand:wikidata"]||t.disused||t.abandoned)return null;
+  const kind=t.amenity||t.tourism||t.leisure,cu=String(t.cuisine||"").toLowerCase(),web=String(t.website||t["contact:website"]||"");
+  if(["restaurant","bar","pub","biergarten","nightclub"].includes(kind)&&!web&&!t.opening_hours)return null;
+  if(kind==="restaurant"&&OSM_SKIP.test(cu))return null;
+  const type=OSM_TYPE[kind]||((kind==="museum"||kind==="gallery")?(t.fee==="no"?"free":"late"):null);if(!type)return null;
+  const hrs=parseHours(t.opening_hours),f=new Set(OSM_TAGS[kind]||[]);
+  if(t.live_music==="yes")f.add("music");
+  if(t.rooftop==="yes"||/rooftop/i.test(t.name)){f.add("rooftop");f.add("views")}
+  if(/vegan|vegetarian/.test(cu)||["yes","only"].includes(t["diet:vegan"])||t["diet:vegetarian"]==="only")f.add("veg");
+  if(t["payment:cash"]==="only")f.add("cash");
+  if(hrs&&hrs.some(d=>d.some(([,b])=>b>=1500)))f.add("late");  // open past 1 am
+  const x=[];if(t.wheelchair==="yes")x.push("wheel");if(t.wheelchair==="no")x.push("nowheel");
+  if(["yes","only"].includes(t["diet:vegan"]))x.push("vegan");if(["yes","only"].includes(t["diet:vegetarian"]))x.push("veg");if(["yes","only"].includes(t["diet:gluten_free"]))x.push("gf");
+  return {n:t.name.slice(0,80),t:type,h:String(t["addr:suburb"]||t["addr:neighbourhood"]||t["addr:quarter"]||t["addr:district"]||"").slice(0,40),
+    p:type==="free"?0:kind==="ice_cream"?1:2,c:type==="dinner"?(OSM_CUISINE.find(([re])=>re.test(cu))?.[1]||""):"",f:[...f],
+    v:cu?cu.split(";")[0].replace(/_/g," ").slice(0,40):"",web:/^https?:\/\//i.test(web)?web.slice(0,200):"",pop:(t.wikidata?1:0)+(web?0.5:0),
+    lat:+lat.toFixed(5),lon:+lon.toFixed(5),hrs:hrs||undefined,x};
+}
+/* OSM opening_hours -> Mon..Sun lists of [open, close] minutes, the same subset the daily build reads
+   ("Mo-Fr 11:00-23:00; Sa,Su 10:00-02:00", "24/7"). Anything fancier is "unknown", never "closed". */
+const OH_DAYS=["mo","tu","we","th","fr","sa","su"];
+function parseHours(oh){oh=String(oh||"").trim().toLowerCase();if(!oh||oh.length>300)return null;
+  if(oh==="24/7")return OH_DAYS.map(()=>[[0,1440]]);
+  const week=Array(7).fill(null);
+  for(const rule of oh.split(/\s*(?:;|\|\|)\s*/)){if(!rule||rule.startsWith("ph"))continue;
+    const m=rule.match(/^((?:[a-z]{2}(?:-[a-z]{2})?)(?:\s*,\s*[a-z]{2}(?:-[a-z]{2})?)*)?\s*(.*)$/),times=m[2].trim();let days=[0,1,2,3,4,5,6];
+    if(m[1]){days=[];for(const part of m[1].split(/\s*,\s*/)){const [a,b]=part.split("-"),i=OH_DAYS.indexOf(a),j=OH_DAYS.indexOf(b||a);
+      if(i<0||j<0)return null;for(let k=0;k<=(j-i+7)%7;k++)days.push((i+k)%7)}}
+    const spans=[];
+    if(times!=="off"&&times!=="closed")for(const tt of times.split(/\s*,\s*/)){
+      const r=tt.match(/^(\d{1,2}):(\d{2})\s*-\s*(\d{1,2}):(\d{2})$|^(\d{1,2}):(\d{2})\+$/);if(!r)return null;
+      let s,e;if(r[5]!=null){s=+r[5]*60+ +r[6];e=s+300}else{s=+r[1]*60+ +r[2];e=+r[3]*60+ +r[4];if(e<=s)e+=1440}
+      if(s>=1440||e>2880)return null;spans.push([s,e])}
+    for(const d of days)week[d]=spans}
+  const w=week.map(x=>x||[]);return w.some(x=>x.length)?w:null}
+/* with a key, one AI call adds what the map doesn't know: price, vibe, why it's good. Unknown places are left alone */
+async function aiTag(raw,city){
+  if(scripted()||!providers().length)return;
+  const top=raw.slice().sort((a,b)=>b.pop-a.pop).slice(0,60);
+  const list=top.map((s,i)=>`${i}. ${s.n} (${s.t}${s.v?", "+s.v:""})`).join("\n");
+  const res=await Promise.race([llm("You know restaurants, bars and nights out in cities around the world. Reply with JSON only.",
+    `City: ${city}. For each place you actually know, give price 1 to 4 (1 cheap, 4 splurge), up to 3 tags from this list: ${ALL_TAGS.join(", ")}, and why it's good for a night out in max 8 words. Skip places you don't know.\nReturn {"items":[{"i":0,"price":2,"tags":["cozy"],"why":"..."}]}\nPlaces:\n${list}`,true),
+    sleep(25000).then(()=>{throw new Error("slow")})]);
+  const items=parseJSON(res.text)?.items;if(!Array.isArray(items))return;
+  for(const it of items.slice(0,60)){const s=Number.isInteger(it?.i)?top[it.i]:null;if(!s)continue;
+    if(Number.isInteger(it.price)&&it.price>=1&&it.price<=4&&s.t!=="free")s.p=it.price;
+    if(Array.isArray(it.tags))s.f=[...new Set([...s.f,...it.tags.filter(x=>ALL_TAGS.includes(x)).slice(0,3)])];
+    if(typeof it.why==="string"&&it.why.trim())s.v=it.why.trim().slice(0,70);s.pop+=1}  // places the AI knows rank a little higher
+}
+/* a typed city -> a pack id ("NYC", "London") or an anywhere id, via OpenStreetMap's search (one request) */
+const cityMemo={};
+const resolveCity=text=>{const k=String(text||"").trim().toLowerCase();return cityMemo[k]||=lookupCity(text).catch(e=>{delete cityMemo[k];throw e})};
+async function lookupCity(text){
+  const q=String(text||"").trim().slice(0,80),k=q.split(",")[0].toLowerCase().replace(/[^a-z]/g,"");if(!q)return plan.city;
+  const pack=CITY_LIST.find(c=>c.id===k||c.name.toLowerCase().replace(/[^a-z]/g,"")===k)||(/^(newyork|ny|manhattan|brooklyn)$/.test(k)?CITY_LIST.find(c=>c.id==="nyc"):null);
+  if(pack)return pack.id;
+  const r=await fetch("https://nominatim.openstreetmap.org/search?"+new URLSearchParams({q,format:"jsonv2",limit:"1",addressdetails:"1","accept-language":"en"}),
+    {referrerPolicy:"origin",signal:AbortSignal.timeout(10000)}).catch(()=>null);  // OSM's usage policy asks apps to identify themselves: send only our origin
+  const j=r?.ok?await r.json().catch(()=>null):null,hit=Array.isArray(j)?j[0]:null,lat=+hit?.lat,lon=+hit?.lon;
+  if(!hit||!isFinite(lat)||!isFinite(lon))throw new Error(r?`Couldn't find "${q}". Try the city's name in English.`:"Couldn't reach the map. Check your connection.");
+  const a=hit.address&&typeof hit.address==="object"?hit.address:{},bb=Array.isArray(hit.boundingbox)?hit.boundingbox.map(Number):[];
+  const id=geoId(lat,lon,String(a.country_code||""),str(a.city||a.town||a.village||a.municipality||hit.name,40)||q.split(",")[0]);
+  if(bb.length===4&&bb.every(isFinite))GEO_KM[id]=Math.min(4,Math.max(1.5,(bb[1]-bb[0])*111/6));  // a sixth of the city's height: about the walkable center
+  return id;
+}
+/* first visit: guess the city from the phone's timezone ("Europe/Berlin" -> Berlin), the person can change it */
+function guessCity(){let tz="";try{tz=Intl.DateTimeFormat().resolvedOptions().timeZone||""}catch(e){}
+  if(tz==="America/New_York")return "New York City";if(tz==="Europe/London")return "London";
+  const last=tz.split("/").pop()||"";return /^[A-Za-z_]{3,30}$/.test(last)&&!/^(UTC|GMT|Etc)$/i.test(last)?last.replace(/_/g," "):"New York City"}
 
 /* ===================== picks ===================== */
 const CRAVINGS=["italian","pizza","steak","french","asian","latin","comfort","american","mediterranean","seafood","veg","anything"];
-const BUDGETS=[["$",1],["$$",2],["$$$",3],["splurge",4]];
+const budgets=()=>[[PRICE[1],1],[PRICE[2],2],[PRICE[3],3],["splurge",4]];  // in the city's own currency
 const VIBES=["romantic","cozy","fancy","chaotic","artsy","lowkey","dancing","nerdy"];
 const MUSTS=[["rooftop","rooftop"],["views","views"],["live music","music"],["photo moment","photo"],["dessert","dessert"],["late night","late"]];
 const PERS={"surprise me":"",dramatic:"Dramatic and theatrical, everything is life or death.",stubborn:"Stubborn, rarely gives in, but caves for a good trade.",chill:"Chill and easygoing, but has one hill to die on.","the mediator":"The peacemaker who finds the compromise.",chaotic:"Chaotic, pitches wild ideas, very funny.",
@@ -424,7 +560,7 @@ function cleanMembers(list,max=6){const arr=v=>Array.isArray(v)?v.filter(x=>type
   return (Array.isArray(list)?list:[]).slice(0,max).filter(m=>m&&typeof m==="object").map(m=>({id:str(String(m.id??uid()),16),n:str(m.n,30),c:arr(m.c),v:arr(m.v),m:arr(m.m),
     d:arr(m.d).map(x=>x==="onlyM"?"only:M":x==="onlyBK"?"only:BK":x),b:[1,2,3,4].includes(m.b)?m.b:2,ps:Object.hasOwn(PERS,m.ps)?m.ps:"chill",q:str(m.q,90)}))}
 function fixPlan(){plan.hood=str(plan.hood,30)||"Anywhere";if(typeof plan.id!=="string"||!CREW_ID.test(plan.id))plan.id=uid();plan.name=str(plan.name,30)||(plan.mode==="girls"?"Friends night":"Date night");plan.when=String(plan.when??"Saturday night").slice(0,60)||"Saturday night";plan.start=STARTS.includes(+plan.start)?+plan.start:1140;plan.needs=(Array.isArray(plan.needs)?plan.needs:[]).filter(v=>NEEDS.some(n=>n[1]===v));
-  plan.city=CITY_ID.test(plan.city||"")?plan.city:"nyc";
+  plan.city=cityOk(plan.city)?plan.city:"nyc";
   plan.members=cleanMembers(plan.members);
   if(!plan.members.length)plan.members=[member("You")];
   if(CITY&&CITY.id===plan.city){if(!HOODS.includes(plan.hood))plan.hood="Anywhere";const ok=new Set(DEALS.map(d=>d[1]));plan.members.forEach(m=>m.d=m.d.filter(x=>ok.has(x)))}}
@@ -452,7 +588,7 @@ function importCrew(P,confirmed){if(!P||typeof P!=="object")throw new Error("bad
   const id=typeof P.id==="string"&&CREW_ID.test(P.id)?P.id:uid(),had=Object.hasOwn(crews,id);
   if(had&&!confirmed)return "ask";  // a link can't replace a crew you already have without a tap
   if(!had&&crewsFull())return "full";
-  stash();plan={id,name:str(P.name,30)||"Shared crew",city:typeof P.city==="string"&&CITY_ID.test(P.city)?P.city:"nyc",mode:P.mode==="girls"?"girls":"date",
+  stash();plan={id,name:str(P.name,30)||"Shared crew",city:cityOk(P.city)?P.city:"nyc",mode:P.mode==="girls"?"girls":"date",
     when:P.when,start:P.start,needs:P.needs,hood:str(P.hood,30)||"Anywhere",wallet:P.wallet===true,members:cleanMembers(P.members)};
   fixPlan();savePlan();return had}
 let cfg={pool:"smart",gKey:"",gModel:"",qKey:"",qModel:"",oKey:"",oModel:"openrouter/free",cBase:"",cKey:"",cModel:"",...store.get("cfg2",{})};
@@ -474,7 +610,7 @@ function chips(id,list,isOn,toggle){const el=$(id);const items=list.map(x=>Array
   [...el.children].forEach((b,i)=>b.onclick=()=>{toggle(items[i][1]);paint()});paint()}
 const tog=(arr,v)=>arr.includes(v)?arr.filter(x=>x!==v):[...arr,v];
 const labelOf=(list,v)=>(list.find(x=>x[1]===v)||[v])[0];
-function summary(m){return [m.c.join(", ")||"anything",labelOf(BUDGETS,m.b),...m.v,...m.m.map(v=>labelOf(MUSTS,v)),...m.d.map(v=>labelOf(DEALS,v))].filter(Boolean).join(" · ")}
+function summary(m){return [m.c.join(", ")||"anything",labelOf(budgets(),m.b),...m.v,...m.m.map(v=>labelOf(MUSTS,v)),...m.d.map(v=>labelOf(DEALS,v))].filter(Boolean).join(" · ")}
 
 /* ===================== setup UI ===================== */
 function agentList(){const a=plan.members.map((m,i)=>({...m,color:COLORS[i%COLORS.length]}));
@@ -501,14 +637,21 @@ function renderSetup(){
   $("startAt").innerHTML=STARTS.map(m=>`<option value="${m}" ${m===plan.start?"selected":""}>starts ${fmtMin(m)}</option>`).join("");
   chips("needChips",NEEDS,v=>plan.needs.includes(v),v=>{plan.needs=tog(plan.needs,v);savePlan()});
   chips("hoodChips",HOODS,v=>plan.hood===v,v=>{plan.hood=v;savePlan();moreSum()});
-  $("citySec").style.display=CITY_LIST.length>1?"":"none";
-  chips("cityChips",CITY_LIST.map(c=>[c.name,c.id]),v=>CITY.id===v,async v=>{if(v===CITY.id)return;await loadCity(v);plan.city=CITY.id;plan.hood="Anywhere";savePlan();renderSetup()});
+  chips("cityChips",[...CITY_LIST.map(c=>[c.name,c.id]),...(CITY.geo?[[CITY.name,CITY.id]]:[]),["Somewhere else","+"]],v=>v==="+"?$("geoRow").style.display==="":CITY.id===v,async v=>{
+    if(v==="+"){const r=$("geoRow");r.style.display=r.style.display?"":"none";if(!r.style.display)$("geoInput").focus();return}
+    if(v===CITY.id)return;await loadCity(v).catch(e=>say(e.message));plan.city=CITY.id;plan.hood="Anywhere";savePlan();renderSetup()});
   $("addForm").style.display=plan.members.length>=6?"none":"";
   $("startBtn").textContent=`Start the chat (${plan.members.length} agents${plan.wallet?" + The Wallet":""})`;  // short enough for one line on a 360px phone
   $("keyHint").style.display=providers().length||MOCK?"none":"";
   renderHead();
 }
 document.querySelectorAll("#modeSeg button").forEach(b=>b.onclick=()=>{if(plan.mode===b.dataset.mode)return;plan.mode=b.dataset.mode;savePlan();renderSetup()});
+$("geoForm").onsubmit=async e=>{e.preventDefault();const st=t=>$("geoStatus").textContent=t;if(!$("geoInput").value.trim())return $("geoInput").focus();
+  $("geoGo").disabled=true;
+  try{st("Looking it up…");const id=await resolveCity($("geoInput").value),g=geoParse(id);if(g)st(`Finding places in ${g.name}… the first time can take up to a minute, then it's saved on this phone`);
+    await loadCity(id);plan.city=CITY.id;plan.hood="Anywhere";savePlan();$("geoRow").style.display="none";$("geoInput").value="";st("Any city. Places come straight from OpenStreetMap.");renderSetup();
+    if(CITY.geo)say(`${SPOTS.length} places around ${CITY.name}, from OpenStreetMap.${providers().length?"":" The demo works here; add your free AI key for the real agents."}`)}
+  catch(err){st(err.message)}finally{$("geoGo").disabled=false}};
 $("crewName").oninput=()=>{plan.name=str($("crewName").value,30);savePlan();renderCrews()};
 $("crewBtn").onclick=async()=>{savePlan();const url=baseUrl()+"#c="+await pack({...planPayload(),name:plan.name});
   await shareOut(plan.name,`our crew for planning nights out: tap to save it, then anyone can start the next plan`,url,$("crewBtn"),"Crew link copied")};
@@ -550,7 +693,7 @@ function openEditor(i,isNew,joinInfo){
   $("edWho").innerHTML=joinInfo?joinInfo.names.map(n=>`<span>${esc(n)} is in</span>`).join(""):"";
   $("edName").value=edDraft.n;$("edName").style.borderColor="";
   chips("edCrave",CRAVINGS,v=>edDraft.c.includes(v),v=>edDraft.c=tog(edDraft.c,v));
-  chips("edBudget",BUDGETS,v=>edDraft.b===v,v=>edDraft.b=v);
+  chips("edBudget",budgets(),v=>edDraft.b===v,v=>edDraft.b=v);
   chips("edVibe",VIBES,v=>edDraft.v.includes(v),v=>edDraft.v=tog(edDraft.v,v));
   chips("edMust",MUSTS,v=>edDraft.m.includes(v),v=>edDraft.m=tog(edDraft.m,v));
   chips("edDeal",DEALS,v=>edDraft.d.includes(v),v=>edDraft.d=tog(edDraft.d,v));
@@ -625,7 +768,7 @@ let qz=null;
 const QSTEPS=[{k:"n",q:"What's your name?",sub:"So everyone knows whose agent is talking."},
   {k:"ps",q:"How do you argue about plans?",sub:"Your agent will argue exactly like this.",tiles:true},
   {k:"c",q:"What are you usually craving?",sub:"Pick a few.",opts:()=>CRAVINGS},
-  {k:"b",q:"Your usual max budget?",one:true,opts:()=>BUDGETS},
+  {k:"b",q:"Your usual max budget?",one:true,opts:budgets},
   {k:"v",q:"Your kind of night?",sub:"Pick a few.",opts:()=>VIBES},
   {k:"d",q:"Any hard no's?",sub:"Skip if nothing bugs you.",opts:()=>DEALS}];
 function openQuiz(ctx){const saved=cleanMembers([store.get("me",null)].filter(Boolean))[0];
@@ -1064,9 +1207,11 @@ $("ownBtn").onclick=async()=>{await ownCity();history.replaceState(null,"",locat
 /* ===================== flow ===================== */
 function setComposer(on){$("say").disabled=!on;$("sendBtn").disabled=!on;$("say").placeholder=on?"change something, or add a note…":"the agents are talking…"}
 /* after viewing someone else's link, switch back to the city of your own plan */
-async function ownCity(){if(CITY?.id!==plan.city){await loadCity(plan.city);plan.city=CITY.id}}  // an unknown city falls back to NYC
+async function ownCity(){if(CITY?.id===plan.city)return true;const ok=await loadCity(plan.city).then(()=>true,e=>{say(e.message);return false});plan.city=CITY.id;return ok}  // an unknown city falls back to NYC
 async function start(){
-  await ownCity();
+  const g=CITY?.id!==plan.city?geoParse(plan.city):null;
+  if(g){$("setup").classList.add("hide");chatEl.innerHTML="";sys(`Finding places in ${g.name} on OpenStreetMap. The first time can take up to a minute, then it's saved on this phone.`)}
+  if(!await ownCity()&&g){chatEl.innerHTML="";renderSetup();$("setup").classList.remove("hide");return}
   DEMO=!MOCK&&!providers().length;
   plan.members=plan.members.filter(m=>m.n);savePlan();
   $("setup").classList.add("hide");$("composer").classList.remove("off");chatEl.innerHTML="";transcript=[];lastPlan=null;lastWho=null;mi=0;
@@ -1160,7 +1305,7 @@ async function handleHash(first){
   if(busy)return;
   try{const data=await unpack(h[2]);
     const want=h[1]==="p"?data?.c:"vcm".includes(h[1])?null:data?.city;  // open the link in its own city
-    if(typeof want==="string"&&CITY_ID.test(want)&&want!==CITY.id)await loadCity(want);  // your own plan keeps its city (see ownCity)
+    if(cityOk(want)&&want!==CITY.id)await loadCity(want).catch(e=>sys(e.message,true));  // your own plan keeps its city (see ownCity)
     if(h[1]==="p"){if(REPLAY)return;await playReplay(data)}
     else if(h[1]==="j"){$("setup").classList.add("hide");openJoin(data)}
     else if(h[1]==="f"){$("setup").classList.add("hide");openQuiz({title:`${str(data?.from,30)||"A friend"} is saving your taste for future plans`,done:finishProfile})}
@@ -1226,12 +1371,18 @@ const obGuess=()=>obMode||($("obOthers").value.split(",").filter(n=>n.trim()).le
 const paintOb=()=>document.querySelectorAll("#obMode button").forEach(b=>b.classList.toggle("on",b.dataset.mode===obGuess()));
 document.querySelectorAll("#obMode button").forEach(b=>b.onclick=()=>{obMode=b.dataset.mode;paintOb()});
 $("obOthers").oninput=paintOb;
-function openOnboarding(){renderInstall();paintOb();$("onboard").classList.remove("hide");setTimeout(()=>$("obMe").focus(),450)}
+$("obCity").onchange=()=>{$("obCity").style.borderColor="";$("obCityNote").textContent="Any city in the world.";
+  resolveCity($("obCity").value).then(id=>{const g=geoParse(id);if(g)return geoSpots(g,id)}).catch(()=>{})};  // a head start while they type names
+function openOnboarding(){renderInstall();paintOb();if(!$("obCity").value)$("obCity").value=CITY?.geo?CITY.name:CITY?.id==="london"?"London":guessCity();$("onboard").classList.remove("hide");setTimeout(()=>$("obMe").focus(),450)}
 function doneOb(){store.set("onboarded",1);$("onboard").classList.add("hide")}
 $("obForm").onsubmit=async e=>{e.preventDefault();const me=$("obMe").value.trim().slice(0,20);
   if(!me){$("obMe").focus();$("obMe").style.borderColor="#b4413c";return}
+  const go=$("obGo"),label=go.textContent,note=t=>{$("obCityNote").textContent=t;$("obCity").style.borderColor="#b4413c"};
+  let cityId;
+  try{go.disabled=true;go.textContent="Finding your city…";cityId=await resolveCity($("obCity").value);if(!geoParse(cityId)&&cityId!==CITY.id)await loadCity(cityId)}
+  catch(err){note(err.message);$("obCity").focus();return}finally{go.disabled=false;go.textContent=label}
   const names=[me,...$("obOthers").value.split(",").map(n=>n.trim().slice(0,20)).filter(Boolean)].filter((n,i,a)=>a.findIndex(x=>x.toLowerCase()===n.toLowerCase())===i).slice(0,6),mode=obGuess();  // "Sam, Sam" is one Sam
-  stash();plan={...defaultPlan(mode),id:uid(),name:mode==="girls"?"Friends night":"Date night",city:plan.city,members:names.map(known)};remember(plan.members.filter(m=>!people.some(p=>same(p,m))));
+  stash();plan={...defaultPlan(mode),id:uid(),name:mode==="girls"?"Friends night":"Date night",city:plan.city,members:names.map(known)};plan.city=geoParse(cityId)?cityId:CITY.id;remember(plan.members.filter(m=>!people.some(p=>same(p,m))));
   store.set("myname",me);savePlan();doneOb();renderSetup();await start()};
 $("obSkip").onclick=e=>{e.preventDefault();doneOb()};
 renderInstall();if(standalone())keepStorage();
@@ -1242,7 +1393,10 @@ let CITY_LIST=[];
 async function loadCityList(){try{const r=await fetch("cities/index.json",{cache:"no-cache"});const j=await r.json();
   CITY_LIST=(Array.isArray(j.cities)?j.cities:[]).filter(c=>CITY_ID.test(c?.id||"")).map(c=>({id:c.id,name:str(c.name,40)||c.id})).slice(0,50)}catch(e){CITY_LIST=[]}}
 (async()=>{
-  await Promise.all([loadCityList(),loadCity(params.get("city")||plan.city).catch(e=>console.warn(e))]);
+  let bootErr=null;
+  await Promise.all([loadCityList(),loadCity(params.get("city")||plan.city).catch(e=>{console.warn(e);bootErr=e})]);
+  if(!CITY&&bootErr)await loadCity("nyc").catch(()=>{});  // a saved anywhere city whose map lookup failed: open on NYC, say why
+  if(bootErr&&CITY)setTimeout(()=>say(`${bootErr.message} Showing ${CITY.name} for now.`),0);
   if(!CITY){sys("Couldn't load the city list. Check your connection and reload.",true);return}
   plan.city=CITY.id;fixPlan();savePlan();renderSetup();handleHash(true)})();
 window.addEventListener("hashchange",()=>handleHash(false));
