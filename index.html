@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>The Plan Committee</title>
 <meta name="description" content="Your friends pick what they want. AI agents argue for each of you in a group chat and agree on one plan for a night out in NYC or London.">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-z8EZwyLDxTCYfh0Q0OJWb6sRIftA4oPUOzdHx33q2CY='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https:; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-vZaTMrhtL0YXCRLN/iT+BRwvyDVHHA81FiUlFzYRAwg='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https:; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
 <meta name="referrer" content="no-referrer">
 <meta name="theme-color" content="#fbf9f6">
 <link rel="manifest" href="manifest.webmanifest">
@@ -211,7 +211,7 @@ button,input,select,textarea{font:inherit;color:inherit}
         <p class="small" id="geoStatus">Any city. Places come straight from OpenStreetMap.</p></div></div>
     <div class="sec" id="crewSec"><span class="lab">Your crews</span><div class="chips" id="crewChips"></div></div>
     <div class="sec"><div class="seg" id="modeSeg"><button type="button" data-mode="date">Date night</button><button type="button" data-mode="girls">Friends night</button></div></div>
-    <div class="sec"><span class="lab">Getting around</span><div class="seg" id="moveSeg"><button type="button" data-move="walk">All on foot</button><button type="button" data-move="ride">Car or transit is fine</button></div></div>
+    <div class="sec"><span class="lab">Getting around</span><div class="seg" id="moveSeg"><button type="button" data-move="walk">On foot</button><button type="button" data-move="transit" id="transitBtn">Subway or bus</button><button type="button" data-move="car">Car or cab</button></div></div>
 
     <div class="sec"><span class="lab">The committee</span>
       <p class="small" id="notice" style="display:none;color:var(--ok);margin:0 0 8px"></p>
@@ -583,6 +583,7 @@ const COLORS=["#c8b6e2","#b9d3c2","#f4c3b0","#a9c8e8","#e7c9a0","#d7b9d5"];
 const WALLET_COLOR="#f1d58a";
 
 const uid=()=>Math.random().toString(36).slice(2,9);
+const TRAVEL=["walk","transit","car"];
 const member=(n,o={})=>({id:uid(),n,c:[],b:2,v:[],m:[],d:[],ps:"surprise me",q:"",...o});
 function defaultPlan(mode){
   return mode==="girls"
@@ -609,7 +610,7 @@ function cleanMembers(list,max=6){const arr=v=>Array.isArray(v)?v.filter(x=>type
   return (Array.isArray(list)?list:[]).slice(0,max).filter(m=>m&&typeof m==="object").map(m=>({id:str(String(m.id??uid()),16),n:str(m.n,30),c:arr(m.c),v:arr(m.v),m:arr(m.m),
     d:arr(m.d).map(x=>x==="onlyM"?"only:M":x==="onlyBK"?"only:BK":x),b:[1,2,3,4].includes(m.b)?m.b:2,ps:Object.hasOwn(PERS,m.ps)?m.ps:"chill",q:str(m.q,90)}))}
 function fixPlan(){plan.hood=str(plan.hood,30)||"Anywhere";if(typeof plan.id!=="string"||!CREW_ID.test(plan.id))plan.id=uid();plan.name=str(plan.name,30)||(plan.mode==="girls"?"Friends night":"Date night");plan.when=String(plan.when??"Saturday night").slice(0,60)||"Saturday night";plan.start=STARTS.includes(+plan.start)?+plan.start:1140;plan.needs=(Array.isArray(plan.needs)?plan.needs:[]).filter(v=>NEEDS.some(n=>n[1]===v));
-  plan.city=cityOk(plan.city)?plan.city:"nyc";plan.move=plan.move==="ride"?"ride":"walk";
+  plan.city=cityOk(plan.city)?plan.city:"nyc";plan.move=TRAVEL.includes(plan.move)?plan.move:plan.move==="ride"?"transit":"walk";
   plan.members=cleanMembers(plan.members);
   if(!plan.members.length)plan.members=[member("You")];
   if(CITY&&CITY.id===plan.city){if(!HOODS.includes(plan.hood))plan.hood="Anywhere";const ok=new Set(DEALS.map(d=>d[1]));plan.members.forEach(m=>m.d=m.d.filter(x=>ok.has(x)))}}
@@ -638,7 +639,7 @@ function importCrew(P,confirmed){if(!P||typeof P!=="object")throw new Error("bad
   if(had&&!confirmed)return "ask";  // a link can't replace a crew you already have without a tap
   if(!had&&crewsFull())return "full";
   stash();plan={id,name:str(P.name,30)||"Shared crew",city:cityOk(P.city)?P.city:"nyc",mode:P.mode==="girls"?"girls":"date",
-    when:P.when,start:P.start,needs:P.needs,hood:str(P.hood,30)||"Anywhere",wallet:P.wallet===true,move:P.move==="ride"?"ride":"walk",members:cleanMembers(P.members)};
+    when:P.when,start:P.start,needs:P.needs,hood:str(P.hood,30)||"Anywhere",wallet:P.wallet===true,move:TRAVEL.includes(P.move)?P.move:"walk",members:cleanMembers(P.members)};
   fixPlan();savePlan();return had}
 let cfg={pool:"smart",gKey:"",gModel:"",qKey:"",qModel:"",oKey:"",oModel:"openrouter/free",cBase:"",cKey:"",cModel:"",...store.get("cfg2",{})};
 delete cfg.ol;delete cfg.olModel;delete cfg.olUrl;  /* Ollama support was removed */
@@ -673,6 +674,7 @@ function renderSetup(){
   fixPlan();renderCrews();$("crewName").value=plan.name;
   document.querySelectorAll("#modeSeg button").forEach(b=>b.classList.toggle("on",b.dataset.mode===plan.mode));
   document.querySelectorAll("#moveSeg button").forEach(b=>b.classList.toggle("on",b.dataset.move===plan.move));
+  $("transitBtn").textContent=transitName().replace(/^./,c=>c.toUpperCase());
   $("members").innerHTML=plan.members.map((m,i)=>`<div class="member" data-i="${i}"><div class="av" style="background:${COLORS[i%COLORS.length]}">${initials(m.n)}</div>
     <div><div class="mn">${esc(m.n)}</div><div class="ms">${esc(summary(m))}</div><button class="pers" data-p="${i}" type="button" aria-label="reroll personality">agent: ${esc(m.ps)} ↻</button></div><button class="x" data-x="${i}" type="button" aria-label="remove">×</button></div>`).join("");
   $("members").querySelectorAll(".member").forEach(el=>el.onclick=e=>{if(e.target.dataset.x!==undefined||e.target.dataset.p!==undefined)return;openEditor(+el.dataset.i)});
@@ -887,7 +889,10 @@ const SLOT={dinner:0,drinks:120,late:210,free:180};  // minutes after the start 
 function km(a,b){if(a?.lat==null||b?.lat==null)return null;const r=Math.PI/180,dl=(b.lat-a.lat)*r,dn=(b.lon-a.lon)*r;
   const x=Math.sin(dl/2)**2+Math.cos(a.lat*r)*Math.cos(b.lat*r)*Math.sin(dn/2)**2;return 12742*Math.asin(Math.sqrt(x))}
 function travel(a,b){const d=km(a,b);if(d==null)return "";if(d<0.15)return "right next door";
-  return d<=2?`${Math.max(2,Math.round(d*1.3/4.8*60))} min walk`:plan.move==="ride"?`about ${Math.round(6+d*2.5)} min by car or transit`:`${Math.round(d*1.3/4.8*60)} min walk, or a short ride`}
+  const walkMin=Math.max(2,Math.round(d*1.3/4.8*60));if(d<=1.2||plan.move==="walk"&&d<=2)return `${walkMin} min walk`;
+  return plan.move==="transit"?`about ${Math.round(9+d*2.6)} min by ${transitName()}`:plan.move==="car"?`about ${Math.round(5+d*2.2)} min by car or cab`:`${walkMin} min walk, or a short ride`}
+/* what locals call public transport: the Tube in London, the subway in New York */
+const transitName=()=>({london:"Tube or bus",nyc:"subway or bus"})[CITY?.id]||"metro or bus";
 /* ---- weather (Open-Meteo: free, no key; we only send the city's center and the date) ---- */
 let WX=null;
 async function fetchWeather(date,startMin){WX=null;
@@ -911,8 +916,8 @@ function shortlist(){
   const needScore=s=>needs.reduce((a,n)=>a+(s.x.includes(n)||(n==="veg"&&s.f.includes("veg"))?(n==="wheel"||s.t==="dinner"?5:0):0),0);
   const wxScore=s=>!WX||!OUTDOOR(s)?0:WX.bad?-6:WX.nice?2:0;
   let anchor=null;  // keep the night in one area: everything is scored by distance to the best dinner pick
-  const walk=plan.move!=="ride";
-  const near=s=>{const d=km(anchor,s);return d==null?0:walk?(d<1?8:d<2?4:-12):(d<4?4:d<10?1:-6)};
+  const walk=plan.move==="walk";
+  const near=s=>{const d=km(anchor,s);return d==null?0:walk?(d<1?8:d<2?4:-12):plan.move==="transit"?(d<3?5:d<7?2:-8):(d<4?4:d<10?1:-6)};
   const within=s=>!walk||!anchor||(km(anchor,s)??0)<=2;  // on foot: everything within about 25 minutes' walk of dinner
   const score=s=>plan.members.reduce((a,m)=>a+personScore(s,m),0)+(hoodMatch(s)?4:0)+(faves.includes(s.n)?2:0)+(s.cur?1:0)+(s.pop||0)-(recent.includes(s.n)&&!faves.includes(s.n)?6:0)
     +needScore(s)+wxScore(s)+(anchor?near(s):0)+((s.t==="dinner"||s.t==="drinks")&&s.p<C.maxB-1?-4:0)+Math.random()*2.5;  // a $$$ group gets $$ and $$$ dinners and drinks, not fast food
@@ -1111,7 +1116,7 @@ $("qkInput").addEventListener("paste",()=>setTimeout(quickKeyGo,50));
 
 /* ===================== the agents ===================== */
 let transcript=[], agents=[], SL=null, busy=false, lastPlan=null, round=0;
-function brief(){const C=SL.C;return `Plan: ${plan.when} in ${CITY.name}, starting at ${fmtMin(plan.start)}. Neighborhood preference: ${plan.hood}. Group max budget: ${PRICE[C.maxB]} per place. Getting around: ${plan.move==="ride"?"car or transit is fine":"all on foot, keep every stop walkable"}.${C.early?" Someone must be home by 11pm.":""}`
+function brief(){const C=SL.C;return `Plan: ${plan.when} in ${CITY.name}, starting at ${fmtMin(plan.start)}. Neighborhood preference: ${plan.hood}. Group max budget: ${PRICE[C.maxB]} per place. Getting around: ${plan.move==="transit"?`${transitName()} between stops is fine`:plan.move==="car"?"car or cab is fine":"all on foot, keep every stop walkable"}.${C.early?" Someone must be home by 11pm.":""}`
   +(plan.needs.length?` The group needs: ${plan.needs.map(v=>labelOf(NEEDS,v)).join(", ")}.`:"")
   +(WX?` Forecast: ${temp(WX.temp)}, ${WX.rain}% chance of rain${WX.bad?", so outdoor spots and rooftops are a bad idea":WX.nice?", perfect for outdoors":""}.`:"")
   +" Keep the stops close to each other."}
@@ -1151,7 +1156,7 @@ async function makePlan(){
   const sys=`You turn a group chat into a final night out plan. Only use places from this list, exact names:\n${SL.list.map(spotLine).join("\n")}\nReturn only JSON.`;
   const user=`${brief()}\n\nGROUP CHAT:\n${chatText()}\n\nReturn JSON exactly like:
 {"title":"a short cute name for the night, max 5 words","stops":[{"time":"7:30 pm","name":"exact place name","note":"why it won, max 12 words"}],"drama":0,"verdict":"one funny sentence about who won the argument"}
-Use 3 stops in order (dinner, drinks, then a late or free stop), ${plan.move==="ride"?"each within about 20 minutes by car or transit of the one before":"all on foot: each within about a 15 minute walk of the one before, no transit"}, first stop at ${fmtMin(plan.start)}, realistic ${CITY.short} times${SL.C.early?", ending by 10:30 pm":""}. drama is 0 to 100 for how much they fought.`;
+Use 3 stops in order (dinner, drinks, then a late or free stop), ${plan.move==="transit"?`each within about 20 minutes by ${transitName()} of the one before, close to a station`:plan.move==="car"?"each within about 20 minutes by car or cab of the one before":"all on foot: each within about a 15 minute walk of the one before, no transit"}, first stop at ${fmtMin(plan.start)}, realistic ${CITY.short} times${SL.C.early?", ending by 10:30 pm":""}. drama is 0 to 100 for how much they fought.`;
   let res;try{res=await llm(sys,user,true)}finally{hideTyping()}
   const p=parseJSON(res.text);
   p.stops=(p.stops||[]).map(s=>({...s,spot:findSpot(s.name)})).filter(s=>s.spot).slice(0,4);
@@ -1328,7 +1333,7 @@ function demoPick(){if(demo.stops)return demo;
   const of=(...t)=>SL.list.filter(s=>t.includes(s.t)),near=(from,list)=>list.slice().sort((x,y)=>(km(from,x)??99)-(km(from,y)??99))[0],
     trip=d=>{const k=near(d,of("drinks").filter(s=>s!==d))||d,l=near(k,of("late","free").filter(s=>s!==d&&s!==k))||k;return {d,k,l,far:(km(d,k)??9)+(km(k,l)??9)}},
     was=lastPlan?.stops.map(s=>s.spot.n)||[],all=(of("dinner").length?of("dinner"):SL.list).map(trip).sort((x,y)=>x.far-y.far),
-    tight=all.filter(t=>t.far<=all[0].far+(plan.move==="ride"?6:1.5)),fresh=[tight,all].map(p=>p.filter(t=>!was.includes(t.d.n))).find(p=>p.length)||all,  // only routes about as short as the best one, so personality never drags in a far dinner
+    tight=all.filter(t=>t.far<=all[0].far+(plan.move==="walk"?1.5:plan.move==="transit"?4:6)),fresh=[tight,all].map(p=>p.filter(t=>!was.includes(t.d.n))).find(p=>p.length)||all,  // only routes about as short as the best one, so personality never drags in a far dinner
     {d,k,l}=fresh.slice(0,6).map(t=>({t,sc:agents.reduce((n,a)=>n+Math.max(...[t.d,t.k,t.l].map(s=>persFit(a,s))),0)+Math.random()})).sort((x,y)=>y.sc-x.sc)[0].t;  // a tight route, like the real planner, where every agent has a place that fits its personality; a change gets a new dinner
   const stops=[...new Set([d,k,l])],decoys=SL.list.filter(s=>!stops.includes(s)).sort(()=>Math.random()-.5).slice(0,2);
   return Object.assign(demo,{d,k,l,stops,decoys:decoys.length?decoys:stops})}
