@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>The Plan Committee</title>
 <meta name="description" content="Your friends pick what they want. AI agents argue for each of you in a group chat and agree on one plan for a night out in NYC or London.">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-W9YItACcOj9GXau62y3jNUeWUQQ1qvRz6bL7JGSLN+k='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https:; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-IE5cLBS8Bw8Y7VgzCw6COTfE9hW4BODg4B8ZHnwmAl0='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https:; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
 <meta name="referrer" content="no-referrer">
 <meta name="theme-color" content="#fbf9f6">
 <link rel="manifest" href="manifest.webmanifest">
@@ -1044,7 +1044,7 @@ function qkShow(n){qkStep=n;document.querySelectorAll("#quickKey .qks").forEach(
   $("qkEyebrow").textContent=`Step ${n} of 3`;$("qkBar").style.width=`${Math.round(n/3*100)}%`;$("qkBackWrap").style.display=n>1?"":"none";
   const q=QK[qkProv];
   if(n===2&&q){$("qk2Title").textContent=`Get your free ${q.name} key`;$("qkSteps").innerHTML=q.steps.map(t=>`<li>${t}</li>`).join("");$("qkOpen").href=q.url;$("qkOpen").textContent=q.open}
-  if(n===3){$("qk3Lead").textContent=q?`It stays in this browser and is sent only to ${q.who}.`:"A Gemini, Groq or OpenRouter key works. It stays in this browser and is sent only to that company.";qkSay("")}}
+  if(n===3){$("qk3Lead").textContent=q?`It stays in this browser and is sent only to the company that issued it (${q.who}).`:"A Gemini, Groq or OpenRouter key works. It stays in this browser and is sent only to the company that issued it.";qkSay("")}}
 document.querySelectorAll("#quickKey [data-p]").forEach(b=>b.onclick=()=>{qkProv=b.dataset.p;qkOpened=false;qkShow(2)});
 $("qkHave").onclick=e=>{e.preventDefault();qkProv=null;qkShow(3);$("qkInput").focus()};
 $("qkOpen").onclick=()=>{qkOpened=true};
@@ -1052,7 +1052,8 @@ $("qkCopied").onclick=()=>qkShow(3);
 $("qkBack").onclick=e=>{e.preventDefault();qkShow(qkStep===3&&qkProv?2:1)};
 // coming back from the key page: go straight to the paste step
 document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible"&&qkOpened&&qkStep===2&&!$("quickKey").classList.contains("hide"))qkShow(3)});
-$("qkPasteBtn").onclick=async()=>{try{const t=(await navigator.clipboard.readText()).trim();if(!t)throw 0;$("qkInput").value=t;quickKeyGo()}
+$("qkPasteBtn").onclick=async()=>{try{const t=(await navigator.clipboard.readText()).trim();if(!t)throw 0;$("qkInput").value=t;
+    if(KEY_TYPES.some(([re])=>re.test(t.replace(/\s+/g,""))))quickKeyGo();else qkSay("That doesn't look like a Gemini, Groq or OpenRouter key. Check it, then tap Use this key.","bad")}
   catch(e){qkSay("Tap the box below, then paste (long press and Paste on a phone).","bad");$("qkInput").focus()}};
 $("keyLink").onclick=e=>{e.preventDefault();openQuickKey()};
 $("keyPill").onclick=openQuickKey;$("keyBar").onclick=openQuickKey;
