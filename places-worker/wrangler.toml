@@ -1,0 +1,7 @@
+name = "plan-committee-places"
+main = "worker.js"
+compatibility_date = "2025-06-01"
+
+[[kv_namespaces]]
+binding = "PLACES"
+id = "PASTE_THE_ID_FROM_wrangler_kv_namespace_create_HERE"
