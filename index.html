@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>The Plan Committee</title>
 <meta name="description" content="Your friends pick what they want. AI agents argue for each of you in a group chat and agree on one plan for a night out in NYC or London.">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-Paw6zDETZkBLrjuqaAtvTZpyrqllVXHf0MhzCtXv9yw='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https:; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-4cxcgH4pyWmMYcSJ/X68vSE8aN+56MJYEQyyjHO94ps='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https:; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
 <meta name="referrer" content="no-referrer">
 <meta name="theme-color" content="#fbf9f6">
 <link rel="manifest" href="manifest.webmanifest">
@@ -1177,12 +1177,12 @@ function setTypingNote(t){const n=typingEl?.querySelector(".name");if(!n)return;
 function sys(t,err){const d=document.createElement("div");d.className="sys"+(err?" err":"");d.textContent=t;chatEl.appendChild(d);lastWho=null;scroll()}
 
 /* ===================== ticket ===================== */
-const gmap=n=>"https://www.google.com/maps/search/?api=1&query="+encodeURIComponent(n+", "+CITY.search);
-const gmapSpot=s=>s.lat?"https://www.google.com/maps/search/?api=1&query="+encodeURIComponent(s.n)+"%20"+s.lat+"%2C"+s.lon:gmap(s.n);
+const placeQ=s=>[s.n,s.h,CITY.search].filter(Boolean).join(", ");  // "Signal, East Williamsburg, New York, NY": Google can't search a name glued to coordinates
+const gmapSpot=s=>"https://www.google.com/maps/search/?api=1&query="+encodeURIComponent(placeQ(s));
 /* many places book through Resy, Tock or walk in only, so search instead of guessing OpenTable */
 const BOOKING=/^https:\/\/(www\.)?(resy\.com|opentable\.com|exploretock\.com|sevenrooms\.com)\/[^\s<>"']{1,200}$/i;
 const reserve=s=>BOOKING.test(s.rsv||"")?esc(s.rsv):"https://www.google.com/search?q="+encodeURIComponent(`${s.n} ${s.h||""} ${CITY.name} reservation`.replace(/\s+/g," "));
-function routeUrl(stops){const q=s=>encodeURIComponent(s.spot.n+", "+CITY.search);
+function routeUrl(stops){const q=s=>encodeURIComponent(placeQ(s.spot));
   let u="https://www.google.com/maps/dir/?api=1&origin="+q(stops[0])+"&destination="+q(stops[stops.length-1]);
   if(stops.length>2)u+="&waypoints="+stops.slice(1,-1).map(q).join("%7C");return u}
 function stopInfo(s,p){const base=nightDate(p.when||plan.when),t=parseTime(s.time,base),m=t.getHours()*60+t.getMinutes();
