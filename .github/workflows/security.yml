@@ -25,17 +25,37 @@ jobs:
           "$RUNNER_TEMP/gitleaks" dir --config .gitleaks.toml --redact --no-banner .
           "$RUNNER_TEMP/gitleaks" git --config .gitleaks.toml --redact --no-banner .
 
-  csp:
+  checks:
     # index.html only runs the inline script whose hash is in its Content Security Policy
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.12"
       - name: Check the CSP hash matches the inline script
         run: python3 tools/csp.py --check
       - name: Check every city pack loads
         run: python3 -c "import sys; sys.path.insert(0, 'pipeline'); import build_spots as b; print([c['id'] for c in b.load_cities()])"
+      - name: Lint the Python (ruff, pinned)
+        run: |
+          python3 -m pip install --quiet ruff==0.14.0
+          ruff check pipeline tools tests
+          python3 -m compileall -q pipeline tools
+
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.12"
+      - name: Run the pipeline unit tests
+        run: python3 -m unittest -v
 
   dependencies:
     # Dependency review is free on public repos only.
