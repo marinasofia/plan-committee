@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>The Plan Committee</title>
 <meta name="description" content="Your friends pick what they want. AI agents argue for each of you in a group chat and agree on one plan for a night out in NYC or London.">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-4cxcgH4pyWmMYcSJ/X68vSE8aN+56MJYEQyyjHO94ps='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https:; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-DkoN1fVTEVZVGX7g+VtH6243wGFohY4o94/R2z3rV6A='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https:; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
 <meta name="referrer" content="no-referrer">
 <meta name="theme-color" content="#fbf9f6">
 <link rel="manifest" href="manifest.webmanifest">
@@ -449,10 +449,10 @@ const PLACES_CDN="https://cdn.jsdelivr.net/gh/marinasofia/plan-committee@places-
 let openIndex=null;
 const openCities=()=>openIndex||=fetch(PLACES_CDN+"index.json",{signal:AbortSignal.timeout(8000)}).then(r=>r.ok?r.json():Promise.reject(r.status))
   .then(j=>(Array.isArray(j?.cities)?j.cities.slice(0,5000):[]).filter(c=>CITY_ID.test(c?.id||"")&&isFinite(c.lat)&&isFinite(c.lon)&&typeof c.name==="string")
-    .map(c=>({id:c.id,name:str(c.name,40),cc:/^[a-z]{2}$/.test(c.cc)?c.cc:"xx",lat:+c.lat,lon:+c.lon})))
+    .map(c=>({id:c.id,name:str(c.name,40),cc:/^[a-z]{2}$/.test(c.cc)?c.cc:"xx",lat:+c.lat,lon:+c.lon,n:Number.isInteger(c.n)?c.n:0})))
   .catch(()=>{openIndex=null;return []});
 async function openSpots(g){
-  const best=(await openCities()).map(c=>({c,d:km(g,c)})).sort((a,b)=>a.d-b.d)[0];if(!best||best.d>25)return null;  // a city on the list near this point
+  const best=(await openCities()).map(c=>({c,d:km(g,c)})).sort((a,b)=>a.d-b.d)[0];if(!best||best.d>25||best.c.n<40)return null;  // a city on the list near this point, with enough places to plan (thin ones use the live map)
   const r=await fetch(`${PLACES_CDN}${best.c.id}.json`,{signal:AbortSignal.timeout(15000)});if(+r.headers.get("content-length")>3e6)return null;const j=r.ok?await r.json():null;
   return Array.isArray(j?.spots)?j.spots.slice(0,2000):null}
 /* city name suggestions while typing, from the same list (filled once, on first focus) */
@@ -545,7 +545,7 @@ async function lookupCity(text){
   const q=String(text||"").trim().slice(0,80),k=q.split(",")[0].toLowerCase().replace(/[^a-z]/g,"");if(!q)return plan.city;
   const pack=CITY_LIST.find(c=>c.id===k||c.name.toLowerCase().replace(/[^a-z]/g,"")===k)||(/^(newyork|ny|manhattan|brooklyn)$/.test(k)?CITY_LIST.find(c=>c.id==="nyc"):null);
   if(pack)return pack.id;
-  const nm=q.split(",")[0].trim().toLowerCase(),known=(await openCities()).find(c=>c.name.toLowerCase()===nm);
+  const nm=q.split(",")[0].trim().toLowerCase(),known=(await openCities()).filter(c=>c.name.toLowerCase()===nm).sort((a,b)=>b.n-a.n)[0];  // two Barcelonas: the one with more places
   if(known)return geoId(known.lat,known.lon,known.cc,known.name);  // a city on the open list: no map lookup at all
   const r=await fetch("https://nominatim.openstreetmap.org/search?"+new URLSearchParams({q,format:"jsonv2",limit:"1",addressdetails:"1","accept-language":"en"}),
     {referrerPolicy:"origin",signal:AbortSignal.timeout(10000)}).catch(()=>null);  // OSM's usage policy asks apps to identify themselves: send only our origin
