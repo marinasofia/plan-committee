@@ -96,7 +96,7 @@ def to_spot(row: dict) -> dict | None:
     """One Overture place -> the app's spot format, or None. Never trusts the input: every field is typed and capped."""
     name = clean_text(row.get("name"), 80)
     lat, lon = row.get("lat"), row.get("lon")
-    if not name or not isinstance(lat, (int, float)) or not isinstance(lon, (int, float)):
+    if not name or not all(isinstance(v, (int, float)) and math.isfinite(v) for v in (lat, lon)):
         return None
     if row.get("status") not in (None, "open") or (row.get("confidence") or 0) < 0.6:
         return None
@@ -141,7 +141,7 @@ def clean_edit(s: object) -> dict | None:
     if not isinstance(s, dict) or s.get("t") not in TYPES:
         return None
     name, lat, lon = clean_text(s.get("n"), 80), s.get("lat"), s.get("lon")
-    if not name or not all(isinstance(v, (int, float)) and not isinstance(v, bool) for v in (lat, lon)):
+    if not name or not all(isinstance(v, (int, float)) and not isinstance(v, bool) and math.isfinite(v) for v in (lat, lon)):
         return None
     if not (-85 <= lat <= 85 and -180 <= lon <= 180):
         return None
@@ -213,7 +213,10 @@ The city list comes from Overture's divisions, which are derived from OpenStreet
 def latest_release(con) -> str:
     rows = con.execute(f"SELECT DISTINCT regexp_extract(file, 'release/([^/]+)/', 1) r FROM glob('{S3}/*/theme=places/type=place/*') "
                        "ORDER BY r DESC LIMIT 1").fetchall()
-    return rows[0][0]
+    release = rows[0][0]
+    if not re.fullmatch(r"\d{4}-\d{2}-\d{2}\.\d+", release or ""):  # it goes into file paths and SQL
+        raise SystemExit(f"unexpected Overture release name {release!r}")
+    return release
 
 
 def connect():
@@ -234,9 +237,25 @@ def city_rows(con, src: str, city: dict) -> list[dict]:
     return [dict(zip(cols, r)) for r in cur.fetchall()]
 
 
+def check_inputs(cities: object, edits: object) -> None:
+    """places/cities.json and places/edits.json come from pull requests: refuse anything that could write outside
+    --out or stop the build halfway."""
+    if not isinstance(cities, list) or not isinstance(edits, dict):
+        raise SystemExit("places/cities.json must be a list and places/edits.json an object")
+    for c in cities:
+        ok = isinstance(c, dict) and isinstance(c.get("id"), str) and re.fullmatch(r"[a-z][a-z-]{1,23}", c["id"])
+        nums = ok and all(isinstance(c.get(k), (int, float)) and math.isfinite(c[k]) for k in ("lat", "lon", "km"))
+        if not (nums and -85 <= c["lat"] <= 85 and -180 <= c["lon"] <= 180 and 1.5 <= c["km"] <= 4 and isinstance(c.get("name"), str)):
+            raise SystemExit(f"bad entry in places/cities.json: {str(c)[:120]}")
+    for k, v in edits.items():
+        if not isinstance(v, dict) or not all(isinstance(v.get(f, []), list) for f in ("add", "remove")):
+            raise SystemExit(f"places/edits.json: {k!r} must be {{\"add\": [...], \"remove\": [...]}}")
+
+
 def build(out: Path, only: str | None) -> None:
     cities = json.loads(CITIES.read_text(encoding="utf-8"))
     edits = json.loads(EDITS.read_text(encoding="utf-8")) if EDITS.exists() else {}
+    check_inputs(cities, edits)
     con = connect()
     release = latest_release(con)
     src = f"{S3}/{release}/theme=places/type=place/*"
@@ -248,7 +267,7 @@ def build(out: Path, only: str | None) -> None:
         t = time.time()
         spots = apply_edits(pick(city_rows(con, src, c)), edits.get(c["id"]) or {})
         (out / f"{c['id']}.json").write_text(json.dumps({"v": 1, "release": release, "spots": spots}, ensure_ascii=False,
-                                                        separators=(",", ":")), encoding="utf-8")
+                                                        separators=(",", ":"), allow_nan=False), encoding="utf-8")
         index.append({k: c[k] for k in ("id", "name", "cc", "lat", "lon")} | {"n": len(spots)})
         print(f"{c['id']}: {len(spots)} places in {time.time() - t:.1f}s", flush=True)
     (out / "index.json").write_text(json.dumps({"v": 1, "release": release, "cities": index}, ensure_ascii=False,

@@ -28,7 +28,7 @@ Open http://localhost:8000/?mock. Mock mode runs scripted agents, so you don't n
   * The daily pipeline fills `spots.json` from OpenStreetMap, and a free AI tags it over the next few days. Every city shares the same free daily AI quota, so new cities grow a little slower than the first two.
 * **Fix a "Somewhere else" city.** Over 600 cities worldwide come from open place lists built every month from Overture Maps (`places/cities.json`, `pipeline/build_places.py`). To add a place or drop a closed one, edit `places/edits.json`, keyed by the city id from `places/cities.json`:
   `{"lisbon-pt": {"remove": ["Exact Name Of Closed Bar"], "add": [{"n": "Park Bar", "t": "drinks", "lat": 38.7105, "lon": -9.1466, "f": ["views", "rooftop"]}]}}`
-  Same fields as hand picks, `lat`/`lon` required (copy them from OpenStreetMap or Overture, never Google Maps). Edits are applied on every rebuild.
+  Same fields as hand picks, `lat`/`lon` required (copy them from OpenStreetMap or Overture, never Google Maps). Edits are applied on every rebuild. Their text is shown to people and given to the AI, so keep it short and factual: maintainers review it like code.
 * **Add a city to the open list.** Add a line to `places/cities.json` (`id` like `city-cc`, `name`, `cc`, `lat`, `lon`, `km` from 1.5 to 4) and it's in next month's build.
 * **Report a closed place.** Open an issue, or add its exact name to `data/blocklist.txt`.
 * **Better agent banter** in mock mode, so the no key demo is more fun.

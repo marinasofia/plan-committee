@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>The Plan Committee</title>
 <meta name="description" content="Your friends pick what they want. AI agents argue for each of you in a group chat and agree on one plan for a night out in NYC or London.">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-0GFkiCf+ONAtUGXQz/mdQWgj2qOu9GiczMQokEprLkk='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https:; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-rZAx7TLB2Ht8h9NEIAcubRSj6v+VYyBeJ+ZnO83A1FU='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https:; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
 <meta name="referrer" content="no-referrer">
 <meta name="theme-color" content="#fbf9f6">
 <link rel="manifest" href="manifest.webmanifest">
@@ -418,7 +418,7 @@ async function geoFetch(g,id){
     if(!hit.ai&&providers().length&&!scripted()){const raw=hit.s.map(geoClean).filter(Boolean);if(await aiTag(raw,g.name).then(()=>true,()=>false))store.set("geo",{...cache,[id]:{...hit,ai:true,s:raw}});return raw}
     return hit.s.map(geoClean).filter(Boolean)}
   const open=await openSpots(g).catch(()=>null),seen=new Set();  // our open list first (Overture), the live map only for cities it doesn't cover
-  const raw=open?.length?open.filter(o=>o&&typeof o==="object"&&typeof o.n==="string").map(o=>({...o,pop:0})):
+  const raw=open?.length?open.map(geoClean).filter(Boolean).map(s=>({...s,pop:0})):  // cleaned before the AI prompt and the cache, not just at render
     (await overpass(g,GEO_KM[id]||2.5)).map(osmSpot).filter(s=>s&&!seen.has(s.n.toLowerCase())&&seen.add(s.n.toLowerCase()))
     .sort((a,b)=>km(g,a)-km(g,b)).slice(0,900);  // the 900 places nearest the center
   if(!raw.length)throw new Error(`No restaurants or bars found around ${g.name} yet.`);
@@ -437,7 +437,7 @@ const openCities=()=>openIndex||=fetch(PLACES_CDN+"index.json",{signal:AbortSign
   .catch(()=>{openIndex=null;return []});
 async function openSpots(g){
   const best=(await openCities()).map(c=>({c,d:km(g,c)})).sort((a,b)=>a.d-b.d)[0];if(!best||best.d>25)return null;  // a city on the list near this point
-  const r=await fetch(`${PLACES_CDN}${best.c.id}.json`,{signal:AbortSignal.timeout(15000)});const j=r.ok?await r.json():null;
+  const r=await fetch(`${PLACES_CDN}${best.c.id}.json`,{signal:AbortSignal.timeout(15000)});if(+r.headers.get("content-length")>3e6)return null;const j=r.ok?await r.json():null;
   return Array.isArray(j?.spots)?j.spots.slice(0,2000):null}
 /* city name suggestions while typing, from the same list (filled once, on first focus) */
 let cityNamesDone=false;

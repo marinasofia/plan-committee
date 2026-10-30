@@ -84,6 +84,15 @@ class ChooseCities(unittest.TestCase):
         ids = [c["id"] for c in bp.choose_cities(rows)]
         self.assertEqual(ids, ["lisbon-pt", "porto-pt"])
 
+    def test_inputs_from_pull_requests_are_checked(self):
+        import json
+        bp.check_inputs(json.loads(bp.CITIES.read_text(encoding="utf-8")), json.loads(bp.EDITS.read_text(encoding="utf-8")))
+        for cities, edits in (([{"id": "../x", "name": "X", "lat": 1, "lon": 1, "km": 2}], {}),
+                              ([{"id": "ok-xx", "name": "X", "lat": float("nan"), "lon": 1, "km": 2}], {}),
+                              ([], {"ok-xx": ["not", "an", "object"]})):
+            with self.assertRaises(SystemExit):
+                bp.check_inputs(cities, edits)
+
     def test_every_city_file_entry_is_valid(self):
         import json
         cities = json.loads(bp.CITIES.read_text(encoding="utf-8"))
