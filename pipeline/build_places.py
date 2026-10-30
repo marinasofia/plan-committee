@@ -21,6 +21,7 @@ import re
 import sys
 import time
 import unicodedata
+import urllib.parse
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -71,6 +72,15 @@ VIBES = {"cocktail_bar": ["fancy"], "speakeasy": ["fancy", "cozy"], "wine_bar": 
 CTRL = re.compile(r"[\x00-\x1f\x7f​-‏‪-‮⁦-⁩]")  # control and bidi characters
 
 
+def clean_url(u: object) -> str:
+    """A business website, without the query or fragment: those carry booking and tracking tokens, never needed to visit."""
+    u = str(u or "")
+    if not re.match(r"^https?://[^\s<>\"']+$", u):
+        return ""
+    p = urllib.parse.urlsplit(u)
+    return urllib.parse.urlunsplit((p.scheme, p.netloc, p.path, "", ""))[:200] if p.netloc else ""
+
+
 def clean_text(s: object, n: int) -> str:
     return CTRL.sub("", str(s or "")).strip()[:n]
 
@@ -112,8 +122,7 @@ def to_spot(row: dict) -> dict | None:
     web = str(row.get("web") or "")
     return {"n": name, "t": t, "h": "", "p": 0 if t == "free" else 3 if primary in ("steakhouse", "opera_and_ballet") else 2,
             "c": cuisine, "f": [x for x in tags if x in TAGS], "v": clean_text(primary.replace("_", " "), 40),
-            "web": web[:200] if re.match(r"^https?://[^\s<>\"']+$", web) else "",
-            "lat": round(float(lat), 5), "lon": round(float(lon), 5),
+            "web": clean_url(web), "lat": round(float(lat), 5), "lon": round(float(lon), 5),
             "_score": float(row.get("confidence") or 0) + (0.3 if web else 0) + (0.4 if t == "free" and "gallery" not in primary else 0),
             "_gallery": "gallery" in primary or primary == "street_art"}
 
@@ -149,7 +158,7 @@ def clean_edit(s: object) -> dict | None:
     web = str(s.get("web") or "")
     return {"n": name, "t": s["t"], "h": clean_text(s.get("h"), 40), "p": p if isinstance(p, int) and 0 <= p <= 4 else 2,
             "c": clean_text(s.get("c"), 20), "f": [x for x in s.get("f") or [] if x in TAGS][:5], "v": clean_text(s.get("v"), 90),
-            "web": web[:200] if re.match(r"^https?://[^\s<>\"']+$", web) else "", "lat": round(lat, 5), "lon": round(lon, 5)}
+            "web": clean_url(web), "lat": round(lat, 5), "lon": round(lon, 5)}
 
 
 def apply_edits(spots: list[dict], edits: dict) -> list[dict]:
