@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>The Plan Committee</title>
 <meta name="description" content="Your friends pick what they want. AI agents argue for each of you in a group chat and agree on one plan for a night out in NYC or London.">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-cMTrlZkEb4BNxfQsWiPwo6FavoJoRnFSVSxEIY3Mxss='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https:; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-2aJTnYEuBoEDpYhrOvbeXWy1Q964SVxtWR5all1LgjY='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https:; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
 <meta name="referrer" content="no-referrer">
 <meta name="theme-color" content="#fbf9f6">
 <link rel="manifest" href="manifest.webmanifest">
@@ -384,11 +384,11 @@ async function loadMoreSpots(){
    A city without a pack gets its places from OpenStreetMap around its center. The id carries everything a
    friend's phone needs to load the same city from a link: "@lat,lon,country,Name". OSM data is untrusted
    like spots.json: every place goes through cleanSpot()/extra() and is escaped when shown. */
-const GEO_ID=/^@(-?\d{1,2}(?:\.\d{1,4})?),(-?\d{1,3}(?:\.\d{1,4})?),([a-z]{2}),([^<>&"'`@,/\\]{1,40})$/u;
+const GEO_ID=/^@(-?\d{1,2}(?:\.\d{1,4})?),(-?\d{1,3}(?:\.\d{1,4})?),([a-z]{2}),([^<>&"'`@,/\\\p{C}]{1,40})$/u;  // no markup, separators or control/bidi characters
 function geoParse(id){const m=GEO_ID.exec(typeof id==="string"?id:"");if(!m)return null;const lat=+m[1],lon=+m[2],name=m[4].trim();
   return Math.abs(lat)<=85&&Math.abs(lon)<=180&&name?{lat,lon,cc:m[3],name}:null}
 const cityOk=id=>typeof id==="string"&&(CITY_ID.test(id)||!!geoParse(id));
-const geoId=(lat,lon,cc,name)=>`@${lat.toFixed(3)},${lon.toFixed(3)},${/^[a-z]{2}$/.test(cc)?cc:"xx"},${String(name).replace(/[<>&"'`@,/\\]/g," ").trim().slice(0,40)||"Here"}`;
+const geoId=(lat,lon,cc,name)=>`@${lat.toFixed(3)},${lon.toFixed(3)},${/^[a-z]{2}$/.test(cc)?cc:"xx"},${String(name).replace(/[<>&"'`@,/\\]|\p{C}/gu," ").trim().slice(0,40)||"Here"}`;
 const EURO="at be cy de ee es fi fr gr hr ie it lt lu lv mt nl pt si sk".split(" ");
 const CURRENCY={us:"$",ca:"$",au:"$",nz:"$",mx:"$",sg:"$",hk:"$",gb:"£",jp:"¥",cn:"¥",in:"₹",kr:"₩",th:"฿",ph:"₱",tr:"₺",il:"₪",ng:"₦",vn:"₫",ua:"₴",br:"R$",za:"R"};
 async function loadGeoCity(id,g){
@@ -400,7 +400,7 @@ async function loadGeoCity(id,g){
   document.title=`The Plan Committee · ${CITY.short}`;
   SPOTS=spots;
 }
-/* ---- places: cached on this phone for a week, so a city loads instantly the second time ---- */
+/* ---- places: cached on this phone for 30 days, so a city loads instantly the second time ---- */
 const GEO_TTL=30*864e5,geoMemo={},GEO_KM={},geoClean=o=>{const s=cleanSpot(o,false);return s?extra(s,o):null};
 const geoSpots=(g,id)=>geoMemo[id]||=geoFetch(g,id).catch(e=>{delete geoMemo[id];throw e});  // one lookup per city, even if prefetch and start both ask
 async function geoFetch(g,id){
@@ -1167,7 +1167,7 @@ function parseTime(t,base){const m=(t||"").toLowerCase().match(/(\d{1,2})(?::(\d
   d.setHours(h,+(m[2]||0),0,0);if(h<6)d.setDate(d.getDate()+1);return d}
 function downloadICS(p){
   const base=nightDate(p.when||plan.when),pad=n=>String(n).padStart(2,"0"),f=d=>`${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}T${pad(d.getHours())}${pad(d.getMinutes())}00`;
-  const starts=p.stops.map(s=>parseTime(s.time,base)),cl=s=>String(s||"").replace(/[,;\\]/g," ");
+  const starts=p.stops.map(s=>parseTime(s.time,base)),cl=s=>String(s||"").replace(/[,;\\\r\n]/g," ");
   const ev=p.stops.map((s,i)=>{const st=starts[i];const en=starts[i+1]&&starts[i+1]>st?starts[i+1]:new Date(st.getTime()+90*60000);
     return ["BEGIN:VEVENT",`UID:${Date.now()}-${i}@plancommittee`,`DTSTAMP:${f(new Date())}`,`DTSTART:${f(st)}`,`DTEND:${f(en)}`,
       `SUMMARY:${cl(s.spot.n)} (${cl(p.title||"the plan")})`,`LOCATION:${cl(s.spot.n)} ${cl(s.spot.h)} ${cl(CITY.name)}`,`DESCRIPTION:${cl(s.note)}`,"END:VEVENT"].join("\r\n")});
