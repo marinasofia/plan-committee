@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>The Plan Committee</title>
 <meta name="description" content="Your friends pick what they want. AI agents argue for each of you in a group chat and agree on one plan for a night out in NYC or London.">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-2aJTnYEuBoEDpYhrOvbeXWy1Q964SVxtWR5all1LgjY='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https:; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-TfvSBPmqd4Gtuzjw6W1EgV+ycGz2/sbKI9X2S8VkfRQ='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https:; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
 <meta name="referrer" content="no-referrer">
 <meta name="theme-color" content="#fbf9f6">
 <link rel="manifest" href="manifest.webmanifest">
@@ -165,6 +165,8 @@ button,input,select,textarea{font:inherit;color:inherit}
 .who{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
 .qk{text-align:center;text-decoration:none;color:var(--ink);border-style:solid;background:#fff;line-height:1.3}
 .qk .small{display:block;margin-top:2px;font-weight:400}
+.qk.on{border-color:var(--ink);box-shadow:0 0 0 1px var(--ink)}
+.steps{margin:4px 0 14px;padding-left:22px;font-size:14px;line-height:1.5}.steps li{margin:7px 0}.steps a{color:var(--ink);font-weight:600}
 .obart{display:flex;gap:6px;margin-bottom:26px}.obart .av{width:54px;height:54px;font-size:20px;margin-left:-14px;border:3px solid var(--paper)}.obart .av:first-child{margin-left:0}
 .obi{width:54px;height:54px;border-radius:50%;display:grid;place-items:center;background:var(--accent-soft);color:var(--accent);font-size:24px;font-weight:600}
 .vote{border-top:1px dashed var(--line);padding-top:12px}.vote .lbl{font-family:"DM Mono",monospace;font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);padding:0 16px 8px}
@@ -226,7 +228,7 @@ button,input,select,textarea{font:inherit;color:inherit}
 
     <button class="cta" id="startBtn" type="button">Start the group chat</button>
     <p class="small">Places from hand picks, NYC Open Data and © OpenStreetMap contributors. Weather by Open-Meteo. Check hours before you go.</p>
-    <p class="small" id="keyHint">No AI key yet? You'll see a demo first. A free Gemini or Groq key (1 minute) turns on the real AI.</p>
+    <p class="small" id="keyHint">No AI key yet? You'll see a demo first. <a href="#" id="keyLink">Add a free key</a> (1 minute) or one you already have to turn on the real AI.</p>
     <p class="small">Keys and picks stay on this device and go only to the AI you chose. Google's free Gemini tier may use prompts to improve its models.</p>
     <p class="small" id="installHint" style="display:none"><a href="#" id="installLink">Install the app</a> so it opens like an app and keeps your key.</p>
   </div>
@@ -314,17 +316,21 @@ button,input,select,textarea{font:inherit;color:inherit}
   <!-- quick key: the one minute path for people with no key yet -->
   <div class="sheet hide top" id="quickKey">
     <button class="iconbtn close" id="closeQuick" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
-    <h2>Get your free AI key.</h2>
-    <p class="lead">Takes about a minute, no card. Only the planner needs one: friends who join by link don't.</p>
-    <div class="sec"><span class="lab">1. Pick one and sign in</span>
-      <div class="btnrow"><a class="ghost qk" href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">Gemini<br><span class="small">sign in with Google</span></a>
-        <a class="ghost qk" href="https://console.groq.com/keys" target="_blank" rel="noopener">Groq<br><span class="small">fastest replies</span></a></div></div>
-    <div class="sec"><span class="lab">2. Tap "Create API key" and copy it</span></div>
-    <div class="sec"><span class="lab">3. Paste it here</span>
+    <h2>Turn on the real AI.</h2>
+    <p class="lead">With a key, every agent argues for real about your picks. Only the planner needs one: friends who join by link don't.</p>
+    <div class="sec"><div class="seg" id="qkMode"><button type="button" data-k="free">Get a free key</button><button type="button" data-k="have">I have a key</button></div></div>
+    <div id="qkFree">
+      <div class="sec"><span class="lab">Pick one (both free, no card)</span>
+        <div class="btnrow"><button class="ghost qk" type="button" data-p="gemini">Gemini<br><span class="small">your Google account</span></button>
+          <button class="ghost qk" type="button" data-p="groq">Groq<br><span class="small">email or Google, fastest</span></button></div></div>
+      <ol class="steps" id="qkSteps"></ol>
+    </div>
+    <p class="small" id="qkHave" style="display:none">Paste a Gemini, Groq or OpenRouter key. We'll recognize which one it is.</p>
+    <div class="sec"><span class="lab" id="qkPasteLab">Paste your key</span>
       <input class="field" id="qkInput" type="password" placeholder="paste your key" autocomplete="off" spellcheck="false">
       <p class="small" id="qkStatus">It stays in this browser and is sent only to the provider you chose.</p></div>
     <button class="cta" id="qkGo" type="button">Start the group chat</button>
-    <p class="small"><a href="#" id="qkMore">More options (OpenRouter, other APIs)</a></p>
+    <p class="small"><a href="#" id="qkMore">Another service (any OpenAI compatible API) or pick a model</a></p>
     <p class="small">Keys and picks stay on this device and go only to the AI you chose. Google's free Gemini tier may use prompts to improve its models.</p>
   </div>
 </div>
@@ -1006,7 +1012,23 @@ $("testKeys").onclick=async()=>{
 /* quick key: paste any key, we work out whose it is */
 /* Google has two key formats (AIza… and the newer AQ.…). Anything unrecognized is tried on each service in turn. */
 const KEY_TYPES=[[/^(AIza[\w-]{30,}|AQ\.[\w.-]{20,})$/,"gemini","gKey","Gemini"],[/^gsk_\w{20,}$/,"groq","qKey","Groq"],[/^sk-or-[\w-]{20,}$/,"openrouter","oKey","OpenRouter"]];
-function openQuickKey(){$("qkInput").value="";qkSay("It stays in this browser and is sent only to the provider you chose.");$("quickKey").classList.remove("hide")}
+/* step by step, per provider: every word here is ours (constants), nothing from outside */
+const QK_STEPS={
+  gemini:[`<a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">Open Google AI Studio</a> and sign in with your Google account.`,
+    `Tap <b>Create API key</b>. If it asks for a project, pick any one or let it make a new one.`,
+    `Tap the copy icon next to your new key. It starts with <b>AIza</b>.`,`Come back to this tab and paste it below.`],
+  groq:[`<a href="https://console.groq.com/keys" target="_blank" rel="noopener">Open the Groq console</a> and sign up with your email or Google.`,
+    `Tap <b>Create API Key</b>, type any name, then tap <b>Submit</b>.`,
+    `Copy the key right away: Groq shows it only once. It starts with <b>gsk_</b>.`,`Come back to this tab and paste it below.`]};
+let qkProv="gemini",qkTab="free";
+function paintQuick(){document.querySelectorAll("#qkMode button").forEach(b=>b.classList.toggle("on",b.dataset.k===qkTab));
+  document.querySelectorAll("#qkFree [data-p]").forEach(b=>b.classList.toggle("on",b.dataset.p===qkProv));
+  $("qkFree").style.display=qkTab==="free"?"":"none";$("qkHave").style.display=qkTab==="have"?"":"none";
+  $("qkSteps").innerHTML=QK_STEPS[qkProv].map(t=>`<li>${t}</li>`).join("");$("qkPasteLab").textContent=qkTab==="free"?"Paste your key":"Your key"}
+document.querySelectorAll("#qkMode button").forEach(b=>b.onclick=()=>{qkTab=b.dataset.k;paintQuick();if(qkTab==="have")$("qkInput").focus()});
+document.querySelectorAll("#qkFree [data-p]").forEach(b=>b.onclick=()=>{qkProv=b.dataset.p;paintQuick()});
+$("keyLink").onclick=e=>{e.preventDefault();openQuickKey()};
+function openQuickKey(){paintQuick();$("qkInput").value="";qkSay("It stays in this browser and is sent only to the provider you chose.");$("quickKey").classList.remove("hide")}
 function qkSay(t,cls){const el=$("qkStatus");el.textContent=t;el.style.color=cls==="bad"?"#b4413c":cls==="ok"?"var(--ok)":""}
 $("closeQuick").onclick=()=>$("quickKey").classList.add("hide");
 $("qkMore").onclick=e=>{e.preventDefault();$("quickKey").classList.add("hide");$("gearBtn").click()};
