@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>The Plan Committee</title>
 <meta name="description" content="Your friends pick what they want. AI agents argue for each of you in a group chat and agree on one plan for a night out in NYC or London.">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-IE5cLBS8Bw8Y7VgzCw6COTfE9hW4BODg4B8ZHnwmAl0='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https:; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-Paw6zDETZkBLrjuqaAtvTZpyrqllVXHf0MhzCtXv9yw='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https:; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
 <meta name="referrer" content="no-referrer">
 <meta name="theme-color" content="#fbf9f6">
 <link rel="manifest" href="manifest.webmanifest">
@@ -192,6 +192,7 @@ button,input,select,textarea{font:inherit;color:inherit}
   </div>
 
   <div class="chat" id="chat"></div>
+  <datalist id="cityNames"></datalist>
 
   <form class="composer" id="composer">
     <input id="say" placeholder="the agents are talking…" disabled autocomplete="off">
@@ -206,7 +207,7 @@ button,input,select,textarea{font:inherit;color:inherit}
     <button class="keybar" id="keyBar" type="button" style="display:none"><span>Free demo for now.</span> <b>Turn on the real AI, free in 1 minute</b></button>
 
     <div class="sec" id="citySec"><span class="lab">City</span><div class="chips" id="cityChips"></div>
-      <div id="geoRow" style="display:none;margin-top:8px"><form class="btnrow" id="geoForm"><input class="field" id="geoInput" placeholder="your city: Paris, Tokyo, Austin" maxlength="80" autocomplete="address-level2"><button class="chip" type="submit" id="geoGo">Find</button></form>
+      <div id="geoRow" style="display:none;margin-top:8px"><form class="btnrow" id="geoForm"><input class="field" id="geoInput" placeholder="your city: Paris, Tokyo, Austin" maxlength="80" autocomplete="off" list="cityNames"><button class="chip" type="submit" id="geoGo">Find</button></form>
         <p class="small" id="geoStatus">Any city. Places come straight from OpenStreetMap.</p></div></div>
     <div class="sec" id="crewSec"><span class="lab">Your crews</span><div class="chips" id="crewChips"></div></div>
     <div class="sec"><div class="seg" id="modeSeg"><button type="button" data-mode="date">Date night</button><button type="button" data-mode="girls">Friends night</button></div></div>
@@ -233,7 +234,7 @@ button,input,select,textarea{font:inherit;color:inherit}
     </details>
 
     <button class="cta" id="startBtn" type="button">Start the group chat</button>
-    <p class="small">Places from hand picks, NYC Open Data and © OpenStreetMap contributors. Weather by Open-Meteo. Check hours before you go.</p>
+    <p class="small">Places from hand picks, Overture Maps Foundation, NYC Open Data and © OpenStreetMap contributors. Weather by Open-Meteo. Check hours before you go.</p>
     <p class="small" id="keyHint">No AI key yet? You'll see a demo first. <a href="#" id="keyLink">Add a free key</a> (1 minute) or one you already have to turn on the real AI.</p>
     <p class="small">Keys and picks stay on this device and go only to the AI you chose. Google's free Gemini tier may use prompts to improve its models.</p>
     <p class="small" id="installHint" style="display:none"><a href="#" id="installLink">Install the app</a> so it opens like an app and keeps your key.</p>
@@ -299,7 +300,7 @@ button,input,select,textarea{font:inherit;color:inherit}
     <p class="lead">Each person gets an AI agent with its own personality. They fight it out in a group chat and agree on one real plan.</p>
     <form id="obForm">
       <div class="sec"><span class="lab">Your name</span><input class="field" id="obMe" placeholder="your name" maxlength="20" autocomplete="given-name"></div>
-      <div class="sec"><span class="lab">City</span><input class="field" id="obCity" placeholder="your city" maxlength="80" autocomplete="address-level2"><p class="small" id="obCityNote" style="margin-top:4px">Any city in the world.</p></div>
+      <div class="sec"><span class="lab">City</span><input class="field" id="obCity" placeholder="your city" maxlength="80" autocomplete="off" list="cityNames"><p class="small" id="obCityNote" style="margin-top:4px">Any city in the world.</p></div>
       <div class="sec"><span class="lab">Who's coming</span><input class="field" id="obOthers" placeholder="their names: Sam, Lee" maxlength="120" autocomplete="off"></div>
       <div class="sec"><div class="seg" id="obMode"><button type="button" data-mode="date">Date night</button><button type="button" data-mode="girls">Friends night</button></div></div>
       <button class="cta" id="obGo" type="submit">Let the agents plan</button>
@@ -432,15 +433,32 @@ async function geoFetch(g,id){
   if(hit&&Date.now()-hit.at<GEO_TTL&&Array.isArray(hit.s)&&hit.s.length){
     if(!hit.ai&&providers().length&&!scripted()){const raw=hit.s.map(geoClean).filter(Boolean);if(await aiTag(raw,g.name).then(()=>true,()=>false))store.set("geo",{...cache,[id]:{...hit,ai:true,s:raw}});return raw}
     return hit.s.map(geoClean).filter(Boolean)}
-  const els=await overpass(g,GEO_KM[id]||2.5),seen=new Set();
-  const raw=els.map(osmSpot).filter(s=>s&&!seen.has(s.n.toLowerCase())&&seen.add(s.n.toLowerCase()))
+  const open=await openSpots(g).catch(()=>null),seen=new Set();  // our open list first (Overture), the live map only for cities it doesn't cover
+  const raw=open?.length?open.map(geoClean).filter(Boolean).map(s=>({...s,pop:0})):  // cleaned before the AI prompt and the cache, not just at render
+    (await overpass(g,GEO_KM[id]||2.5)).map(osmSpot).filter(s=>s&&!seen.has(s.n.toLowerCase())&&seen.add(s.n.toLowerCase()))
     .sort((a,b)=>km(g,a)-km(g,b)).slice(0,900);  // the 900 places nearest the center
-  if(!raw.length)throw new Error(`OpenStreetMap has no restaurants or bars mapped around ${g.name} yet.`);
+  if(!raw.length)throw new Error(`No restaurants or bars found around ${g.name} yet.`);
   const ai=await aiTag(raw,g.name).then(()=>providers().length>0&&!scripted(),()=>false);  // with a key, the AI adds prices and vibes it knows; without, OSM tags are enough
   const keep=Object.fromEntries(Object.entries(cache&&typeof cache==="object"?cache:{}).filter(([k,v])=>k!==id&&v?.at).sort((a,b)=>b[1].at-a[1].at).slice(0,2));
   store.set("geo",{...keep,[id]:{at:Date.now(),ai,s:raw}});  // the last 3 cities, if there's room
   return raw.map(geoClean).filter(Boolean);
 }
+/* open place lists: one file per city, built every month from Overture Maps Places (not OpenStreetMap) by
+   pipeline/build_places.py and served by jsDelivr from this repo's places-data branch. Anyone can use or correct them. */
+const PLACES_CDN="https://cdn.jsdelivr.net/gh/marinasofia/plan-committee@places-data/";
+let openIndex=null;
+const openCities=()=>openIndex||=fetch(PLACES_CDN+"index.json",{signal:AbortSignal.timeout(8000)}).then(r=>r.ok?r.json():Promise.reject(r.status))
+  .then(j=>(Array.isArray(j?.cities)?j.cities.slice(0,5000):[]).filter(c=>CITY_ID.test(c?.id||"")&&isFinite(c.lat)&&isFinite(c.lon)&&typeof c.name==="string")
+    .map(c=>({id:c.id,name:str(c.name,40),cc:/^[a-z]{2}$/.test(c.cc)?c.cc:"xx",lat:+c.lat,lon:+c.lon})))
+  .catch(()=>{openIndex=null;return []});
+async function openSpots(g){
+  const best=(await openCities()).map(c=>({c,d:km(g,c)})).sort((a,b)=>a.d-b.d)[0];if(!best||best.d>25)return null;  // a city on the list near this point
+  const r=await fetch(`${PLACES_CDN}${best.c.id}.json`,{signal:AbortSignal.timeout(15000)});if(+r.headers.get("content-length")>3e6)return null;const j=r.ok?await r.json():null;
+  return Array.isArray(j?.spots)?j.spots.slice(0,2000):null}
+/* city name suggestions while typing, from the same list (filled once, on first focus) */
+let cityNamesDone=false;
+function fillCityNames(){if(cityNamesDone)return;cityNamesDone=true;openCities().then(list=>{const dl=$("cityNames");
+  for(const n of [...new Set([...CITY_LIST.map(c=>c.name),...list.map(c=>c.name)])].sort()){const o=document.createElement("option");o.value=n;dl.appendChild(o)}})}
 const OVERPASS=["https://overpass-api.de/api/interpreter","https://overpass.private.coffee/api/interpreter"];
 async function overpass(g,size){
   for(const half of size<4?[size,4]:[4]){  // km from the center, sized to the city; a sparse result gets one wider try
@@ -527,6 +545,8 @@ async function lookupCity(text){
   const q=String(text||"").trim().slice(0,80),k=q.split(",")[0].toLowerCase().replace(/[^a-z]/g,"");if(!q)return plan.city;
   const pack=CITY_LIST.find(c=>c.id===k||c.name.toLowerCase().replace(/[^a-z]/g,"")===k)||(/^(newyork|ny|manhattan|brooklyn)$/.test(k)?CITY_LIST.find(c=>c.id==="nyc"):null);
   if(pack)return pack.id;
+  const nm=q.split(",")[0].trim().toLowerCase(),known=(await openCities()).find(c=>c.name.toLowerCase()===nm);
+  if(known)return geoId(known.lat,known.lon,known.cc,known.name);  // a city on the open list: no map lookup at all
   const r=await fetch("https://nominatim.openstreetmap.org/search?"+new URLSearchParams({q,format:"jsonv2",limit:"1",addressdetails:"1","accept-language":"en"}),
     {referrerPolicy:"origin",signal:AbortSignal.timeout(10000)}).catch(()=>null);  // OSM's usage policy asks apps to identify themselves: send only our origin
   const j=r?.ok?await r.json().catch(()=>null):null,hit=Array.isArray(j)?j[0]:null,lat=+hit?.lat,lon=+hit?.lon;
@@ -1423,6 +1443,7 @@ const obGuess=()=>obMode||($("obOthers").value.split(",").filter(n=>n.trim()).le
 const paintOb=()=>document.querySelectorAll("#obMode button").forEach(b=>b.classList.toggle("on",b.dataset.mode===obGuess()));
 document.querySelectorAll("#obMode button").forEach(b=>b.onclick=()=>{obMode=b.dataset.mode;paintOb()});
 $("obOthers").oninput=paintOb;
+$("obCity").onfocus=fillCityNames;$("geoInput").onfocus=fillCityNames;
 $("obCity").onchange=()=>{$("obCity").style.borderColor="";$("obCityNote").textContent="Any city in the world.";
   resolveCity($("obCity").value).then(id=>{const g=geoParse(id);if(g)return geoSpots(g,id)}).catch(()=>{})};  // a head start while they type names
 function openOnboarding(){renderInstall();paintOb();if(!$("obCity").value)$("obCity").value=CITY?.geo?CITY.name:CITY?.id==="london"?"London":guessCity();$("onboard").classList.remove("hide");setTimeout(()=>$("obMe").focus(),450)}

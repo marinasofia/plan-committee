@@ -15,8 +15,8 @@ AI agents argue in a group chat and agree on one real NYC date night or friends 
 * The project is open source (MIT code, ODbL place data). Contributor PRs run in users' browsers next to their AI keys: review every change to `index.html`, `sw.js` and workflows line by line, especially new hosts in fetch calls, CSP edits and anything rendered as HTML.
 
 * Everything stays free: no paid services, no Supabase.
-* Data only from NYC Open Data, OpenStreetMap and the free AI keys in repo secrets (`GROQ_API_KEY`, `GEMINI_API_KEY`). Never scrape Google Maps, Yelp, Resy or The Infatuation.
-* Keep `index.html` a single file with no build step. The pipeline uses the Python standard library only.
+* Data only from NYC Open Data, OpenStreetMap, Overture Maps Places and the free AI keys in repo secrets (`GROQ_API_KEY`, `GEMINI_API_KEY`). Never scrape Google Maps, Yelp, Resy or The Infatuation.
+* Keep `index.html` a single file with no build step. The daily pipeline uses the Python standard library only. The one exception is the monthly `pipeline/build_places.py` ("Somewhere else" cities from Overture), which needs DuckDB, installed only in its GitHub Action with the version and file hash pinned.
 * Keep explanations short.
 
 ## Security review on every change (the repo is public)
@@ -27,7 +27,7 @@ Act as a senior security engineer and pen test every change before it is committ
 * CSP: `index.html` only runs the inline script whose sha256 is in its Content Security Policy. After any edit to the script, run `python3 tools/csp.py`, or the app will not run. CI checks it.
 * Hosting: the app has its own origin on Cloudflare Pages. Don't move it back to GitHub Pages: every repo on a `username.github.io` shares one origin and could read users' saved keys. Keep `_headers` (frame blocking, nosniff, no-cache for `sw.js`).
 * Service worker (`sw.js`): only same origin GET requests, never AI calls or anything cross origin; keep pages network first so fixes reach people.
-* XSS in `index.html`: share links (`#j=`, `#r=`, `#p=`, `#v=`, `#c=`, `#f=`, `#m=`), `spots.json`, OpenStreetMap data and AI replies are all untrusted. Everything put into `innerHTML` goes through `esc()`, links through `safeUrl()` (http and https only), colors through `safeColor()`. Users' AI keys live in localStorage, so any XSS steals them.
+* XSS in `index.html`: share links (`#j=`, `#r=`, `#p=`, `#v=`, `#c=`, `#f=`, `#m=`), `spots.json`, the open place files (Overture), OpenStreetMap data and AI replies are all untrusted. Everything put into `innerHTML` goes through `esc()`, links through `safeUrl()` (http and https only), colors through `safeColor()`. Users' AI keys live in localStorage, so any XSS steals them.
 * GitHub Actions: no `pull_request_target` or comment triggers, least `permissions`, no `${{ }}` of untrusted input inside `run:`, secrets only in the step that needs them.
 * Worker (`worker/`): validate and cap input, parameterized D1 queries, nothing a stranger posts can reach the page as HTML.
 * New dependencies or third party scripts: avoid them; if needed, pin exact versions.
