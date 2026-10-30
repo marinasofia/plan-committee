@@ -16,7 +16,7 @@ const json = (body, status = 200, extra = {}) => new Response(body, { status, he
 function query(lat, lon, km) {
   const dy = km / 111, dx = dy / Math.cos(lat * Math.PI / 180);
   const b = [lat - dy, lon - dx, lat + dy, lon + dx].map(v => v.toFixed(4)).join(",");
-  return `[out:json][timeout:90];(nw["amenity"~"^(restaurant|bar|pub|biergarten|nightclub|cinema|theatre|ice_cream|arts_centre)$"]["name"](${b});` +
+  return `[out:json][timeout:40];(nw["amenity"~"^(restaurant|bar|pub|biergarten|nightclub|cinema|theatre|ice_cream|arts_centre)$"]["name"](${b});` +
     `nw["tourism"~"^(museum|gallery|viewpoint)$"]["name"](${b});nwr["leisure"~"^(park|garden)$"]["name"]["wikidata"](${b}););out center tags 2500;`;
 }
 const slim = e => {
@@ -38,13 +38,16 @@ export default {
     const key = `p:${lat.toFixed(2)},${lon.toFixed(2)},${km}`;
     const hit = env.PLACES && await env.PLACES.get(key);
     if (hit) return json(hit, 200, { "X-Cache": "hit" });
+    // a miss costs an OpenStreetMap query: a few per minute per visitor, so nobody can walk the map through us
+    if (env.MISSES && !(await env.MISSES.limit({ key: req.headers.get("CF-Connecting-IP") || "unknown" })).success) return json('{"error":"slow down"}', 429);
     let elements = null;
     for (const host of OVERPASS) {
       try {
         const r = await fetch(host, { method: "POST", headers: { "User-Agent": UA, "Content-Type": "application/x-www-form-urlencoded" },
-          body: new URLSearchParams({ data: query(lat, lon, km) }), signal: AbortSignal.timeout(100000) });
+          body: new URLSearchParams({ data: query(lat, lon, km) }), signal: AbortSignal.timeout(45000) });
         if (!r.ok) continue;
         const j = await r.json();
+        if (j?.remark) continue;  // Overpass ran out of time and sent part of the city: never cache that
         if (Array.isArray(j?.elements)) { elements = j.elements.slice(0, 8000).map(slim).filter(Boolean); break; }
       } catch { /* busy or slow: try the mirror */ }
     }

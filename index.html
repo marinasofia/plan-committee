@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>The Plan Committee</title>
 <meta name="description" content="Your friends pick what they want. AI agents argue for each of you in a group chat and agree on one plan for a night out in NYC or London.">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-V4utQeVGH/Yjj447lQnvLuIkNz4TY0BH3NQdjrTSgOQ='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https:; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-pz5sDj5tD8JzGpoA34bIaJkJ1DBn/7AxGQ1NsWhr3zw='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https:; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
 <meta name="referrer" content="no-referrer">
 <meta name="theme-color" content="#fbf9f6">
 <link rel="manifest" href="manifest.webmanifest">
@@ -436,7 +436,7 @@ async function overpass(g,size){
 }
 /* the shared cache: instant for any city someone opened before. The same slim OSM elements as Overpass */
 async function placesAsk(g,half){if(!PLACES_URL)throw 0;
-  const r=await fetch(`${PLACES_URL.replace(/\/$/,"")}/places?`+new URLSearchParams({lat:g.lat.toFixed(2),lon:g.lon.toFixed(2),km:String(Math.round(half*2)/2)}),{signal:AbortSignal.timeout(110000)});
+  const r=await fetch(`${PLACES_URL.replace(/\/$/,"")}/places?`+new URLSearchParams({lat:g.lat.toFixed(2),lon:g.lon.toFixed(2),km:String(Math.round(half*2)/2)}),{signal:AbortSignal.timeout(95000)});
   const j=r.ok?await r.json():null;if(!Array.isArray(j?.elements))throw 0;return j.elements.slice(0,8000)}
 /* the public servers are often slow: ask the main one, and the mirror too if it hasn't answered in 8 seconds; first answer wins */
 async function overpassAsk(q){const ctl=new AbortController(),timer=setTimeout(()=>ctl.abort(),60000);
@@ -459,8 +459,8 @@ function osmSpot(e){
   const kind=t.amenity||t.tourism||t.leisure,cu=String(t.cuisine||"").toLowerCase(),web=String(t.website||t["contact:website"]||"");
   if(["restaurant","bar","pub","biergarten","nightclub"].includes(kind)&&!web&&!t.opening_hours)return null;
   if(kind==="restaurant"&&OSM_SKIP.test(cu))return null;
-  const type=OSM_TYPE[kind]||((kind==="museum"||kind==="gallery")?(t.fee==="no"?"free":"late"):null);if(!type)return null;
-  const hrs=parseHours(t.opening_hours),f=new Set(OSM_TAGS[kind]||[]);
+  const type=(Object.hasOwn(OSM_TYPE,kind)&&OSM_TYPE[kind])||((kind==="museum"||kind==="gallery")?(t.fee==="no"?"free":"late"):null);if(!type)return null;
+  const hrs=parseHours(t.opening_hours),f=new Set(Object.hasOwn(OSM_TAGS,kind)?OSM_TAGS[kind]:[]);
   if(t.live_music==="yes")f.add("music");
   if(t.rooftop==="yes"||/rooftop/i.test(t.name)){f.add("rooftop");f.add("views")}
   if(/vegan|vegetarian/.test(cu)||["yes","only"].includes(t["diet:vegan"])||t["diet:vegetarian"]==="only")f.add("veg");

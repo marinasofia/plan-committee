@@ -5,3 +5,15 @@ compatibility_date = "2025-06-01"
 [[kv_namespaces]]
 binding = "PLACES"
 id = "PASTE_THE_ID_FROM_wrangler_kv_namespace_create_HERE"
+
+# a cache miss queries OpenStreetMap: at most 5 per minute per visitor
+[[ratelimits]]
+name = "MISSES"
+namespace_id = "1001"
+  [ratelimits.simple]
+  limit = 5
+  period = 60
+
+# no request logs: the README promises nothing about visitors is kept
+[observability]
+enabled = false

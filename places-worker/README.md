@@ -1,6 +1,6 @@
 # Places cache (optional, free)
 
-"Somewhere else" cities get their places from OpenStreetMap's public Overpass servers, which are often slow (30 to 60 seconds) or full. This Worker sits in front of them: the first person to open a city waits, everyone after gets it in under a second from Cloudflare KV, for 30 days. Free tier: 100,000 reads and 1,000 new cities a day.
+"Somewhere else" cities get their places from OpenStreetMap's public Overpass servers, which are often slow (30 to 60 seconds) or full. This Worker sits in front of them: the first person to open a city waits, everyone after gets it in under a second from Cloudflare KV, for 30 days. Free tier: 100,000 reads and 1,000 new cities a day. Each visitor can trigger at most 5 OpenStreetMap lookups a minute, and request logs are off.
 
 It only passes public map data. It stores no names, IPs or keys, and answers only requests from the app's own origin (`ORIGIN` in `worker.js`).
 
