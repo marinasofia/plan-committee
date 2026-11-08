@@ -62,6 +62,23 @@ class ParseHours(unittest.TestCase):
             self.assertIsNone(b.parse_hours(oh), oh)
 
 
+class CuratedHours(unittest.TestCase):
+    BBOX = [40.0, -75.0, 41.0, -73.0]
+
+    def test_hand_hours_win_over_osm(self):
+        osm = [{"name": "MoMA", "lat": 40.76, "lon": -73.97, "hrs": b.parse_hours("24/7"), "x": [], "rsv": ""}]
+        info = b.curated_info([{"n": "MoMA", "hours": "Mo-Su 10:30-17:30"}], osm, None, self.BBOX)
+        self.assertEqual(info["MoMA"]["hrs"][0], [[630, 1050]])
+        self.assertEqual(info["MoMA"]["lat"], 40.76)
+
+    def test_hand_hours_without_an_osm_match(self):
+        info = b.curated_info([{"n": "Strand", "hours": "Mo-Su 10:00-20:00"}], [], None, self.BBOX)
+        self.assertEqual(info["Strand"], {"hrs": [[[600, 1200]]] * 7})
+
+    def test_bad_hours_are_ignored(self):
+        self.assertEqual(b.curated_info([{"n": "X", "hours": "sunset"}, {"n": "Y", "hours": 5}], [], None, self.BBOX), {})
+
+
 class Booking(unittest.TestCase):
     def test_known_booking_sites_pass(self):
         self.assertEqual(b.booking({"website": "https://resy.com/cities/ny/via-carota"}), "https://resy.com/cities/ny/via-carota")
