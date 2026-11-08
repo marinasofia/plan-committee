@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>The Plan Committee</title>
 <meta name="description" content="Your friends pick what they want. AI agents argue for each of you in a group chat and agree on one plan for a night out in NYC or London.">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-SnCyrIKKJ91t5GcSqDP06ByTP4ed8h5JNTkbTrTuteE='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https:; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-LrA6c8KBER0qLR4SVvqSXXwjf1bhPS2wDCanD6yAKEo='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https:; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
 <meta name="referrer" content="no-referrer">
 <meta name="theme-color" content="#fbf9f6">
 <link rel="manifest" href="manifest.webmanifest">
@@ -940,7 +940,8 @@ function shortlist(){
   const near=s=>{const d=km(anchor,s);return d==null?0:walk?(d<1?8:d<2?4:-12):plan.move==="transit"?(d<3?5:d<7?2:-8):(d<4?4:d<10?1:-6)};
   const within=s=>!walk||!anchor||(km(anchor,s)??0)<=2;  // on foot: everything within about 25 minutes' walk of dinner
   const score=s=>plan.members.reduce((a,m)=>a+personScore(s,m),0)+(hoodMatch(s)?4:0)+(faves.includes(s.n)?2:0)+(s.cur?1:0)+(s.pop||0)-(recent.includes(s.n)&&!faves.includes(s.n)?6:0)
-    +needScore(s)+wxScore(s)+(anchor?near(s):0)+((s.t==="dinner"||s.t==="drinks")&&s.p<C.maxB-1?-4:0)+Math.random()*2.5;  // a $$$ group gets $$ and $$$ dinners and drinks, not fast food
+    +needScore(s)+wxScore(s)+(anchor?near(s):0)+priceFit(s)+Math.random()*2.5;
+  const priceFit=s=>s.t!=="dinner"&&s.t!=="drinks"?0:C.maxB>=4?[-6,-6,-6,2,6][s.p]??0:s.p<C.maxB-1?-4:0;  // a $$$ group gets $$ and $$$, not fast food; a splurge group gets the fancy places
   const pick=(t,k)=>{let pool=[];for(const f of [s=>ok(s,true)&&within(s),s=>ok(s,false)&&within(s),s=>ok(s,true),s=>ok(s,false)]){pool=SPOTS.filter(s=>s.t===t&&f(s));if(pool.length>=Math.min(k,3))break}
     const ranked=pool.map(s=>({s,sc:score(s)})).sort((a,b)=>b.sc-a.sc).map(x=>x.s);
     // keep a few slots for newer auto-added spots so the list keeps discovering new places
@@ -1141,7 +1142,7 @@ function brief(){const C=SL.C;return `Plan: ${plan.when} in ${CITY.name}, starti
   +(WX?` Forecast: ${temp(WX.temp)}, ${WX.rain}% chance of rain${WX.bad?", so outdoor spots and rooftops are a bad idea":WX.nice?", perfect for outdoors":""}.`:"")
   +" Keep the stops close to each other."}
 function personaFor(a){
-  if(a.wallet)return `You are The Wallet, the group's shared bank account, personified. Dry humor. You guard the budget (max ${PRICE[SL.C.maxB]} per place), call out pricey picks, push cheap and free stops, and you mediate.`;
+  if(a.wallet)return `You are The Wallet, the group's shared bank account, personified. Dry humor. ${SL.C.maxB>=4?"Everyone chose to splurge tonight, so you allow fancy, expensive places: you mourn every bill dramatically, but you push back on cheap picks that would waste a splurge night, and you mediate.":`You guard the budget (max ${PRICE[SL.C.maxB]} per place), call out pricey picks, push cheap and free stops, and you mediate.`}`;
   return `You are the AI agent for ${a.n}. Personality: ${PERS[a.ps]||PERS.chill}
 ${a.n} wants: food: ${a.c.join(", ")||"anything"}; vibe: ${a.v.join(", ")||"any"}; must have: ${a.m.map(v=>labelOf(MUSTS,v)).join(", ")||"nothing specific"}; max budget ${PRICE[a.b]}.${a.d.length?` Dealbreakers: ${a.d.map(v=>labelOf(DEALS,v)).join(", ")}.`:""}${a.q?` Also: ${a.q}.`:""}
 Your favorite picks to push from the list: ${a.favs.join(", ")}. Fight for ${a.n}.`}
@@ -1416,7 +1417,7 @@ async function mockLLM(system,user,json,prefer){await sleep(200);
   if(!SL.list.length)throw new Error("No spots fit that time and place. Try another neighborhood or time.");
   const {d,k,l,stops,decoys}=demoPick(),i=demo.said,settled=i>=demo.total-agents.length;  // the last round only names places that make the plan
   const said=demo.pitched||(demo.pitched={}),mine=s=>said[speaker?.n+"|"+s.n]||0,any=s=>said["*|"+s.n]||0,
-    fit=s=>(speaker?.wallet?-s.p:persFit(speaker,s)-mine(s)*.6)-any(s)*.5;  // a place the whole chat keeps naming loses its shine
+    fit=s=>(speaker?.wallet?(SL.C.maxB>=4?s.p:-s.p):persFit(speaker,s)-mine(s)*.6)-any(s)*.5;  // a place the whole chat keeps naming loses its shine
   const pool=settled?stops:[...stops,...decoys],rot=pool.map((_,j)=>pool[(i+j)%pool.length]),best=rot.reduce((x,y)=>fit(y)>fit(x)?y:x);  // each agent pitches the place that fits its personality (The Wallet: the cheapest), early rounds range wider, the last round settles on the plan
   said[speaker?.n+"|"+best.n]=mine(best)+1;said["*|"+best.n]=any(best)+1;
   const over=(settled?stops:[...stops,...decoys]).find(s=>s.p>SL.C.maxB),prev=demo.prev?.who!==speaker?.n?demo.prev?.s:null;demo.prev={who:speaker?.n,s:best};  // the place this agent names first
