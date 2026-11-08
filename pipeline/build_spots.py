@@ -225,8 +225,8 @@ def parse_hours(oh: str | None) -> list[list[list[int]]] | None:
                     start, end = int(tm.group(1)) * 60 + int(tm.group(2)), int(tm.group(3)) * 60 + int(tm.group(4))
                     if end <= start:
                         end += 1440
-                if start >= 1440 or end > 2880:
-                    return None
+                if start >= 1440 or end > 2880 or (end - start >= 1440 and start > 0):
+                    return None  # "12:00-12:00" is a typo, not 24 hours open: treat as unknown
                 spans.append([start, end])
         for d in days:
             week[d] = spans

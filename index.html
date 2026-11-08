@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>The Plan Committee</title>
 <meta name="description" content="Your friends pick what they want. AI agents argue for each of you in a group chat and agree on one plan for a night out in NYC or London.">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-6Jxn8t04a7YFesK8lU4P5H56vvAeK+J4DxP3gAht3fc='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https:; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-SnCyrIKKJ91t5GcSqDP06ByTP4ed8h5JNTkbTrTuteE='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https:; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
 <meta name="referrer" content="no-referrer">
 <meta name="theme-color" content="#fbf9f6">
 <link rel="manifest" href="manifest.webmanifest">
@@ -900,7 +900,7 @@ function isOpen(s,date,min){ // true, false, or null when we don't know
   return s.hrs[d].some(([a,b])=>min>=a&&min<b)||s.hrs[prev].some(([a,b])=>b>1440&&min+1440<b)}
 function closesAt(s,date,min){if(!s.hrs)return null;const d=(date.getDay()+6)%7, prev=(d+6)%7;
   const h=s.hrs[d].find(([a,b])=>min>=a&&min<b)||s.hrs[prev].map(([a,b])=>[a-1440,b-1440]).find(([a,b])=>min>=a&&min<b);
-  return !h||h[1]>=1440&&s.hrs[(d+1)%7].some(([a])=>a===0)?null:h[1]}  // open through midnight into the next day (24/7): no closing time to show
+  return !h||h[1]-h[0]>=1440||h[1]>=1440&&s.hrs[(d+1)%7].some(([a])=>a===0)?null:h[1]}  // open through midnight into the next day (24/7): no closing time to show
 const SLOT={dinner:0,drinks:120,late:210,free:180};  // minutes after the start time
 /* ---- distance ---- */
 function km(a,b){if(a?.lat==null||b?.lat==null)return null;const r=Math.PI/180,dl=(b.lat-a.lat)*r,dn=(b.lon-a.lon)*r;
