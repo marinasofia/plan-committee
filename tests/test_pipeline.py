@@ -244,5 +244,26 @@ class PromptFor(unittest.TestCase):
         self.assertIn("££", p)
 
 
+class PlaceLocator(unittest.TestCase):
+    def places(self):
+        filler = [(f"Far {i}", "suburb", 10.0 + i, 10.0) for i in range(30)]
+        return filler + [("Soho", "suburb", 51.5136, -0.1340), ("Seven Dials", "neighbourhood", 51.5140, -0.1270)]
+
+    def test_nearest_suburb_wins(self):
+        loc = b.place_locator(self.places())
+        self.assertEqual(loc(51.5134, -0.1310), ("", "Soho"))
+
+    def test_neighbourhood_when_no_suburb_is_close(self):
+        loc = b.place_locator([p for p in self.places() if p[0] != "Soho"])
+        self.assertEqual(loc(51.5141, -0.1268)[1], "Seven Dials")
+
+    def test_nothing_close_gives_empty(self):
+        self.assertEqual(b.place_locator(self.places())(40.0, -74.0)[1], "")
+
+    def test_too_few_places_gives_none(self):
+        self.assertIsNone(b.place_locator([("Soho", "suburb", 51.5, -0.13)]))
+
+
 if __name__ == "__main__":
     unittest.main()
+
