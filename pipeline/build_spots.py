@@ -651,7 +651,8 @@ def load_cities() -> list[dict]:
 def curated_info(picks: list[dict], osm: list[dict], locate: Locate | None, bbox: Sequence[float]) -> dict[str, dict]:
     """Coordinates, hours and needs for the hand picked spots, from the one OSM place with the same name (in the
     same area when the city has areas). Skipped when the match is ambiguous, so we never attach the wrong hours.
-    Then a pick's own "lat"/"lon" (looked up on OpenStreetMap by hand) gives at least its location."""
+    Then a pick's own "lat"/"lon" (looked up on OpenStreetMap by hand) gives at least its location, and its own
+    "hours" (opening_hours syntax, checked by hand) win over OSM, so a museum never lands in a 10 pm slot."""
     by_name = {}
     for o in osm:
         by_name.setdefault(norm(o["name"]), []).append(o)
@@ -672,6 +673,10 @@ def curated_info(picks: list[dict], osm: list[dict], locate: Locate | None, bbox
         o = hits[0]
         info[name] = {k: v for k, v in {"lat": round(o["lat"], 5), "lon": round(o["lon"], 5), "hrs": o["hrs"],
                                         "x": o["x"], "rsv": o["rsv"]}.items() if v}
+    for row in picks:
+        hrs = parse_hours(row.get("hours")) if isinstance(row.get("hours"), str) else None
+        if hrs:
+            info.setdefault(row.get("n", ""), {})["hrs"] = hrs
     return info
 
 

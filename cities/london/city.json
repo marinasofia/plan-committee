@@ -41,15 +41,15 @@
     {"n": "Ye Olde Cheshire Cheese", "t": "drinks", "h": "Fleet Street", "b": "", "p": 1, "c": "", "f": ["cozy", "nerdy"], "v": "historic pub, rebuilt 1667"},
     {"n": "The Churchill Arms", "t": "drinks", "h": "Kensington", "b": "", "p": 1, "c": "", "f": ["photo", "loud"], "v": "pub covered in flowers"},
     {"n": "Coupette", "t": "drinks", "h": "Bethnal Green", "b": "", "p": 2, "c": "", "f": ["lowkey"], "v": "French cocktails, neighborhood favorite"},
-    {"n": "Ronnie Scott's", "t": "late", "h": "Soho", "b": "", "p": 3, "c": "", "f": ["music", "fancy", "late"], "v": "the famous jazz club", "lat": 51.51345, "lon": -0.13152},
-    {"n": "Prince Charles Cinema", "t": "late", "h": "Leicester Square", "b": "", "p": 1, "c": "", "f": ["nerdy", "chaotic"], "v": "cult films and singalongs"},
-    {"n": "The Comedy Store", "t": "late", "h": "Leicester Square", "b": "", "p": 2, "c": "", "f": ["chaotic", "loud"], "v": "stand up since 1979", "lat": 51.51012, "lon": -0.13226},
-    {"n": "Barbican Centre", "t": "late", "h": "Barbican", "b": "", "p": 2, "c": "", "f": ["artsy", "nerdy"], "v": "brutalist arts centre, films and gigs", "lat": 51.52065, "lon": -0.09381},
+    {"n": "Ronnie Scott's", "t": "late", "h": "Soho", "b": "", "p": 3, "c": "", "f": ["music", "fancy", "late"], "v": "the famous jazz club", "lat": 51.51345, "lon": -0.13152, "hours": "Mo-Su 18:00-01:00"},
+    {"n": "Prince Charles Cinema", "t": "late", "h": "Leicester Square", "b": "", "p": 1, "c": "", "f": ["nerdy", "chaotic"], "v": "cult films and singalongs", "hours": "Mo-Su 11:00-01:00"},
+    {"n": "The Comedy Store", "t": "late", "h": "Leicester Square", "b": "", "p": 2, "c": "", "f": ["chaotic", "loud"], "v": "stand up since 1979", "lat": 51.51012, "lon": -0.13226, "hours": "Mo-Su 18:00-00:00"},
+    {"n": "Barbican Centre", "t": "late", "h": "Barbican", "b": "", "p": 2, "c": "", "f": ["artsy", "nerdy"], "v": "brutalist arts centre, films and gigs", "lat": 51.52065, "lon": -0.09381, "hours": "Mo-Su 09:00-23:00"},
     {"n": "Gelupo", "t": "late", "h": "Soho", "b": "", "p": 1, "c": "", "f": ["dessert"], "v": "Italian gelato, open late"},
-    {"n": "Sky Garden", "t": "free", "h": "City of London", "b": "", "p": 0, "c": "", "f": ["views", "photo"], "v": "free rooftop garden, book ahead"},
-    {"n": "Primrose Hill", "t": "free", "h": "Primrose Hill", "b": "", "p": 0, "c": "", "f": ["views", "romantic"], "v": "skyline view at sunset"},
-    {"n": "South Bank walk", "t": "free", "h": "South Bank", "b": "", "p": 0, "c": "", "f": ["views", "lowkey"], "v": "river walk past the London Eye", "lat": 51.50756, "lon": -0.11467},
+    {"n": "Sky Garden", "t": "free", "h": "City of London", "b": "", "p": 0, "c": "", "f": ["views", "photo"], "v": "free rooftop garden, book ahead", "hours": "Mo-Fr 10:00-18:00; Sa,Su 11:00-21:00"},
+    {"n": "Primrose Hill", "t": "free", "h": "Primrose Hill", "b": "", "p": 0, "c": "", "f": ["views", "romantic"], "v": "skyline view at sunset", "hours": "24/7"},
+    {"n": "South Bank walk", "t": "free", "h": "South Bank", "b": "", "p": 0, "c": "", "f": ["views", "lowkey"], "v": "river walk past the London Eye", "lat": 51.50756, "lon": -0.11467, "hours": "24/7"},
     {"n": "Tate Modern", "t": "free", "h": "Bankside", "b": "", "p": 0, "c": "", "f": ["artsy"], "v": "free modern art in a power station"},
-    {"n": "Kyoto Garden", "t": "free", "h": "Holland Park", "b": "", "p": 0, "c": "", "f": ["romantic", "quiet", "photo"], "v": "Japanese garden with peacocks"}
+    {"n": "Kyoto Garden", "t": "free", "h": "Holland Park", "b": "", "p": 0, "c": "", "f": ["romantic", "quiet", "photo"], "v": "Japanese garden with peacocks", "hours": "Mo-Su 07:30-17:00"}
   ]
 }

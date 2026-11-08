@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>The Plan Committee</title>
 <meta name="description" content="Your friends pick what they want. AI agents argue for each of you in a group chat and agree on one plan for a night out in NYC or London.">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-5vdMYPZP/jPNNh9L+4Trg3FewJDUIPzwK3XvpukH9cA='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https:; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-+OCwdyPCy/pfskjn3a4EpxeHAuoVl43NK7bzyYR5M3w='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https:; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
 <meta name="referrer" content="no-referrer">
 <meta name="theme-color" content="#fbf9f6">
 <link rel="manifest" href="manifest.webmanifest">
@@ -899,7 +899,8 @@ function isOpen(s,date,min){ // true, false, or null when we don't know
   if(!s.hrs)return null;const d=(date.getDay()+6)%7, prev=(d+6)%7;
   return s.hrs[d].some(([a,b])=>min>=a&&min<b)||s.hrs[prev].some(([a,b])=>b>1440&&min+1440<b)}
 function closesAt(s,date,min){if(!s.hrs)return null;const d=(date.getDay()+6)%7, prev=(d+6)%7;
-  const h=s.hrs[d].find(([a,b])=>min>=a&&min<b)||s.hrs[prev].map(([a,b])=>[a-1440,b-1440]).find(([a,b])=>min>=a&&min<b);return h?h[1]:null}
+  const h=s.hrs[d].find(([a,b])=>min>=a&&min<b)||s.hrs[prev].map(([a,b])=>[a-1440,b-1440]).find(([a,b])=>min>=a&&min<b);
+  return !h||h[1]>=1440&&s.hrs[(d+1)%7].some(([a])=>a===0)?null:h[1]}  // open through midnight into the next day (24/7): no closing time to show
 const SLOT={dinner:0,drinks:120,late:210,free:180};  // minutes after the start time
 /* ---- distance ---- */
 function km(a,b){if(a?.lat==null||b?.lat==null)return null;const r=Math.PI/180,dl=(b.lat-a.lat)*r,dn=(b.lon-a.lon)*r;
@@ -918,12 +919,15 @@ async function fetchWeather(date,startMin){WX=null;
     const rain=Math.max(...win.map(k=>+h.precipitation_probability?.[k]||0)),temp=Math.round(+h.temperature_2m?.[i]);
     if(isFinite(rain)&&isFinite(temp))WX={rain:Math.round(rain),temp,bad:rain>=50||temp<40,nice:rain<20&&temp>=62&&temp<=86}}catch(e){}}
 const temp=f=>CITY.units==="c"?`${Math.round((f-32)*5/9)}°C`:`${f}°F`;
+const DAYTIME=/museum|galler|librar|exhibit|book ?(shop|store)|bakery|garden|cemetery|\bzoo\b|botanic|playground/i;  // places that close by evening
+/* closing time at the spot's slot in tonight's plan, so the AI sees it too (null when we don't know) */
+function slotClose(s){const m=plan.start+(SLOT[s.t]||0);return closesAt(s,new Date(nightDate(plan.when).getTime()+Math.floor(m/1440)*864e5),m%1440)}
 const OUTDOOR=s=>s.t==="free"||s.f.includes("rooftop");
 function shortlist(){
   const C=constraints();
   const base=nightDate(plan.when),needs=plan.needs;
   const slotOk=s=>{const m=plan.start+(SLOT[s.t]||0),o=isOpen(s,new Date(base.getTime()+Math.floor(m/1440)*864e5),m%1440);
-    return o!==false&&!(o==null&&s.t==="free"&&!s.cur&&m>=1200)};  // an auto-added free spot with no hours is usually a museum or gallery: not after 8 pm
+    return o!==false&&!(o==null&&!s.cur&&m>=1200&&(s.t==="free"||s.t==="late"&&DAYTIME.test(s.n+" "+s.v)))};  // an auto-added spot with no hours that sounds like a museum, gallery or park: not after 8 pm
   const ok=(s,strict)=>{if(!slotOk(s))return false;if(needs.includes("wheel")&&s.x.includes("nowheel"))return false;
     if(s.p>C.maxB+(strict?0:1))return false;if(!strict)return true;
     if(C.deals.has("wait")&&s.f.includes("wait"))return false;if(C.deals.has("loud")&&s.f.includes("loud"))return false;
@@ -947,7 +951,7 @@ function shortlist(){
   for(let i=list.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[list[i],list[j]]=[list[j],list[i]]}
   return {list,C};
 }
-const spotLine=s=>`${s.n} | ${s.t} | ${s.h} | ${PRICE[s.p]} | ${s.v}${s.x.includes("wheel")?" | wheelchair ok":""}${s.x.includes("vegan")?" | vegan options":""}${s.nw?" | fresh find, nobody has reviewed it yet":""}`;
+const spotLine=s=>{const c=slotClose(s);return `${s.n} | ${s.t} | ${s.h} | ${PRICE[s.p]} | ${s.v}${c!=null?` | open till ${fmtMin(c)}`:""}${s.x.includes("wheel")?" | wheelchair ok":""}${s.x.includes("vegan")?" | vegan options":""}${s.nw?" | fresh find, nobody has reviewed it yet":""}`};
 function norm(s){return (s||"").toLowerCase().replace(/[^a-z0-9]/g,"")}
 function findSpot(n){const k=norm(n);if(!k)return null;return SPOTS.find(s=>norm(s.n)===k)||SPOTS.find(s=>k.includes(norm(s.n))||(norm(s.n).includes(k)&&k.length>4))}
 const stubSpot=n=>({n:str(n,80),t:"dinner",h:"",b:"",p:2,c:"",f:[],v:"",nw:false,pop:0,web:"",x:[],cur:false});  // a shared plan's stop that is no longer in the list: still shown, map search only
@@ -1172,7 +1176,7 @@ async function makePlan(){
   const sys=`You turn a group chat into a final night out plan. Only use places from this list, exact names:\n${SL.list.map(spotLine).join("\n")}\nReturn only JSON.`;
   const user=`${brief()}\n\nGROUP CHAT:\n${chatText()}\n\nReturn JSON exactly like:
 {"title":"a short cute name for the night, max 5 words","stops":[{"time":"7:30 pm","name":"exact place name","en":"only if the name isn't in Latin letters: its English or Latin letter name","note":"why it won, max 12 words"}],"drama":0,"verdict":"one funny sentence about who won the argument"}
-Use 3 stops in order (dinner, drinks, then a late or free stop), ${plan.move==="transit"?`each within about 20 minutes by ${transitName()} of the one before, close to a station`:plan.move==="car"?"each within about 20 minutes by car or cab of the one before":"all on foot: each within about a 15 minute walk of the one before, no transit"}, first stop at ${fmtMin(plan.start)}, realistic ${CITY.short} times${SL.C.early?", ending by 10:30 pm":""}. drama is 0 to 100 for how much they fought.`;
+Use 3 stops in order (dinner, drinks, then a late or free stop), ${plan.move==="transit"?`each within about 20 minutes by ${transitName()} of the one before, close to a station`:plan.move==="car"?"each within about 20 minutes by car or cab of the one before":"all on foot: each within about a 15 minute walk of the one before, no transit"}, first stop at ${fmtMin(plan.start)}, realistic ${CITY.short} times${SL.C.early?", ending by 10:30 pm":""}. Every stop must be open at its time: if the list says "open till", arrive at least an hour before that. drama is 0 to 100 for how much they fought.`;
   let res;try{res=await llm(sys,user,true)}finally{hideTyping()}
   const p=parseJSON(res.text);
   p.stops=(p.stops||[]).map(s=>({...s,spot:findSpot(s.name)})).filter(s=>s.spot).slice(0,4)
