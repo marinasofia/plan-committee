@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>The Plan Committee</title>
 <meta name="description" content="Your friends pick what they want. AI agents argue for each of you in a group chat and agree on one plan for a night out in NYC or London.">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-kLy4CsvVZTy4RXGbTdkFDD03W7//lBZwd8ruyPSh0+A='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https:; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-5vdMYPZP/jPNNh9L+4Trg3FewJDUIPzwK3XvpukH9cA='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https:; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
 <meta name="referrer" content="no-referrer">
 <meta name="theme-color" content="#fbf9f6">
 <link rel="manifest" href="manifest.webmanifest">
@@ -236,7 +236,7 @@ button,input,select,textarea{font:inherit;color:inherit}
     </details>
 
     <button class="cta" id="startBtn" type="button">Start the group chat</button>
-    <p class="small">Places from hand picks, Overture Maps Foundation, NYC Open Data and © OpenStreetMap contributors. Weather by Open-Meteo. Check hours before you go.</p>
+    <p class="small">Places from hand picks, Overture Maps Foundation, <span id="nycSrc">NYC Open Data </span>and © OpenStreetMap contributors. Weather by Open-Meteo. Check hours before you go.</p>
     <p class="small" id="keyHint">No AI key yet? You'll see a demo first. <a href="#" id="keyLink">Add a free key</a> (1 minute) or one you already have to turn on the real AI.</p>
     <p class="small">Keys and picks stay on this device and go only to the AI you chose. Google's free Gemini tier may use prompts to improve its models.</p>
     <p class="small" id="installHint" style="display:none"><a href="#" id="installLink">Install the app</a> so it opens like an app and keeps your key.</p>
@@ -702,12 +702,13 @@ function renderSetup(){
   $("startAt").innerHTML=STARTS.map(m=>`<option value="${m}" ${m===plan.start?"selected":""}>starts ${fmtMin(m)}</option>`).join("");
   chips("needChips",NEEDS,v=>plan.needs.includes(v),v=>{plan.needs=tog(plan.needs,v);savePlan()});
   chips("hoodChips",HOODS,v=>plan.hood===v,v=>{plan.hood=v;savePlan();moreSum()});
-  chips("cityChips",[...CITY_LIST.map(c=>[c.name,c.id]),...(CITY.geo?[[CITY.name,CITY.id]]:[]),["Somewhere else","+"]],v=>v==="+"?$("geoRow").style.display==="":CITY.id===v,async v=>{
+  chips("cityChips",[...CITY_LIST.map(c=>[c.name,c.id]),...(CITY.geo?[[CITY.name,CITY.id]]:[]),["Somewhere else","+"]],v=>{const open=$("geoRow").style.display==="";return v==="+"?open:!open&&CITY.id===v},async v=>{
     if(v==="+"){const r=$("geoRow");r.style.display=r.style.display?"":"none";if(!r.style.display)$("geoInput").focus();return}
-    if(v===CITY.id)return;await loadCity(v).catch(e=>say(e.message));plan.city=CITY.id;plan.hood="Anywhere";savePlan();renderSetup()});
+    $("geoRow").style.display="none";if(v===CITY.id)return;await loadCity(v).catch(e=>say(e.message));plan.city=CITY.id;plan.hood="Anywhere";savePlan();renderSetup()});
   $("addForm").style.display=plan.members.length>=6?"none":"";
-  $("startBtn").textContent=`Start the chat (${plan.members.length} agents${plan.wallet?" + The Wallet":""})`;  // short enough for one line on a 360px phone
+  $("startBtn").textContent=`Start the chat (${plan.members.length} agent${plan.members.length===1?"":"s"}${plan.wallet?" + The Wallet":""})`;  // short enough for one line on a 360px phone
   $("keyHint").style.display=providers().length||MOCK?"none":"";
+  $("nycSrc").hidden=CITY.id!=="nyc";
   renderHead();
 }
 document.querySelectorAll("#modeSeg button").forEach(b=>b.onclick=()=>{if(plan.mode===b.dataset.mode)return;plan.mode=b.dataset.mode;savePlan();renderSetup()});
@@ -1221,7 +1222,7 @@ function renderTicket(p,names,count){
   const d=document.createElement("div");d.className="ticket";
   const drama=Math.max(0,Math.min(100,parseInt(p.drama)||0));
   d.innerHTML=`<div class="top"><div class="eyebrow">the plan · ${esc(p.when||plan.when)}</div><h2>${esc(p.title||"The Plan")}</h2>
-    <div class="when">${names.map(esc).join(" · ")} · agreed after ${count} messages</div></div>
+    <div class="when">${names.map(esc).join(" · ")} · agreed after ${count} message${count===1?"":"s"}</div></div>
     <div class="perf"></div>
     <div class="stops">${p.stops.map((s,i)=>`${i?`<div class="hop">${esc(travel(p.stops[i-1].spot,s.spot))}</div>`:""}<div class="stop"><div class="tm">${esc(s.time||"")}</div><div><div class="nm">${esc(stopName(s))}</div>${stopName(s)!==s.spot.n?`<div class="loc">${esc(s.spot.n)}</div>`:nonLatin(s.spot.n)&&s.spot.v?`<div class="loc">${esc(s.spot.v)}</div>`:""}
       <div class="meta">${esc([s.spot.h,PRICE[s.spot.p]].filter(Boolean).join(" · "))}${esc(stopInfo(s,p))}</div>${s.note?`<div class="why">${esc(s.note)}</div>`:""}
@@ -1366,6 +1367,12 @@ $("newBtn").onclick=async()=>{if(busy)return;await ownCity();REPLAY=null;$("app"
 let mi=0,speaker=null,demo=null;const mockUsed=new Set();
 /* the demo picks its plan first, so the chat argues about the places that end up in it */
 function demoPick(){if(demo.stops)return demo;
+  const hv=[...transcript].reverse().find(m=>m.ai==null&&/final say/.test(m.who||"")),sw=lastPlan&&/^veto: swap (.+)\. pick something else for that stop$/.exec(hv?.text||"");
+  if(sw&&lastPlan.stops.length===3){const cur=lastPlan.stops.map(x=>SL.list.find(s=>s.n===x.spot.n)||x.spot),j=cur.findIndex(s=>s.n===sw[1]);  // a swap changes only that stop, like the real planner
+    const types=[["dinner"],["drinks"],["late","free"]][j]||[],keep=cur.filter((_,q)=>q!==j),dist=s=>keep.reduce((n,c)=>n+(km(c,s)??9),0),
+      pick=SL.list.filter(s=>types.includes(s.t)&&!cur.some(c=>c.n===s.n)).sort((x,y)=>dist(x)-dist(y))[0];
+    if(pick){cur[j]=pick;const [d,k,l]=cur,stops=[...new Set(cur)],decoys=SL.list.filter(s=>!stops.includes(s)).sort(()=>Math.random()-.5).slice(0,2);
+      return Object.assign(demo,{d,k,l,stops,decoys:decoys.length?decoys:stops})}}
   const of=(...t)=>SL.list.filter(s=>t.includes(s.t)),near=(from,list)=>list.slice().sort((x,y)=>(km(from,x)??99)-(km(from,y)??99))[0],
     trip=d=>{const k=near(d,of("drinks").filter(s=>s!==d))||d,l=near(k,of("late","free").filter(s=>s!==d&&s!==k))||k;return {d,k,l,far:(km(d,k)??9)+(km(k,l)??9)}},
     was=lastPlan?.stops.map(s=>s.spot.n)||[],all=(of("dinner").length?of("dinner"):SL.list).map(trip).sort((x,y)=>x.far-y.far),
