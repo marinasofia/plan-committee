@@ -58,7 +58,7 @@ class ParseHours(unittest.TestCase):
         self.assertEqual(b.parse_hours("Fr 20:00+")[4], [[1200, 1500]])
 
     def test_unknown_forms_return_none(self):
-        for oh in ("", None, "sunrise-sunset", "Mo-Fr 11:00-23:00; Dec 25 off", "x" * 301, "Mo-Su off"):
+        for oh in ("", None, "sunrise-sunset", "Mo-Su 12:00-12:00", "Mo-Fr 11:00-23:00; Dec 25 off", "x" * 301, "Mo-Su off"):
             self.assertIsNone(b.parse_hours(oh), oh)
 
 
