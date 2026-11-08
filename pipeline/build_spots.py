@@ -307,6 +307,41 @@ def fetch_neighborhoods() -> Locate:
     return locate
 
 
+PLACE_QUERY = '[out:json][timeout:120];node["place"~"^(town|suburb|quarter|neighbourhood)$"]["name"](BBOX);out;'
+
+
+def fetch_place_names(city: dict) -> Locate | None:
+    """Cities without official neighborhood shapes: name a spot after the nearest OSM town, suburb or quarter (within 2 km),
+    else the nearest neighbourhood (within 1 km). The AI's guess was wrong for about a quarter of London.
+    Returns None when OSM has too few place names, so the AI's guess stays as the fallback."""
+    bbox = ",".join(str(x) for x in city["bbox"])
+    data = urllib.parse.urlencode({"data": PLACE_QUERY.replace("BBOX", bbox)}).encode()
+    try:
+        els = get_json(OVERPASS, data=data, timeout=180).get("elements", [])
+    except Exception as e:  # noqa: BLE001
+        log(f"place names: skipped ({str(e)[:120]})")
+        return None
+    return place_locator([(e["tags"]["name"], e["tags"].get("place", ""), e["lat"], e["lon"])
+                          for e in els if e.get("lat") and (e.get("tags") or {}).get("name")])
+
+
+def place_locator(places: list[tuple[str, str, float, float]]) -> Locate | None:
+    big = [p for p in places if p[1] in ("town", "suburb", "quarter")]
+    small = [p for p in places if p[1] == "neighbourhood"]
+    log(f"place names: {len(big)} towns, suburbs and quarters, {len(small)} neighbourhoods")
+    if len(big) + len(small) < 30:
+        return None
+
+    def nearest(lat: float, lon: float, pool: list, limit: float) -> str:
+        best = min(pool, key=lambda p: km((lat, lon), (p[2], p[3])), default=None)
+        return best[0][:30] if best and km((lat, lon), (best[2], best[3])) <= limit else ""
+
+    def locate(lat: float, lon: float) -> tuple[str, str]:
+        return "", nearest(lat, lon, big, 2.0) or nearest(lat, lon, small, 1.0)
+    locate.count = len(big) + len(small)
+    return locate
+
+
 OSM_SKIP_CUISINE = re.compile(r"coffee|sandwich|bubble_tea|donut|juice|bagel|kebab|fried_chicken|burger|chicken", re.I)
 
 
@@ -690,6 +725,10 @@ def build_city(city: dict, cache: dict, stats: dict, max_batches: int) -> None:
     if len(osm) < 500 or (src.get("restaurants") and len(insp) < 1000) or (locate and locate.count < 150):
         raise RuntimeError(f"source data looks incomplete (osm {len(osm)}, inspections {len(insp)}); keeping the old spots")
     cands = build_candidates(city, insp, osm, curated, locate)
+    named = None if locate else fetch_place_names(city)
+    if named:  # official shapes win where a city has them; elsewhere the nearest OSM place name beats the AI's guess
+        for c in cands.values():
+            c["hood"] = named(c["lat"], c["lon"])[1]
     tag_new(cands, cache, city, max_batches)
     save_cache(cache)
 

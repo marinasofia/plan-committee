@@ -14,13 +14,13 @@
   "hoods": [
     {"label": "Soho", "match": ["Soho"]},
     {"label": "Covent Garden", "match": ["Covent Garden"]},
-    {"label": "Shoreditch", "match": ["Shoreditch"]},
+    {"label": "Shoreditch", "match": ["Shoreditch", "Hoxton", "Haggerston"]},
     {"label": "Mayfair", "match": ["Mayfair"]},
-    {"label": "South Bank", "match": ["South Bank"]},
-    {"label": "Camden", "match": ["Camden"]},
-    {"label": "Notting Hill", "match": ["Notting Hill"]},
-    {"label": "Islington", "match": ["Islington"]},
-    {"label": "Peckham", "match": ["Peckham"]}
+    {"label": "South Bank", "match": ["South Bank", "Waterloo", "Bankside"]},
+    {"label": "Camden", "match": ["Camden", "Chalk Farm", "Kentish Town", "Primrose Hill"]},
+    {"label": "Notting Hill", "match": ["Notting Hill", "Westbourne", "Ladbroke Grove"]},
+    {"label": "Islington", "match": ["Islington", "Angel", "Highbury", "Barnsbury", "Canonbury"]},
+    {"label": "Peckham", "match": ["Peckham", "Nunhead"]}
   ],
   "picks": [
     {"n": "Dishoom Covent Garden", "t": "dinner", "h": "Covent Garden", "b": "", "p": 2, "c": "asian", "f": ["loud", "wait", "photo"], "v": "Bombay cafe, black daal and chai", "lat": 51.51243, "lon": -0.12686},
