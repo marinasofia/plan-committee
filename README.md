@@ -1,10 +1,10 @@
-<p align="center"><img src="og.png" alt="The Plan Committee: AI agents argue in a group chat and agree on one NYC plan" width="720"></p>
+<p align="center"><img src="og.png" alt="The Plan Committee: AI agents argue in a group chat and agree on one real plan" width="720"></p>
 
 <h1 align="center">The Plan Committee</h1>
 
 <p align="center">
   Everyone picks what they want. Each person gets an AI agent that fights for them in a group chat.<br>
-  They agree on one real NYC plan: dinner, drinks, something after.
+  They agree on one real plan in New York, London or almost any city: dinner, drinks, something after.
 </p>
 
 <p align="center">
@@ -20,18 +20,25 @@
 
 ## What it does
 
-<img src="docs/setup.png" alt="Setup screen" width="300" align="right">
+<img src="docs/demo.gif" alt="The demo: agents argue in a group chat, then the plan ticket appears" width="300" align="right">
 
 * **Date night or friends night.** Add your people, or send an invite link to the group chat so everyone picks on their own phone. Friends never need a key or an account.
 * **Your people, saved.** Send friends a profile link: 6 quick taps and their taste and agent personality are saved on your phone. Next time you just tap who's coming.
 * **Agents with personalities.** Dramatic, stubborn, chill, the mediator, chaotic. An optional Wallet agent guards the budget.
-* **Any city.** Pick "Somewhere else" and type any city. Over 650 cities load instantly from open place lists built every month from [Overture Maps](https://overturemaps.org), and anywhere else comes live from OpenStreetMap. New York and London also have curated packs refreshed daily, and adding yours is one command and one pull request ([how](CONTRIBUTING.md)).
-* **Real places only.** 153 hand picked spots (125 in New York, 28 in London), plus 1,325 more tagged from NYC Open Data and OpenStreetMap, refreshed every day. Closed restaurants drop out on their own.
-* **A plan you can use.** Map, website, reserve (straight to Resy or OpenTable when we know the page), add to calendar, share the whole argument as a replay link.
+* **Any city.** Pick "Somewhere else" and type any city. 475 cities load instantly from open place lists built every month from [Overture Maps](https://overturemaps.org), and anywhere else comes live from OpenStreetMap. New York and London also have curated packs refreshed daily, and adding yours is one command and one pull request ([how](CONTRIBUTING.md)).
+* **Real places only.** 153 hand picked spots (125 in New York, 28 in London), plus 4,219 more tagged from NYC Open Data and OpenStreetMap, refreshed every day. Closed restaurants drop out on their own.
+* **A night that works.** Stops stay close together for how you get around (on foot, transit or car), and every stop is checked to be open at its time. Museums and theatres with unknown hours never show up late at night.
+* **A plan you can use.** Map, website, reserve (straight to Resy or OpenTable when we know the page), a route in your travel mode, add to calendar, share the whole argument as a replay link.
 * **Your AI, your key.** Bring a free Gemini, Groq or OpenRouter key, or point it at any OpenAI compatible API. The key stays in your browser and is sent only to the provider you chose.
 * **Installable.** Add it to your home screen and it opens like an app.
 
 <br clear="right">
+
+<p align="center">
+  <img src="docs/setup.png" alt="Setup: city, date or friends night, getting around, the committee" width="260">
+  <img src="docs/chat.png" alt="The agents arguing in the group chat" width="260">
+  <img src="docs/plan.png" alt="The final plan: three stops with walking times, map, reserve and route" width="260">
+</p>
 
 ## Why I built it
 
@@ -39,9 +46,10 @@ Picking a place for six people takes longer than the dinner itself. I wanted to 
 
 ## By the numbers
 
-* 2 cities: New York and London ([`cities/index.json`](cities/index.json)).
+* 2 curated cities: New York and London ([`cities/index.json`](cities/index.json)).
+* 475 more cities ready to plan from the monthly Overture build, out of 651 on the list ([`places/cities.json`](places/cities.json)). The other 176 have under 40 places and use OpenStreetMap live.
 * 153 hand picked spots: 125 in New York, 28 in London (`picks` in [`cities/*/city.json`](cities)).
-* 1,325 more spots tagged by the pipeline: 513 in New York, 812 in London ([`cities/*/spots.json`](cities), built 2026-10-28).
+* 4,219 more spots tagged by the pipeline: 1,839 in New York, 2,380 in London ([`cities/*/spots.json`](cities), built 2026-11-10).
 * 3 open data sources: NYC Open Data, OpenStreetMap and Overture Maps. No scraping.
 * 0 packages in the app and the daily pipeline (Python standard library only). The monthly Overture build uses DuckDB, pinned by hash in its Action.
 * 0 build steps: `index.html` is served as is.
@@ -69,7 +77,10 @@ city.json + spots.json
   makePlan()       one more AI call turns the chat into JSON: title, 3 stops, verdict
         |
         v
-  findSpot()       every stop must match a place on the shortlist, or it is dropped
+  findSpot()       every stop must match a real place, or it is dropped
+        |
+        v
+  tighten()        swaps any stop that is too far for how you get around, or may be closed then
         |
         v
   renderTicket()   map, reserve, calendar and a share link, every string escaped before it hits the page
