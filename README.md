@@ -1,4 +1,4 @@
-<p align="center"><img src="og.png" alt="The Plan Committee: AI agents argue in a group chat and agree on one real plan" width="720"></p>
+<p align="center"><img src="docs/banner.png" alt="The Plan Committee: AI agents argue in a group chat and agree on one real plan" width="720"></p>
 
 <h1 align="center">The Plan Committee</h1>
 
