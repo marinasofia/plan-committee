@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>The Plan Committee</title>
 <meta name="description" content="Your friends pick what they want. AI agents argue for each of you in a group chat and agree on one plan for a night out in NYC or London.">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-4lBg1sm4nFHrwbUgkT43MwAnZqsPqgcj1PoLT7AqbWY='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https:; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-qAY4fALzaO5V5GVNxqwTgtcexD1F1Ioif9ot5w+hoDY='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https:; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
 <meta name="referrer" content="no-referrer">
 <meta name="theme-color" content="#fbf9f6">
 <link rel="manifest" href="manifest.webmanifest">
@@ -920,15 +920,16 @@ async function fetchWeather(date,startMin){WX=null;
     const rain=Math.max(...win.map(k=>+h.precipitation_probability?.[k]||0)),temp=Math.round(+h.temperature_2m?.[i]);
     if(isFinite(rain)&&isFinite(temp))WX={rain:Math.round(rain),temp,bad:rain>=50||temp<40,nice:rain<20&&temp>=62&&temp<=86}}catch(e){}}
 const temp=f=>CITY.units==="c"?`${Math.round((f-32)*5/9)}°C`:`${f}°F`;
-const DAYTIME=/museum|galler|librar|exhibit|book ?(shop|store)|bakery|garden|cemetery|\bzoo\b|botanic|playground/i;  // places that close by evening
+const DAYTIME=/museum|galler|librar|exhibit|book ?(shop|store)|bakery|garden|cemetery|\bzoo\b|botanic|playground|theat(re|er)|\bopera\b|ballet|concert hall|performing arts|lecture|cultural cent|aquarium/i;  // places that close by evening, or whose shows start by 8
+/* closed at that time, or an auto-added spot with no hours that sounds like a museum, theatre or park after 8 pm: we can't be sure it's open */
+const shut=(s,date,m)=>{const o=isOpen(s,date,m%1440);return o===false||o==null&&!s.cur&&m>=1200&&(s.t==="free"||s.t==="late"&&DAYTIME.test(s.n+" "+s.v))};
 /* closing time at the spot's slot in tonight's plan, so the AI sees it too (null when we don't know) */
 function slotClose(s){const m=plan.start+(SLOT[s.t]||0);return closesAt(s,new Date(nightDate(plan.when).getTime()+Math.floor(m/1440)*864e5),m%1440)}
 const OUTDOOR=s=>s.t==="free"||s.f.includes("rooftop");
 function shortlist(){
   const C=constraints();
   const base=nightDate(plan.when),needs=plan.needs;
-  const slotOk=s=>{const m=plan.start+(SLOT[s.t]||0),o=isOpen(s,new Date(base.getTime()+Math.floor(m/1440)*864e5),m%1440);
-    return o!==false&&!(o==null&&!s.cur&&m>=1200&&(s.t==="free"||s.t==="late"&&DAYTIME.test(s.n+" "+s.v)))};  // an auto-added spot with no hours that sounds like a museum, gallery or park: not after 8 pm
+  const slotOk=s=>{const m=plan.start+(SLOT[s.t]||0);return !shut(s,new Date(base.getTime()+Math.floor(m/1440)*864e5),m)};
   const ok=(s,strict)=>{if(!slotOk(s))return false;if(needs.includes("wheel")&&s.x.includes("nowheel"))return false;
     if(s.p>C.maxB+(strict?0:1))return false;if(!strict)return true;
     if(C.deals.has("wait")&&s.f.includes("wait"))return false;if(C.deals.has("loud")&&s.f.includes("loud"))return false;
@@ -1193,14 +1194,16 @@ Use 3 stops in order (dinner, drinks, then a late or free stop), each one a plac
   track("pick",p.stops.map(s=>s.spot.n));
   return p;
 }
-/* a leg too long for how the group gets around: swap the later stop for the closest open shortlisted place of the same kind, like a veto swap */
+/* a leg too long for how the group gets around, or a stop that may be shut at its time: swap that stop for the closest open shortlisted place of the same kind, like a veto swap */
 const LEG_KM={walk:1.25,transit:6,car:10};  // about 20 min on foot, 25 by transit, 27 by car (see travel())
 function tighten(p){const lim=LEG_KM[plan.move]||LEG_KM.walk,base=nightDate(p.when||plan.when),kind=t=>t==="free"?"late":t;
-  for(let i=1;i<p.stops.length;i++){const st=p.stops[i],prev=p.stops[i-1].spot,leg=km(prev,st.spot);if(leg==null||leg<=lim)continue;
-    const t=parseTime(st.time,base),m=t.getHours()*60+t.getMinutes(),keep=p.stops.filter((_,q)=>q!==i).map(x=>x.spot),
+  for(let i=0;i<p.stops.length;i++){const st=p.stops[i],t=parseTime(st.time,base),m=t.getHours()*60+t.getMinutes()+(t.getDate()!==base.getDate()?1440:0),
+      prev=i?p.stops[i-1].spot:null,leg=i?km(prev,st.spot)??0:0,far=leg>lim,closed=shut(st.spot,t,m);if(!far&&!closed)continue;
+    const keep=p.stops.filter((_,q)=>q!==i).map(x=>x.spot),
       dist=s=>keep.reduce((n,c)=>n+(km(c,s)??9),0),
-      pick=SL.list.filter(s=>kind(s.t)===kind(st.spot.t)&&!p.stops.some(x=>x.spot.n===s.n)&&isOpen(s,t,m)!==false&&(km(prev,s)??99)<leg).sort((x,y)=>((km(prev,x)??99)>lim)-((km(prev,y)??99)>lim)||dist(x)-dist(y))[0];  // one within the limit first
-    if(pick)p.stops[i]={...st,spot:pick,name:pick.n,en:"",note:"the planner swapped this in, closer to the last stop"}}}
+      pick=SL.list.filter(s=>kind(s.t)===kind(st.spot.t)&&!p.stops.some(x=>x.spot.n===s.n)&&!shut(s,t,m)&&(!far||(km(prev,s)??99)<leg)).sort((x,y)=>(i&&((km(prev,x)??99)>lim)-((km(prev,y)??99)>lim))||dist(x)-dist(y))[0];  // one within the limit first
+    if(pick)p.stops[i]={...st,spot:pick,name:pick.n,en:"",note:closed?"the planner swapped this in, sure to be open then":"the planner swapped this in, closer to the last stop"};
+    else if(closed&&kind(st.spot.t)==="late"&&p.stops.length>1){p.stops.splice(i,1);i--}}}  // nothing open to swap in: drop the late stop rather than send people to a dark door; dinner and drinks stay with the "may be closed" note
 function parseJSON(t){t=t.replace(/```json|```/g,"").trim();try{return JSON.parse(t)}catch(e){const m=t.match(/\{[\s\S]*\}/);if(m)return JSON.parse(m[0]);throw new Error("Couldn't read the plan. Try again.")}}
 
 /* ===================== chat rendering ===================== */
