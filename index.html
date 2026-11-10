@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>The Plan Committee</title>
 <meta name="description" content="Your friends pick what they want. AI agents argue for each of you in a group chat and agree on one plan for a night out in NYC or London.">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-LrA6c8KBER0qLR4SVvqSXXwjf1bhPS2wDCanD6yAKEo='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https:; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-4lBg1sm4nFHrwbUgkT43MwAnZqsPqgcj1PoLT7AqbWY='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https:; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
 <meta name="referrer" content="no-referrer">
 <meta name="theme-color" content="#fbf9f6">
 <link rel="manifest" href="manifest.webmanifest">
@@ -704,7 +704,7 @@ function renderSetup(){
   chips("hoodChips",HOODS,v=>plan.hood===v,v=>{plan.hood=v;savePlan();moreSum()});
   chips("cityChips",[...CITY_LIST.map(c=>[c.name,c.id]),...(CITY.geo?[[CITY.name,CITY.id]]:[]),["Somewhere else","+"]],v=>{const open=$("geoRow").style.display==="";return v==="+"?open:!open&&CITY.id===v},async v=>{
     if(v==="+"){const r=$("geoRow");r.style.display=r.style.display?"":"none";if(!r.style.display)$("geoInput").focus();return}
-    $("geoRow").style.display="none";if(v===CITY.id)return;await loadCity(v).catch(e=>say(e.message));plan.city=CITY.id;plan.hood="Anywhere";savePlan();renderSetup()});
+    $("geoRow").style.display="none";if(v===CITY.id)return;hush();await loadCity(v).catch(e=>say(e.message));plan.city=CITY.id;plan.hood="Anywhere";savePlan();renderSetup()});
   $("addForm").style.display=plan.members.length>=6?"none":"";
   $("startBtn").textContent=`Start the chat (${plan.members.length} agent${plan.members.length===1?"":"s"}${plan.wallet?" + The Wallet":""})`;  // short enough for one line on a 360px phone
   $("keyHint").style.display=providers().length||MOCK?"none":"";
@@ -714,7 +714,7 @@ function renderSetup(){
 document.querySelectorAll("#modeSeg button").forEach(b=>b.onclick=()=>{if(plan.mode===b.dataset.mode)return;plan.mode=b.dataset.mode;savePlan();renderSetup()});
 document.querySelectorAll("#moveSeg button").forEach(b=>b.onclick=()=>{plan.move=b.dataset.move;savePlan();renderSetup()});
 $("geoForm").onsubmit=async e=>{e.preventDefault();const st=t=>$("geoStatus").textContent=t;if(!$("geoInput").value.trim())return $("geoInput").focus();
-  $("geoGo").disabled=true;
+  $("geoGo").disabled=true;hush();
   try{st("Looking it up…");const id=await resolveCity($("geoInput").value),g=geoParse(id);if(g)st(`Finding places in ${g.name}… the first time can take up to a minute, then it's saved on this phone`);
     await loadCity(id);plan.city=CITY.id;plan.hood="Anywhere";savePlan();$("geoRow").style.display="none";$("geoInput").value="";st("Any city. Places come straight from OpenStreetMap.");renderSetup();
     if(CITY.geo)say(`${SPOTS.length} places around ${CITY.name}, from OpenStreetMap.${providers().length?"":" The demo works here; add your free AI key for the real agents."}`)}
@@ -723,6 +723,7 @@ $("crewName").oninput=()=>{plan.name=str($("crewName").value,30);savePlan();rend
 $("crewBtn").onclick=async()=>{savePlan();const url=baseUrl()+"#c="+await pack({...planPayload(),name:plan.name});
   await shareOut(plan.name,`our crew for planning nights out: tap to save it, then anyone can start the next plan`,url,$("crewBtn"),"Crew link copied")};
 /* setup notice line, optionally with one action button (no browser dialogs) */
+function hush(){const n=$("notice");n.style.display="none";n.textContent=""}
 function say(t,btn,fn){const n=$("notice");n.style.display="";n.textContent=t;if(btn){const b=document.createElement("button");b.type="button";b.className="chip";b.style.marginLeft="8px";b.textContent=btn;b.onclick=fn;n.appendChild(b)}}
 $("crewDel").onclick=()=>{if(Object.keys(crews).length<=1)return say("You need at least one crew.");
   say(`Delete "${plan.name}" from this phone?`,"Delete",async()=>{delete crews[plan.id];store.set("crews",crews);plan=Object.values(crews)[0];fixPlan();savePlan();await ownCity();renderSetup();say("Crew deleted.")})};
@@ -1187,10 +1188,19 @@ Use 3 stops in order (dinner, drinks, then a late or free stop), each one a plac
   p.stops=(p.stops||[]).map(s=>({...s,spot:findSpot(s.name)})).filter(s=>s.spot).slice(0,4)
     .map(s=>({...s,en:nonLatin(s.spot.n)&&typeof s.en==="string"&&!nonLatin(s.en)?s.en.trim().slice(0,80):""}));
   if(!p.stops.length)throw new Error("The agents couldn't agree on real places. Tap + to try again.");
+  tighten(p);
   if(!scripted()){hist=[...hist,...p.stops.map(s=>s.spot.n)].slice(-60);store.set("hist",hist)}  // demo picks never steer real runs
   track("pick",p.stops.map(s=>s.spot.n));
   return p;
 }
+/* a leg too long for how the group gets around: swap the later stop for the closest open shortlisted place of the same kind, like a veto swap */
+const LEG_KM={walk:1.25,transit:6,car:10};  // about 20 min on foot, 25 by transit, 27 by car (see travel())
+function tighten(p){const lim=LEG_KM[plan.move]||LEG_KM.walk,base=nightDate(p.when||plan.when),kind=t=>t==="free"?"late":t;
+  for(let i=1;i<p.stops.length;i++){const st=p.stops[i],prev=p.stops[i-1].spot,leg=km(prev,st.spot);if(leg==null||leg<=lim)continue;
+    const t=parseTime(st.time,base),m=t.getHours()*60+t.getMinutes(),keep=p.stops.filter((_,q)=>q!==i).map(x=>x.spot),
+      dist=s=>keep.reduce((n,c)=>n+(km(c,s)??9),0),
+      pick=SL.list.filter(s=>kind(s.t)===kind(st.spot.t)&&!p.stops.some(x=>x.spot.n===s.n)&&isOpen(s,t,m)!==false&&(km(prev,s)??99)<leg).sort((x,y)=>((km(prev,x)??99)>lim)-((km(prev,y)??99)>lim)||dist(x)-dist(y))[0];  // one within the limit first
+    if(pick)p.stops[i]={...st,spot:pick,name:pick.n,en:"",note:"the planner swapped this in, closer to the last stop"}}}
 function parseJSON(t){t=t.replace(/```json|```/g,"").trim();try{return JSON.parse(t)}catch(e){const m=t.match(/\{[\s\S]*\}/);if(m)return JSON.parse(m[0]);throw new Error("Couldn't read the plan. Try again.")}}
 
 /* ===================== chat rendering ===================== */
@@ -1220,7 +1230,7 @@ const BOOKING=/^https:\/\/(www\.)?(resy\.com|opentable\.com|exploretock\.com|sev
 const reserve=s=>BOOKING.test(s.rsv||"")?esc(s.rsv):"https://www.google.com/search?q="+encodeURIComponent(`${s.n} ${s.h||""} ${CITY.name} reservation`.replace(/\s+/g," "));
 function routeUrl(stops){const q=s=>encodeURIComponent(placeQ(s.spot));
   let u="https://www.google.com/maps/dir/?api=1&origin="+q(stops[0])+"&destination="+q(stops[stops.length-1]);
-  if(stops.length>2)u+="&waypoints="+stops.slice(1,-1).map(q).join("%7C");return u}
+  if(stops.length>2)u+="&waypoints="+stops.slice(1,-1).map(q).join("%7C");return u+"&travelmode="+({walk:"walking",transit:"transit",car:"driving"})[plan.move]}
 function stopInfo(s,p){const base=nightDate(p.when||plan.when),t=parseTime(s.time,base),m=t.getHours()*60+t.getMinutes();
   const open=isOpen(s.spot,t,m),until=open?closesAt(s.spot,t,m):null,bits=[];
   if(open===false)bits.push("may be closed then, check hours");else if(until!=null)bits.push(`open till ${fmtMin(until)}`);
