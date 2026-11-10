@@ -1,4 +1,4 @@
-<p align="center"><img src="og.png" alt="The Plan Committee: AI agents argue in a group chat and agree on one real plan" width="720"></p>
+<p align="center"><img src="docs/banner.png" alt="The Plan Committee: AI agents argue in a group chat and agree on one real plan" width="720"></p>
 
 <h1 align="center">The Plan Committee</h1>
 
@@ -20,8 +20,6 @@
 
 ## What it does
 
-<img src="docs/demo.gif" alt="The demo: agents argue in a group chat, then the plan ticket appears" width="300" align="right">
-
 * **Date night or friends night.** Add your people, or send an invite link to the group chat so everyone picks on their own phone. Friends never need a key or an account.
 * **Your people, saved.** Send friends a profile link: 6 quick taps and their taste and agent personality are saved on your phone. Next time you just tap who's coming.
 * **Agents with personalities.** Dramatic, stubborn, chill, the mediator, chaotic. An optional Wallet agent guards the budget.
@@ -32,11 +30,9 @@
 * **Your AI, your key.** Bring a free Gemini, Groq or OpenRouter key, or point it at any OpenAI compatible API. The key stays in your browser and is sent only to the provider you chose.
 * **Installable.** Add it to your home screen and it opens like an app.
 
-<br clear="right">
-
 <p align="center">
   <img src="docs/setup.png" alt="Setup: city, date or friends night, getting around, the committee" width="260">
-  <img src="docs/chat.png" alt="The agents arguing in the group chat" width="260">
+  <img src="docs/demo.gif" alt="The demo: agents argue in a group chat, then the plan ticket appears" width="260">
   <img src="docs/plan.png" alt="The final plan: three stops with walking times, map, reserve and route" width="260">
 </p>
 
