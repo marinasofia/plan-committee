@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>The Plan Committee</title>
 <meta name="description" content="Your friends pick what they want. AI agents argue for each of you in a group chat and agree on one plan for a night out in NYC or London.">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-cM+Je4EfDozPPIr3LO5L0bCF0WAZqNayI2ggcnqWIJY='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https:; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-/eUgdP1CuFQJA6Q1OrKpZw0NOQVFeTkoNR/c1CX993o='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https:; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
 <meta name="referrer" content="no-referrer">
 <meta name="theme-color" content="#fbf9f6">
 <link rel="manifest" href="manifest.webmanifest">
@@ -188,7 +188,7 @@ button,input,select,textarea{font:inherit;color:inherit}
     <div class="stack" id="stack"></div>
     <div class="t"><h1 id="title">date night committee</h1><p id="subtitle">AI agents · 1 plan · 0 chill</p></div>
     <button class="keypill" id="keyPill" type="button" style="display:none">Free AI key</button>
-    <button class="iconbtn" id="newBtn" title="New plan"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
+    <button class="iconbtn" id="newBtn" title="Main menu: change settings or start over" aria-label="Main menu"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></button>
     <button class="iconbtn" id="gearBtn" title="AI settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></svg></button>
   </div>
 
@@ -622,8 +622,9 @@ let plan=store.get("plan",null)||defaultPlan(params.get("mode")==="girls"?"girls
 /* plans also arrive from share links, so clamp the fields we compute with */
 /* members also arrive in links from strangers: keep only the fields we use, with the right types */
 function cleanMembers(list,max=6){const seen=new Set(),uniq=m=>{if(seen.has(m.id))m.id=uid();seen.add(m.id);return m};const arr=v=>Array.isArray(v)?v.filter(x=>typeof x==="string").map(x=>x.slice(0,30)).slice(0,20):[];
-  return (Array.isArray(list)?list:[]).slice(0,max).filter(m=>m&&typeof m==="object").map(m=>({id:str(String(m.id??uid()),16),n:str(m.n,30),c:arr(m.c),v:arr(m.v),m:arr(m.m),
-    d:arr(m.d).map(x=>x==="onlyM"?"only:M":x==="onlyBK"?"only:BK":x),b:[1,2,3,4].includes(m.b)?m.b:2,ps:Object.hasOwn(PERS,m.ps)?m.ps:"chill",pk:m.pk===true||(m.pk===undefined&&Object.hasOwn(PERS,m.ps)&&m.ps!=="surprise me"),q:str(m.q,90)})).map(uniq)}
+  const only=(v,ok)=>arr(v).filter(x=>ok.includes(x)),MUST_KEYS=MUSTS.map(([,k])=>k),DEAL_OK=x=>["wait","loud","cash","early"].includes(x)||/^only:[A-Za-z]{1,4}$/.test(x);  // links come from strangers: only values the app offers reach the AI
+  return (Array.isArray(list)?list:[]).slice(0,max).filter(m=>m&&typeof m==="object").map(m=>({id:str(String(m.id??uid()),16),n:str(m.n,30),c:only(m.c,CRAVINGS),v:only(m.v,VIBES),m:only(m.m,MUST_KEYS),
+    d:arr(m.d).map(x=>x==="onlyM"?"only:M":x==="onlyBK"?"only:BK":x).filter(DEAL_OK),b:[1,2,3,4].includes(m.b)?m.b:2,ps:Object.hasOwn(PERS,m.ps)?m.ps:"chill",pk:m.pk===true||(m.pk===undefined&&Object.hasOwn(PERS,m.ps)&&m.ps!=="surprise me"),q:str(m.q,90)})).map(uniq)}
 function fixPlan(){plan.hood=str(plan.hood,30)||"Anywhere";if(typeof plan.id!=="string"||!CREW_ID.test(plan.id))plan.id=uid();plan.name=str(plan.name,30)||(plan.mode==="girls"?"Friends night":"Date night");plan.when=String(plan.when??"Saturday night").slice(0,60)||"Saturday night";plan.start=STARTS.includes(+plan.start)?+plan.start:1140;plan.needs=(Array.isArray(plan.needs)?plan.needs:[]).filter(v=>NEEDS.some(n=>n[1]===v));
   plan.city=cityOk(plan.city)?plan.city:"nyc";plan.move=TRAVEL.includes(plan.move)?plan.move:plan.move==="ride"?"transit":"walk";
   plan.members=cleanMembers(plan.members);
@@ -795,7 +796,7 @@ async function unpack(str){if(str.length>MAX_LINK)throw new Error("link too big"
   const raw=new Uint8Array(total);let o=0;for(const v of parts){raw.set(v,o);o+=v.length}
   return JSON.parse(new TextDecoder().decode(raw))}
 const baseUrl=()=>location.href.split("#")[0].split("?")[0];
-const planPayload=()=>({id:plan.id,city:plan.city,mode:plan.mode,when:plan.when,start:plan.start,needs:plan.needs,hood:plan.hood,wallet:plan.wallet,move:plan.move,members:plan.members});
+const planPayload=()=>({id:plan.id,city:plan.city,mode:plan.mode,when:plan.when,start:plan.start,needs:plan.needs,hood:plan.hood,wallet:plan.wallet,move:plan.move,members:plan.members.map(({q,...m})=>m)});  // never the private notes: everyone with the link would see them
 async function shareOut(title,text,url,btn,label,quiet){
   if(location.protocol==="file:")sys("Heads up: links only open for friends once this page is hosted online, like on Cloudflare Pages.");
   try{if(navigator.share){await navigator.share({title,text,url});return}}catch(e){if(e.name==="AbortError")return}
@@ -816,7 +817,7 @@ function openJoin(P){
 async function finishJoin(me){
   store.set("me",me);
   const P=joinCtx.P;P.members=[...P.members.filter((m,i)=>!(m.id===me.id||(i>0&&same(m,me)))).slice(0,5),me];  // replaces the name the planner typed for you; never dropped from a full plan
-  const url=baseUrl()+"#r="+await pack(P);
+  const url=baseUrl()+"#r="+await pack({...P,members:P.members.map(({q,...m})=>m)});  // notes stay on this phone
   $("editor").classList.add("hide");$("setup").classList.add("hide");
   chatEl.innerHTML="";$("composer").classList.add("off");  // nothing to say here: the chat runs on the planner's phone
   const ag=P.members.map((m,i)=>({...m,color:COLORS[i%COLORS.length]}));if(P.wallet)ag.push({n:"The Wallet",color:WALLET_COLOR});  // the planner's committee, not this phone's
@@ -893,7 +894,8 @@ function mergeReply(P){
   P.members=cleanMembers(P.members);
   if(plan.id!==P.id){if(typeof P.id==="string"&&Object.hasOwn(crews,P.id))useCrew(P.id);else if(importCrew(P)==="full")throw new Error("You have 12 crews. Delete one first.")}
   const before=new Set(plan.members.map(m=>m.id));
-  for(const m of P.members){const i=plan.members.findIndex((x,j)=>x.id===m.id||(j>0&&same(x,m)));if(i<0)plan.members.push(m);else plan.members[i]=m}  // a friend the planner typed by name gets their picks, not a twin
+  for(const m of P.members){const i=plan.members.findIndex((x,j)=>x.id===m.id||(j>0&&same(x,m)));if(i===0)continue;  // a link never rewrites the planner's own profile
+    m.q=i>0?plan.members[i].q:"";if(i<0)plan.members.push(m);else plan.members[i]=m}  // a friend the planner typed by name gets their picks, not a twin; notes stay the planner's own
   plan.members=plan.members.slice(0,6);remember(P.members.filter(m=>!before.has(m.id)));savePlan();
   return P.members.filter(m=>!before.has(m.id)).map(m=>m.n);
 }
@@ -1009,9 +1011,9 @@ async function groqModel(){
   return groqPick=ids[0];
 }
 async function openaiCall(base,key,model,system,user,json,name){
-  const r=await fetch(`${base}/chat/completions`,{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+key},
+  const r=await fetch(`${base}/chat/completions`,{method:"POST",signal:aiSignal(),headers:{"Content-Type":"application/json","Authorization":"Bearer "+key},
     body:JSON.stringify({model,temperature:json?0.4:1,messages:[{role:"system",content:system},{role:"user",content:user}],...(json?{response_format:{type:"json_object"}}:{})})})
-    .catch(()=>{throw new PErr("net",`Can't reach ${name}`)});
+    .catch(netErr(`Can't reach ${name}`));
   if(!r.ok){let m="";try{const j=await r.json();m=j.error?.message||""}catch(e){}
     if(r.status===401||r.status===403)throw new PErr("auth",`${name} key didn't work`);
     if(r.status===429||r.status>=500)throw new PErr("quota",`${name} is busy or out of free quota`,/day/i.test(m)?3600e3:30e3);
@@ -1030,9 +1032,9 @@ async function callProvider(p,system,user,json){
   const models=await geminiModels();
   while(models.length){
     const model=models[0];
-    const r=await fetch(`${GBASE}/models/${model}:generateContent`,{method:"POST",headers:{"Content-Type":"application/json","x-goog-api-key":cfg.gKey},
+    const r=await fetch(`${GBASE}/models/${model}:generateContent`,{method:"POST",signal:aiSignal(),headers:{"Content-Type":"application/json","x-goog-api-key":cfg.gKey},
       body:JSON.stringify({systemInstruction:{parts:[{text:system}]},contents:[{role:"user",parts:[{text:user}]}],generationConfig:{temperature:json?0.4:1.0,...(json?{responseMimeType:"application/json"}:{})}})})
-      .catch(()=>{throw new PErr("net","Can't reach Gemini")});
+      .catch(netErr("Can't reach Gemini"));
     if(r.ok){const j=await r.json();const t=(j.candidates?.[0]?.content?.parts||[]).filter(x=>!x.thought).map(x=>x.text||"").join("").trim();
       if(!t)throw new PErr("other","Gemini sent an empty reply");return {text:t,model}}
     let err={};try{err=(await r.json()).error||{}}catch(e){}
@@ -1053,11 +1055,11 @@ async function llm(system,user,json,prefer){
   const P=providers().filter(p=>!dead[p]);
   if(!P.length)throw new Error(providers().length?"All your AI keys failed. Check them in settings.":"NO_KEY");
   const start=prefer!=null?prefer%P.length:(rr++%P.length);
-  const order=[...P.slice(start),...P.slice(0,start)];
+  const order=[...P.slice(start),...P.slice(0,start)],R=run,live=!R.off;  // a stopped run must not keep calling the AI
   let lastErr=null;
   for(let pass=0;pass<3;pass++){
     for(const p of order){
-      if(dead[p]||(cool[p]&&cool[p]>Date.now()))continue;
+      if(live)check(R);if(dead[p]||(cool[p]&&cool[p]>Date.now()))continue;
       try{const r=await callProvider(p,system,user,json);return {...r,provider:p}}
       catch(e){lastErr=e;if(!(e instanceof PErr))throw e;
         if(e.kind==="auth"){dead[p]=e.message;continue}
@@ -1067,7 +1069,7 @@ async function llm(system,user,json,prefer){
     }
     const alive=order.filter(p=>!dead[p]);if(!alive.length)break;
     const next=Math.min(...alive.map(p=>cool[p]||0));const wait=Math.max(1500,next-Date.now());if(wait>65000)break;
-    setTypingNote(`busy, retrying in ${Math.round(wait/1000)}s`);await sleep(wait);setTypingNote("");
+    setTypingNote(`busy, retrying in ${Math.round(wait/1000)}s`);await sleep(wait);if(live)check(R);setTypingNote("");
   }
   throw new Error((lastErr?.message||"Your AI is busy")+(lastErr?.kind==="auth"?". Check the key in settings.":P.length<2?". Add a second free key in settings so the agents can switch.":". Try again in a minute."));
 }
@@ -1136,9 +1138,10 @@ async function quickKeyGo(){
   if(!k){qkSay("Paste your key first.","bad");return}
   if(k.length<20||/\s/.test(k)){qkSay("That looks too short to be a key. Copy it again.","bad");return}
   const known=KEY_TYPES.find(([re])=>re.test(k));
+  if(!known){qkSay("That doesn't look like a Gemini, Groq or OpenRouter key. Check it, or paste it in its own box under settings.","bad");return}  // never try an unknown secret on three companies
   qkBusy=true;$("qkGo").disabled=true;
   let ok=null,lastMsg="";
-  for(const [,p,field,name] of known?[known]:KEY_TYPES){
+  for(const [,p,field,name] of [known]){
     qkSay(`Checking your key with ${name}…`);
     const prev=cfg[field];cfg[field]=k;gemModels=null;groqPick=null;delete dead[p];delete cool[p];
     try{await callProvider(p,"Reply with the single word: ok","ok?",false);ok=name;break}
@@ -1154,6 +1157,12 @@ $("qkInput").addEventListener("paste",()=>setTimeout(quickKeyGo,50));
 
 /* ===================== the agents ===================== */
 let transcript=[], agents=[], SL=null, busy=false, lastPlan=null, round=0;
+/* the run in progress: the main menu button can stop it at any moment, and a stuck AI call gives up after 90 s */
+let run={off:true,ctl:new AbortController()},navTok=0;
+const CANCEL="CANCELLED",check=R=>{if(R.off)throw new Error(CANCEL)};
+const aiSignal=()=>{const sig=[...(run.off?[]:[run.ctl.signal]),...(AbortSignal.timeout?[AbortSignal.timeout(90000)]:[])];  // a stopped run's signal never leaks into key checks
+  return sig.length<2?sig[0]:AbortSignal.any?AbortSignal.any(sig):sig[1]};
+const netErr=msg=>e=>{throw e?.name==="AbortError"?new Error(CANCEL):new PErr("net",msg)};  // stopped from the main menu is not a network failure: no cooldown
 function brief(){const C=SL.C;return `Plan: ${plan.when} in ${CITY.name}, starting at ${fmtMin(plan.start)}. Neighborhood preference: ${plan.hood}. Group max budget: ${PRICE[C.maxB]} per place. Getting around: ${plan.move==="transit"?`${transitName()} between stops is fine`:plan.move==="car"?"car or cab is fine":"all on foot, keep every stop walkable"}.${C.early?" Someone must be home by 11pm.":""}`
   +(plan.needs.length?` The group needs: ${plan.needs.map(v=>labelOf(NEEDS,v)).join(", ")}.`:"")
   +(WX?` Forecast: ${temp(WX.temp)}, ${WX.rain}% chance of rain${WX.bad?", so outdoor spots and rooftops are a bad idea":WX.nice?", perfect for outdoors":""}.`:"")
@@ -1181,14 +1190,14 @@ ${SL.list.map(spotLine).join("\n")}
 }
 const chatText=()=>transcript.map(m=>`${m.who}: ${m.text}`).join("\n");
 function clean(t,name){return t.replace(/^["'\s]+|["'\s]+$/g,"").replace(new RegExp("^"+name.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")+"\\s*:\\s*","i"),"").replace(/\*\*/g,"").split("\n").filter(Boolean).slice(0,2).join(" ")}
-async function runRounds(total,startAt){
+async function runRounds(total,startAt){const R=run;
   for(let r=startAt;r<startAt+total;r++){round=r;
     for(const [i,a] of agents.entries()){
       showTyping(a);const t0=Date.now();let res;speaker=a;
       try{res=await llm(systemFor(a,r-startAt+1,total,startAt>1),`${chatText()}\n\nReply as ${a.n}. Only your message.`,false,cfg.pool==="battle"?i:null)}
       catch(e){hideTyping();throw e}
-      const text=clean(res.text,a.n);const via=cfg.pool==="battle"&&!scripted()?shortModel(res.model):"";
-      await sleep(Math.max(0,800+text.length*11-(Date.now()-t0)));
+      check(R);const text=clean(res.text,a.n);const via=cfg.pool==="battle"&&!scripted()?shortModel(res.model):"";
+      await sleep(Math.max(0,800+text.length*11-(Date.now()-t0)));check(R);
       hideTyping();transcript.push({who:a.n,text,ai:i,via});addBubble(a,text,via);
     }
   }
@@ -1238,7 +1247,9 @@ function parseJSON(t){t=t.replace(/```json|```/g,"").trim();try{return JSON.pars
 /* ===================== chat rendering ===================== */
 const chatEl=$("chat");let lastWho=null, typingEl=null;
 function scroll(){requestAnimationFrame(()=>chatEl.scrollTop=chatEl.scrollHeight)}
-function highlight(t){let h=esc(t);(SL?SL.list:SPOTS.filter(s=>s.cur)).slice().sort((a,b)=>b.n.length-a.n.length).forEach(s=>{const e=esc(s.n).replace(/[.*+?^${}()|[\]\\]/g,"\\$&");h=h.replace(new RegExp(e,"gi"),m=>`<span class="spot">${m}</span>`)});return h}
+function highlight(t){const names=(SL?SL.list:SPOTS.filter(s=>s.cur)).map(s=>s.n).filter(Boolean).sort((a,b)=>b.length-a.length);if(!names.length)return esc(t);
+  const re=new RegExp(`(${names.map(n=>n.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")).join("|")})`,"gi");
+  return String(t).split(re).map((p,i)=>i%2?`<span class="spot">${esc(p)}</span>`:esc(p)).join("")}  // split the raw text and escape each piece: a place name can never rewrite markup
 function addBubble(a,text,via){
   const me=!a;const who=me?"me":a.n;const cont=who===lastWho&&!via;lastWho=who;
   const row=document.createElement("div");row.className="row"+(me?" me":"")+(cont?" cont":"");
@@ -1342,14 +1353,14 @@ let REPLAY=null;
 let VOTE_ID=null;
 async function playReplay(R){
   REPLAY=R;VOTE_ID=typeof R.id==="string"&&/^[a-z0-9]{4,12}$/.test(R.id)?R.id:null;$("app").classList.add("replay");$("setup").classList.add("hide");
-  const ag=R.a.map(([n,color],i)=>({n:String(n??""),color:safeColor(color,i)}));
+  const ag=(Array.isArray(R.a)?R.a:[]).slice(0,7).map(([n,color],i)=>({n:str(String(n??""),30),color:safeColor(color,i)}));
   $("stack").innerHTML=ag.slice(0,5).map(a=>`<div class="av" style="background:${a.color}">${initials(a.n)}</div>`).join("");
   $("title").textContent=R.m==="girls"?"friends night committee":"date night committee";$("subtitle").textContent=`${ag.length} AI agents · 1 plan`;
   chatEl.innerHTML="";lastWho=null;
   const humans=ag.filter(a=>a.n!=="The Wallet").map(a=>a.n);
   sys(`${humans.join(", ")} let AI agents plan their night. Here's how it went.`);
   if(R.d===1)sys("This one was made in demo mode, with scripted agents.");
-  for(let [i,text,via] of R.t){text=String(text??"");via=via?String(via):"";const a=i>=0?ag[i]:null;
+  for(let [i,text,via] of (Array.isArray(R.t)?R.t:[]).slice(0,80)){text=String(text??"").slice(0,600);via=via?String(via).slice(0,40):"";const a=i>=0?ag[i]:null;  // same caps as a saved chat: a link can't run for hours
     if(a){showTyping(a);await sleep(450+Math.min(text.length*13,1300));hideTyping()}else await sleep(450);
     addBubble(a,text,via||null)}
   await sleep(500);
@@ -1379,18 +1390,19 @@ $("pkAsk").onclick=async()=>{$("picker").classList.add("hide");pkFlow=null;rende
   say("Invite ready. Each friend taps the link, picks their agent and sends theirs back. Open their replies here and start once everyone's in.")};
 $("closePicker").onclick=()=>{$("picker").classList.add("hide");pkFlow=null};
 let starting=false;  // a double tap on Start or Run again must not start two runs (busy is only set once the chat begins)
-async function start(){if(starting||busy)return;starting=true;try{await startRun()}finally{starting=false}}
-async function startRun(){
+async function start(){if(starting||busy)return;starting=true;const tok=navTok;try{await startRun()}finally{if(tok===navTok)starting=false}}  // a start stopped from the main menu never clears a newer one
+async function startRun(){const tok=navTok,gone=()=>tok!==navTok;  // the main menu button was tapped while we waited
   if($("geoRow").style.display===""&&$("geoInput").value.trim()){await $("geoForm").onsubmit(new Event("submit"));if($("geoRow").style.display==="")return}  // typed a city but tapped start instead of Find: load it first
   const todo=plan.members.filter(m=>m.n&&!m.pk).map(m=>m.id);
   if(todo.length&&!MOCK)return openPicker(todo,start);  // pick (or invite) first, then the chat runs
   const g=CITY?.id!==plan.city?geoParse(plan.city):null;
   if(g){$("setup").classList.add("hide");chatEl.innerHTML="";sys(`Finding places in ${g.name} on OpenStreetMap. The first time can take up to a minute, then it's saved on this phone.`)}
   if(!await ownCity()&&g){chatEl.innerHTML="";renderSetup();$("setup").classList.remove("hide");return}
+  if(gone())return;renderSetup();  // the city may have just changed: prices, chips and labels follow it, even behind the chat
   DEMO=!MOCK&&!providers().length;
   plan.members=plan.members.filter(m=>m.n);savePlan();
   $("setup").classList.add("hide");$("composer").classList.remove("off");chatEl.innerHTML="";transcript=[];lastPlan=null;lastWho=null;mi=0;
-  fixPlan();await fetchWeather(nightDate(plan.when),plan.start);
+  fixPlan();await fetchWeather(nightDate(plan.when),plan.start);if(gone())return;
   SL=shortlist();if(!SL.list.length){sys("No spots fit that time and place. Try another neighborhood or time.",true);$("setup").classList.remove("hide");return}
   const taken=new Set(agentList().map(a=>a.ps)),draw=()=>{const left=REAL_PERS.filter(k=>!taken.has(k)),k=rand(left.length?left:REAL_PERS);taken.add(k);return k};  // no two agents draw the same one
   agents=agentList().map(a=>({...a,drew:!a.wallet&&!PERS[a.ps],ps:a.wallet||PERS[a.ps]?a.ps:draw(),favs:a.wallet?[]:SL.list.map(s=>({s,sc:personScore(s,a)+Math.random()})).sort((x,y)=>y.sc-x.sc).slice(0,3).map(x=>x.s.n)}));
@@ -1403,22 +1415,23 @@ async function startRun(){
   if(DEMO)keyLine("Demo: scripted agents, real spots. With a free AI key they argue about your actual picks.","Turn on the real AI (free)");
   const drew=agents.filter(a=>a.drew);if(drew.length)sys(`Personalities drawn: ${drew.map(a=>`${a.n} got ${a.ps}`).join(", ")}`);
   if(WX)sys(`Forecast for ${plan.when.toLowerCase()}: ${temp(WX.temp)}, ${WX.rain}% chance of rain.${WX.bad?" Outdoor spots and rooftops moved down the list.":WX.nice?" Good night for outdoors.":""}`);
-  await go(rounds,1);
+  if(gone())return;await go(rounds,1);
 }
 function keyLine(text,label){const d=document.createElement("div");d.className="sys";d.textContent=text+" ";
   const b=document.createElement("button");b.type="button";b.className="chip";b.textContent=label;b.onclick=openQuickKey;d.appendChild(b);chatEl.appendChild(d);lastWho=null;scroll()}
 const demoNudge=()=>keyLine("That was the demo. With a free key (1 minute, no card) the agents really fight for each person's picks.","Get my free key");
-async function go(rounds,startAt){
+async function go(rounds,startAt){const R=run={off:false,ctl:new AbortController()};
   DEMO=!MOCK&&!providers().length;busy=true;setComposer(false);
-  try{demo={said:0,total:rounds*agents.length};await runRounds(rounds,startAt);lastPlan=await makePlan();renderTicket(lastPlan,plan.members.map(m=>m.n),transcript.filter(m=>m.ai!=null).length);saveLast();if(DEMO)demoNudge()}
-  catch(e){if(e.message==="NO_KEY"){sys("Add a free AI key first.",true);openQuickKey()}else sys(e.message,true)}
-  busy=false;setComposer(true);
+  try{demo={said:0,total:rounds*agents.length};await runRounds(rounds,startAt);check(R);const p=await makePlan();check(R);lastPlan=p;renderTicket(lastPlan,plan.members.map(m=>m.n),transcript.filter(m=>m.ai!=null).length);saveLast();if(DEMO)demoNudge()}
+  catch(e){if(R.off)return;if(e.message==="NO_KEY"){sys("Add a free AI key first.",true);openQuickKey()}else sys(e.message,true)}  // stopped from the main menu: say nothing
+  if(R===run){busy=false;setComposer(true)}
 }
 async function overrule(t){if(busy||!SL)return;busy=true;setComposer(false);  // claim the turn before any await, so a double tap can't start two runs
-  if(/veto/i.test(t)&&lastPlan)track("veto",lastPlan.stops.map(s=>s.spot.n));transcript.push({who:"The human (has the final say)",text:t});addBubble(null,t);await sleep(300);await go(2,round+1)}
+  if(/veto/i.test(t)&&lastPlan)track("veto",lastPlan.stops.map(s=>s.spot.n));transcript.push({who:"The human (has the final say)",text:t});addBubble(null,t);const tok=navTok;await sleep(300);if(tok!==navTok)return;await go(2,round+1)}  // the main menu was tapped meanwhile
 $("composer").onsubmit=e=>{e.preventDefault();const t=$("say").value.trim();if(!t||busy)return;$("say").value="";overrule(t)};
 $("startBtn").onclick=start;
-$("newBtn").onclick=async()=>{if(busy)return;store.set("last",null);await ownCity();REPLAY=null;$("app").classList.remove("replay");history.replaceState(null,"",location.pathname+location.search);renderSetup();$("setup").classList.remove("hide")};
+$("newBtn").onclick=async()=>{if(busy||starting){run.off=true;run.ctl.abort();navTok++;busy=false;starting=false;hideTyping();setComposer(true)}  // works mid-chat too: stops the run
+  store.set("last",null);await ownCity();REPLAY=null;$("app").classList.remove("replay");history.replaceState(null,"",location.pathname+location.search);renderSetup();$("setup").classList.remove("hide")};
 
 /* ===================== scripted agents: the no key demo, and ?mock for testing ===================== */
 let mi=0,speaker=null,demo=null;const mockUsed=new Set();
@@ -1505,6 +1518,7 @@ async function handleHash(first){
   if(!h){if(first&&MOCK&&params.has("auto"))start();else if(first&&!store.get("onboarded",0)&&isSample(plan))openOnboarding();else if(first)try{restoreLast()}catch(e){store.set("last",null);chatEl.innerHTML="";renderSetup();$("setup").classList.remove("hide")}return}  // a broken save never leaves a blank screen
   if(busy)return;
   try{const data=await unpack(h[2]);
+    for(const m of [...(Array.isArray(data?.members)?data.members:[]),data?.m])if(m&&typeof m==="object")delete m.q;  // private notes never come in from a link either
     const want=h[1]==="p"?data?.c:"vcm".includes(h[1])?null:data?.city;  // open the link in its own city
     if(cityOk(want)&&want!==CITY.id)await loadCity(want).catch(e=>sys(e.message,true));  // your own plan keeps its city (see ownCity)
     if(h[1]==="p"){if(REPLAY)return;await playReplay(data)}
