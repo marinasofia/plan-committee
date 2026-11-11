@@ -162,7 +162,9 @@ test("the last chat and plan survive a reload", async () => {
   await city("London");
   const before = (await runDemo("walk")).stops.map(s => s.n);
   await open(false);  // a plain reload
-  await until(`!!document.querySelector("#chat .ticket")`, 15);
+  await until(`!!document.querySelector("#chat .ticket")`, 15).catch(async e => {
+    throw new Error(`${e.message}: ${await page(`JSON.stringify((L=>({saved:!!L,crew:L?.crew===plan.id,city:L?.city+" vs "+CITY.id,agents:L?.agents?.map(a=>a.n).join()+" vs "+agentList().map(a=>a.n).join(),age:L&&Date.now()-L.at,setup:!$("setup").classList.contains("hide")}))(store.get("last",null)))`)}`);
+  });
   assert.deepEqual(await page(`lastPlan.stops.map(s=>s.spot.n)`), before, "same plan after reload");
   assert.equal(await page(`$("setup").classList.contains("hide")`), true, "lands on the chat, not setup");
 });
