@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>The Plan Committee</title>
 <meta name="description" content="Your friends pick what they want. AI agents argue for each of you in a group chat and agree on one plan for a night out in NYC or London.">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-D5dUgaZlfzyidLdTuVpamEFpJKGauGKP/E4r3RCfUDo='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https:; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-RvjsUYA0/9HXAeWdRjRGUlums8fx0MOZPx16esbAKQE='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https:; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
 <meta name="referrer" content="no-referrer">
 <meta name="theme-color" content="#fbf9f6">
 <link rel="manifest" href="manifest.webmanifest">
@@ -313,6 +313,7 @@ button,input,select,textarea{font:inherit;color:inherit}
 
   <!-- profile quiz: how a friend tells their agent who they are, one question at a time -->
   <div class="sheet hide top" id="quiz">
+    <button class="iconbtn close" id="closeQuiz" type="button" style="display:none"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
     <div class="eyebrow" id="qzEyebrow"></div>
     <div class="qzbar"><span id="qzBar"></span></div>
     <h2 id="qzQ"></h2>
@@ -320,6 +321,7 @@ button,input,select,textarea{font:inherit;color:inherit}
     <div class="sec" id="qzBody"></div>
     <button class="cta" id="qzNext" type="button">Next</button>
     <p class="small" style="text-align:center"><a href="#" id="qzBack">Back</a></p>
+    <p class="small" style="text-align:center;display:none" id="qzMoreRow"><a href="#" id="qzMore">More options: must haves, a note</a></p>
   </div>
 
   <!-- choose an agent: for yourself, or for a friend who'd rather you pick -->
@@ -690,8 +692,7 @@ function renderSetup(){
   $("transitBtn").textContent=transitName().replace(/^./,c=>c.toUpperCase());
   $("members").innerHTML=plan.members.map((m,i)=>`<div class="member" data-i="${i}"><div class="av" style="background:${COLORS[i%COLORS.length]}">${initials(m.n)}</div>
     <div><div class="mn">${esc(m.n)}</div><div class="ms">${esc(summary(m))}</div><button class="pers${m.pk?"":" pick"}" data-p="${i}" type="button" aria-label="choose personality">${m.pk?`agent: ${esc(m.ps)}`:"pick their agent"} ›</button></div><button class="x" data-x="${i}" type="button" aria-label="remove">×</button></div>`).join("");
-  $("members").querySelectorAll(".member").forEach(el=>el.onclick=e=>{if(e.target.dataset.x!==undefined||e.target.dataset.p!==undefined)return;openEditor(+el.dataset.i)});
-  $("members").querySelectorAll("[data-p]").forEach(b=>b.onclick=()=>{const m=plan.members[+b.dataset.p];if(m)openPicker([m.id])});
+  $("members").querySelectorAll(".member").forEach(el=>el.onclick=e=>{if(e.target.dataset.x!==undefined)return;const m=plan.members[+el.dataset.i];if(m)setupPeople([m.id])});  // one guided flow for everything about a person
   $("crewSec").style.display=Object.keys(crews).length>1?"":"none";
   renderPeople();
   moreSum();
@@ -736,9 +737,9 @@ $("startAt").onchange=()=>{plan.start=+$("startAt").value;savePlan();moreSum()};
 /* names only: everyone starts on "anything" with a surprise personality, picks are optional */
 $("addForm").onsubmit=e=>{e.preventDefault();const names=$("quickName").value.split(",").map(n=>n.trim().slice(0,20)).filter(Boolean);
   if(!names.length){$("quickName").focus();return}
-  for(const n of names)if(plan.members.length<6&&!plan.members.some(m=>m.n.toLowerCase()===n.toLowerCase()))plan.members.push(known(n));
+  const added=[];for(const n of names)if(plan.members.length<6&&!plan.members.some(m=>m.n.toLowerCase()===n.toLowerCase())){const m=known(n);plan.members.push(m);added.push(m)}
   remember(plan.members.filter(m=>names.includes(m.n)&&!people.some(p=>same(p,m))));
-  $("quickName").value="";savePlan();renderSetup()};
+  $("quickName").value="";savePlan();renderSetup();setupPeople(added.filter(m=>!m.pk).map(m=>m.id))};  // straight into each new person's picks; saved friends who already picked skip it
 $("newCrewLink").onclick=async e=>{e.preventDefault();newCrew();await ownCity();renderSetup()};
 $("inviteBtn").onclick=()=>invite();
 $("profilesBtn").onclick=()=>collectProfiles();
@@ -834,24 +835,35 @@ async function finishJoin(me){
 /* ===================== profile quiz: one tap per question, answers saved on the friend's phone for next time ===================== */
 let qz=null;
 const QSTEPS=[{k:"n",q:"What's your name?",sub:"So everyone knows whose agent is talking."},
-  {k:"ps",q:"How do you argue about plans?",sub:"Your agent will argue exactly like this.",tiles:true},
-  {k:"c",q:"What are you usually craving?",sub:"Pick a few.",opts:()=>CRAVINGS},
-  {k:"b",q:"Your usual max budget?",one:true,opts:budgets},
-  {k:"v",q:"Your kind of night?",sub:"Pick a few.",opts:()=>VIBES},
-  {k:"d",q:"Any hard no's?",sub:"Skip if nothing bugs you.",opts:()=>DEALS}];
+  {k:"ps",q:"How do you argue about plans?",sub:"Your agent will argue exactly like this.",tiles:true,q3:n=>`How does ${n} argue about plans?`,sub3:"Their agent will argue exactly like this."},
+  {k:"c",q:"What are you usually craving?",sub:"Pick a few.",opts:()=>CRAVINGS,q3:n=>`What's ${n} usually craving?`},
+  {k:"b",q:"Your usual max budget?",one:true,opts:budgets,q3:n=>`${n}'s usual max budget?`},
+  {k:"v",q:"Your kind of night?",sub:"Pick a few.",opts:()=>VIBES,q3:n=>`${n}'s kind of night?`},
+  {k:"d",q:"Any hard no's?",sub:"Skip if nothing bugs you.",opts:()=>DEALS,q3:n=>`Any hard no's for ${n}?`,sub3:"Skip if nothing bugs them."}];
+/* the planner setting someone up on this phone: the same one tap steps, without the name step, for each new person in turn */
+function setupPeople(ids){const total=ids.length,q=[...ids];
+  const next=()=>{const i=plan.members.findIndex(m=>m.id===q[0]);q.shift();if(i<0){if(q.length)return next();renderSetup();return}
+    const m=plan.members[i],self=i===0,find=()=>plan.members.findIndex(x=>x.id===m.id);
+    openQuiz({planner:true,other:self?null:m.n,title:total>1?`${m.n} · ${total-q.length} of ${total}`:self?"your picks":`${m.n}'s picks`,me:m,
+      done:me=>{const j=find();if(j>=0){plan.members[j]=me;remember([me]);savePlan()}if(self)store.set("me",me);renderSetup();next()},  // your own answers become your saved profile
+      cancel:()=>renderSetup(),more:()=>{renderSetup();const j=find();if(j>=0)openEditor(j)},
+      ask:async()=>{renderSetup();$("setup").classList.remove("hide");await invite()}})};
+  next()}
 function openQuiz(ctx){const saved=cleanMembers([store.get("me",null)].filter(Boolean))[0];
-  qz={ctx,me:JSON.parse(JSON.stringify(ctx.me||saved||member("",{ps:""}))),i:0};if(qz.me.n)qz.i=qz.me.pk?-1:1;  // known friends just confirm, unless they never picked their agent; a new one picks their own agent
+  qz={ctx,me:JSON.parse(JSON.stringify(ctx.me||saved||member("",{ps:""}))),i:0};if(qz.me.n)qz.i=qz.me.pk&&!ctx.planner?-1:1;
+  $("closeQuiz").style.display=$("qzMoreRow").style.display=ctx.planner?"":"none";$("qzBar").parentNode.style.marginRight=ctx.planner?"56px":"";  // room for the close button  // known friends just confirm, unless they never picked their agent; a new one picks their own agent
   $("quiz").classList.remove("hide");qzShow()}
 function qzShow(){const st=QSTEPS[qz.i],me=qz.me,body=$("qzBody");$("quiz").scrollTop=0;
-  $("qzEyebrow").textContent=qz.ctx.title;$("qzBar").style.width=qz.i<0?"100%":`${(qz.i+1)/QSTEPS.length*100}%`;$("qzBack").style.visibility=qz.i>0?"":"hidden";
+  $("qzEyebrow").textContent=qz.ctx.title;$("qzBar").style.width=qz.i<0?"100%":`${(qz.i+1)/QSTEPS.length*100}%`;$("qzBack").style.visibility=qz.i>(qz.ctx.planner?1:0)?"":"hidden";
   if(qz.i<0){$("qzQ").textContent=`Still you, ${me.n}?`;$("qzSub").textContent="Your answers from last time.";$("qzNext").textContent="Yes, send it";
     body.innerHTML=`<div class="member" style="cursor:default"><div class="av" style="background:${COLORS[0]}">${initials(me.n)}</div><div><div class="mn">${esc(me.n)}</div><div class="ms">${esc(summary(me))}</div><span class="pers">agent: ${esc(me.ps)}</span></div><span></span></div><p class="small"><a href="#" id="qzRedo">Change my answers</a></p>`;
     $("qzRedo").onclick=e=>{e.preventDefault();qz.i=0;qzShow()};return}
-  $("qzQ").textContent=st.q;$("qzSub").textContent=st.sub||"";$("qzNext").textContent=qz.i===QSTEPS.length-1?"Done":"Next";
+  const o=qz.ctx.other;$("qzQ").textContent=o&&st.q3?st.q3(o):st.q;$("qzSub").textContent=(o&&st.sub3)||st.sub||"";$("qzNext").textContent=qz.i===QSTEPS.length-1?"Done":"Next";
   if(st.k==="n"){body.innerHTML=`<input class="field" id="qzName" placeholder="your name" maxlength="20" autocomplete="given-name">`;$("qzName").value=me.n;
     $("qzName").onkeydown=e=>{if(e.key==="Enter")qzNext()};setTimeout(()=>$("qzName")?.focus(),350);return}
-  if(st.tiles){const keys=Object.keys(PERS);body.innerHTML=keys.map((k,i)=>`<button type="button" class="qztile${me.pk&&me.ps===k?" on":""}" data-i="${i}"><b>${esc(k)}</b><span>${esc(PERS[k]||"A different personality every night.")}</span></button>`).join("");
-    body.querySelectorAll(".qztile").forEach(b=>b.onclick=()=>{me.ps=keys[+b.dataset.i];me.pk=true;qzNext()});return}
+  if(st.tiles){const keys=Object.keys(PERS);body.innerHTML=(o?`<button class="ghost" id="qzAsk" type="button" style="width:100%;margin:2px 0 12px">Let ${esc(o)} pick: send them a link</button>`:"")+keys.map((k,i)=>`<button type="button" class="qztile${me.pk&&me.ps===k?" on":""}" data-i="${i}"><b>${esc(k)}</b><span>${esc(PERS[k]||"A different personality every night.")}</span></button>`).join("");
+    body.querySelectorAll(".qztile").forEach(b=>b.onclick=()=>{me.ps=keys[+b.dataset.i];me.pk=true;qzNext()});
+    if(o)$("qzAsk").onclick=()=>{$("quiz").classList.add("hide");qz.ctx.ask()};return}
   body.innerHTML=`<div class="chips" id="qzChips"></div>`;
   chips("qzChips",st.opts(),v=>st.one?me[st.k]===v:me[st.k].includes(v),v=>{if(st.one){me[st.k]=v;setTimeout(qzNext,180)}else me[st.k]=tog(me[st.k],v)})}
 function qzNext(){
@@ -859,9 +871,11 @@ function qzNext(){
   $("qzSub").style.color="";
   if(qz.i===0){const n=$("qzName").value.trim().slice(0,20);if(!n){$("qzName").focus();$("qzName").style.borderColor="#b4413c";return}qz.me.n=n}
   if(qz.i>=0&&qz.i<QSTEPS.length-1){qz.i++;qzShow();return}
-  $("quiz").classList.add("hide");store.set("me",qz.me);qz.ctx.done(qz.me)}
+  $("quiz").classList.add("hide");if(!qz.ctx.planner)store.set("me",qz.me);qz.ctx.done(qz.me)}
 $("qzNext").onclick=qzNext;
-$("qzBack").onclick=e=>{e.preventDefault();if(qz.i>0){qz.i--;qzShow()}};
+$("qzBack").onclick=e=>{e.preventDefault();if(qz.i>(qz.ctx.planner?1:0)){qz.i--;qzShow()}};
+$("closeQuiz").onclick=()=>{$("quiz").classList.add("hide");qz?.ctx.cancel?.()};
+$("qzMore").onclick=e=>{e.preventDefault();$("quiz").classList.add("hide");qz?.ctx.more?.()};
 async function collectProfiles(){const url=baseUrl()+"#f="+await pack({v:1,from:plan.members[0]?.n||"",city:plan.city});
   await shareOut("Your night out profile","answer 6 quick taps so my AI agents know your taste when we plan nights out:",url,$("profilesBtn"),"Link copied")}
 async function finishProfile(me){const url=baseUrl()+"#m="+await pack({v:1,m:{id:me.id,n:me.n,ps:me.ps,pk:true,c:me.c,b:me.b,v:me.v,d:me.d}});  // only what the quiz asked, never the private note
@@ -956,8 +970,8 @@ function shortlist(){
   return {list,C};
 }
 const spotLine=s=>{const c=slotClose(s);return `${s.n} | ${s.t} | ${s.h} | ${PRICE[s.p]} | ${s.v}${c!=null?` | open till ${fmtMin(c)}`:""}${s.x.includes("wheel")?" | wheelchair ok":""}${s.x.includes("vegan")?" | vegan options":""}${s.nw?" | fresh find, nobody has reviewed it yet":""}`};
-function norm(s){return (s||"").toLowerCase().replace(/[^a-z0-9]/g,"")}
-function findSpot(n){const k=norm(n);if(!k)return null;return SPOTS.find(s=>norm(s.n)===k)||SPOTS.find(s=>k.includes(norm(s.n))||(norm(s.n).includes(k)&&k.length>4))}
+function norm(s){return String(s||"").normalize("NFKD").replace(/\p{M}/gu,"").toLowerCase().replace(/[^\p{L}\p{N}]/gu,"")}  // keep letters in any script: "生ハムCOMPANY" must not shrink to "company" and match some other place
+function findSpot(n,first){const k=norm(n);if(!k)return null;const by=L=>L.find(s=>norm(s.n)===k)||L.find(s=>{const v=norm(s.n);return v&&(k.includes(v)||v.includes(k)&&k.length>4)});return (first&&by(first))||by(SPOTS)}  // the shortlist first when planning, so a same-named place elsewhere never wins
 const stubSpot=n=>({n:str(n,80),t:"dinner",h:"",b:"",p:2,c:"",f:[],v:"",nw:false,pop:0,web:"",x:[],cur:false});  // a shared plan's stop that is no longer in the list: still shown, map search only
 
 /* ===================== AI providers: spread across keys, fail over ===================== */
@@ -1184,10 +1198,10 @@ async function makePlan(){
   const sys=`You turn a group chat into a final night out plan. Only use places from this list, exact names:\n${SL.list.map(spotLine).join("\n")}\nReturn only JSON.`;
   const user=`${brief()}\n\nGROUP CHAT:\n${chatText()}\n\nReturn JSON exactly like:
 {"title":"a short cute name for the night, max 5 words","stops":[{"time":"7:30 pm","name":"exact place name","en":"only if the name isn't in Latin letters: its English or Latin letter name","note":"why it won, max 12 words"}],"drama":0,"verdict":"one funny sentence about who won the argument"}
-Use 3 stops in order (dinner, drinks, then a late or free stop), each one a place the chat argued for; only if the chat never named a place for a stop, pick one from the list and make its note say the planner picked it. Stops ${plan.move==="transit"?`each within about 20 minutes by ${transitName()} of the one before, close to a station`:plan.move==="car"?"each within about 20 minutes by car or cab of the one before":"all on foot: each within about a 15 minute walk of the one before, no transit"}, first stop at ${fmtMin(plan.start)}, realistic ${CITY.short} times${SL.C.early?", ending by 10:30 pm":""}. Every stop must be open at its time: if the list says "open till", arrive at least an hour before that. drama is 0 to 100 for how much they fought.`;
+Use 3 stops in order: a place whose type is dinner, then one whose type is drinks, then one whose type is late or free (the type is the second field in the list), each one a place the chat argued for; only if the chat never named a place for a stop, pick one from the list and make its note say the planner picked it. Stops ${plan.move==="transit"?`each within about 20 minutes by ${transitName()} of the one before, close to a station`:plan.move==="car"?"each within about 20 minutes by car or cab of the one before":"all on foot: each within about a 15 minute walk of the one before, no transit"}, first stop at ${fmtMin(plan.start)}, realistic ${CITY.short} times${SL.C.early?", ending by 10:30 pm":""}. Every stop must be open at its time: if the list says "open till", arrive at least an hour before that. drama is 0 to 100 for how much they fought.`;
   let res;try{res=await llm(sys,user,true)}finally{hideTyping()}
   const p=parseJSON(res.text);
-  p.stops=(p.stops||[]).map(s=>({...s,spot:findSpot(s.name)})).filter(s=>s.spot).slice(0,4)
+  p.stops=(p.stops||[]).map(s=>({...s,spot:findSpot(s.name,SL.list)})).filter(s=>s.spot).slice(0,4)
     .map(s=>({...s,en:nonLatin(s.spot.n)&&typeof s.en==="string"&&!nonLatin(s.en)?s.en.trim().slice(0,80):""}));
   if(!p.stops.length)throw new Error("The agents couldn't agree on real places. Tap + to try again.");
   tighten(p);
@@ -1195,16 +1209,19 @@ Use 3 stops in order (dinner, drinks, then a late or free stop), each one a plac
   track("pick",p.stops.map(s=>s.spot.n));
   return p;
 }
-/* a leg too long for how the group gets around, or a stop that may be shut at its time: swap that stop for the closest open shortlisted place of the same kind, like a veto swap */
+/* guardrails on the final plan: every stop must be a shortlisted place of the right type for its slot (dinner, drinks, then late or free), open at its time and close enough to the last one.
+   A stop that fails is swapped for the closest shortlisted place that passes, like a veto swap, or dropped */
 const LEG_KM={walk:1.25,transit:6,car:10};  // about 20 min on foot, 25 by transit, 27 by car (see travel())
+const SLOT_KIND=["dinner","drinks","late","late"];
 function tighten(p){const lim=LEG_KM[plan.move]||LEG_KM.walk,base=nightDate(p.when||plan.when),kind=t=>t==="free"?"late":t;
   for(let i=0;i<p.stops.length;i++){const st=p.stops[i],t=parseTime(st.time,base),m=t.getHours()*60+t.getMinutes()+(t.getDate()!==base.getDate()?1440:0),
-      prev=i?p.stops[i-1].spot:null,leg=i?km(prev,st.spot)??0:0,far=leg>lim,closed=shut(st.spot,t,m);if(!far&&!closed)continue;
+      prev=i?p.stops[i-1].spot:null,leg=i?km(prev,st.spot)??0:0,far=leg>lim,closed=shut(st.spot,t,m),want=SLOT_KIND[i],
+      wrong=kind(st.spot.t)!==want||!SL.list.includes(st.spot);if(!far&&!closed&&!wrong)continue;
     const keep=p.stops.filter((_,q)=>q!==i).map(x=>x.spot),
       dist=s=>keep.reduce((n,c)=>n+(km(c,s)??9),0),
-      pick=SL.list.filter(s=>kind(s.t)===kind(st.spot.t)&&!p.stops.some(x=>x.spot.n===s.n)&&!shut(s,t,m)&&(!far||(km(prev,s)??99)<leg)).sort((x,y)=>(i&&((km(prev,x)??99)>lim)-((km(prev,y)??99)>lim))||dist(x)-dist(y))[0];  // one within the limit first
-    if(pick)p.stops[i]={...st,spot:pick,name:pick.n,en:"",note:closed?"the planner swapped this in, sure to be open then":"the planner swapped this in, closer to the last stop"};
-    else if(closed&&kind(st.spot.t)==="late"&&p.stops.length>1){p.stops.splice(i,1);i--}}}  // nothing open to swap in: drop the late stop rather than send people to a dark door; dinner and drinks stay with the "may be closed" note
+      pick=SL.list.filter(s=>kind(s.t)===want&&!p.stops.some(x=>x.spot.n===s.n)&&!shut(s,t,m)&&(!far||(km(prev,s)??99)<leg)).sort((x,y)=>(i&&((km(prev,x)??99)>lim)-((km(prev,y)??99)>lim))||dist(x)-dist(y))[0];  // one within the limit first
+    if(pick)p.stops[i]={...st,spot:pick,name:pick.n,en:"",note:wrong?`the planner swapped this in, a real ${want==="late"?"late night":want} spot`:closed?"the planner swapped this in, sure to be open then":"the planner swapped this in, closer to the last stop"};
+    else if((wrong||closed&&want==="late")&&p.stops.length>1){p.stops.splice(i,1);i--}}}  // nothing to swap in: drop a wrong place, or a late stop that may be shut; dinner and drinks that may be shut stay with the "may be closed" note
 function parseJSON(t){t=t.replace(/```json|```/g,"").trim();try{return JSON.parse(t)}catch(e){const m=t.match(/\{[\s\S]*\}/);if(m)return JSON.parse(m[0]);throw new Error("Couldn't read the plan. Try again.")}}
 
 /* ===================== chat rendering ===================== */
@@ -1228,11 +1245,12 @@ function sys(t,err){const d=document.createElement("div");d.className="sys"+(err
 
 /* ===================== ticket ===================== */
 const placeQ=s=>[s.n,s.h,CITY.search].filter(Boolean).join(", ");  // "Signal, East Williamsburg, New York, NY": Google can't search a name glued to coordinates
-const gmapSpot=s=>"https://www.google.com/maps/search/?api=1&query="+encodeURIComponent(placeQ(s));
+const at=s=>!s.h&&Number.isFinite(+s.lat)&&Number.isFinite(+s.lon)?`${(+s.lat).toFixed(5)},${(+s.lon).toFixed(5)}`:"";  // no neighborhood (open city lists): "Zion, Tokyo" finds a hair salon 20 km away, so search around the real spot
+const gmapSpot=s=>at(s)?`https://www.google.com/maps/search/${encodeURIComponent(s.n)}/@${at(s)},18z`:"https://www.google.com/maps/search/?api=1&query="+encodeURIComponent(placeQ(s));
 /* many places book through Resy, Tock or walk in only, so search instead of guessing OpenTable */
 const BOOKING=/^https:\/\/(www\.)?(resy\.com|opentable\.com|exploretock\.com|sevenrooms\.com)\/[^\s<>"']{1,200}$/i;
 const reserve=s=>BOOKING.test(s.rsv||"")?esc(s.rsv):"https://www.google.com/search?q="+encodeURIComponent(`${s.n} ${s.h||""} ${CITY.name} reservation`.replace(/\s+/g," "));
-function routeUrl(stops){const q=s=>encodeURIComponent(placeQ(s.spot));
+function routeUrl(stops){const q=s=>encodeURIComponent(at(s.spot)||placeQ(s.spot));
   let u="https://www.google.com/maps/dir/?api=1&origin="+q(stops[0])+"&destination="+q(stops[stops.length-1]);
   if(stops.length>2)u+="&waypoints="+stops.slice(1,-1).map(q).join("%7C");return u+"&travelmode="+({walk:"walking",transit:"transit",car:"driving"})[plan.move]}
 function stopInfo(s,p){const base=nightDate(p.when||plan.when),t=parseTime(s.time,base),m=t.getHours()*60+t.getMinutes();
@@ -1381,7 +1399,7 @@ function keyLine(text,label){const d=document.createElement("div");d.className="
 const demoNudge=()=>keyLine("That was the demo. With a free key (1 minute, no card) the agents really fight for each person's picks.","Get my free key");
 async function go(rounds,startAt){
   DEMO=!MOCK&&!providers().length;busy=true;setComposer(false);
-  try{demo={said:0,total:rounds*agents.length};await runRounds(rounds,startAt);lastPlan=await makePlan();renderTicket(lastPlan,plan.members.map(m=>m.n),transcript.filter(m=>m.ai!=null).length);if(DEMO)demoNudge()}
+  try{demo={said:0,total:rounds*agents.length};await runRounds(rounds,startAt);lastPlan=await makePlan();renderTicket(lastPlan,plan.members.map(m=>m.n),transcript.filter(m=>m.ai!=null).length);saveLast();if(DEMO)demoNudge()}
   catch(e){if(e.message==="NO_KEY"){sys("Add a free AI key first.",true);openQuickKey()}else sys(e.message,true)}
   busy=false;setComposer(true);
 }
@@ -1389,7 +1407,7 @@ async function overrule(t){if(busy||!SL)return;busy=true;setComposer(false);  //
   if(/veto/i.test(t)&&lastPlan)track("veto",lastPlan.stops.map(s=>s.spot.n));transcript.push({who:"The human (has the final say)",text:t});addBubble(null,t);await sleep(300);await go(2,round+1)}
 $("composer").onsubmit=e=>{e.preventDefault();const t=$("say").value.trim();if(!t||busy)return;$("say").value="";overrule(t)};
 $("startBtn").onclick=start;
-$("newBtn").onclick=async()=>{if(busy)return;await ownCity();REPLAY=null;$("app").classList.remove("replay");history.replaceState(null,"",location.pathname+location.search);renderSetup();$("setup").classList.remove("hide")};
+$("newBtn").onclick=async()=>{if(busy)return;store.set("last",null);await ownCity();REPLAY=null;$("app").classList.remove("replay");history.replaceState(null,"",location.pathname+location.search);renderSetup();$("setup").classList.remove("hide")};
 
 /* ===================== scripted agents: the no key demo, and ?mock for testing ===================== */
 let mi=0,speaker=null,demo=null;const mockUsed=new Set();
@@ -1453,9 +1471,27 @@ async function mockLLM(system,user,json,prefer){await sleep(200);
   mi++;demo.said++;return {text:line.replace(/\{([abn])\}/g,(_,x)=>x==="a"?A:x==="b"?B.n:last),model:["llama-3.3-70b","gemini-flash-lite","nemotron-nano"][(prefer??mi)%3]}}
 
 /* ===================== start ===================== */
+/* the last chat and plan stay on this phone, so a reload or reopening the app lands back on them (localStorage, nothing leaves the phone) */
+function saveLast(){if(REPLAY||!lastPlan||!SL)return;
+  store.set("last",{crew:plan.id,city:CITY.id,at:Date.now(),round,sl:SL.list.map(s=>s.n),transcript:transcript.slice(-80),
+    agents:agents.map(a=>({n:a.n,color:a.color,ps:a.ps,wallet:!!a.wallet,drew:!!a.drew,favs:a.favs||[]})),
+    p:{title:lastPlan.title,drama:lastPlan.drama,verdict:lastPlan.verdict,when:lastPlan.when,id:lastPlan.id,stops:lastPlan.stops.map(s=>[s.time,s.spot.n,s.note||"",s.en||""])}})}
+function restoreLast(){const L=store.get("last",null);
+  if(!L||L.crew!==plan.id||L.city!==CITY.id||!Array.isArray(L.p?.stops)||!Array.isArray(L.agents)||!(Date.now()-L.at<14*864e5))return false;  // only this crew and city, and not a stale old night
+  const by=n=>SPOTS.find(s=>s.n===n),stops=L.p.stops.filter(Array.isArray).slice(0,4).map(([time,n,note,en])=>({time:str(time,20),spot:by(n),note:str(note,160),en:str(en,80)})).filter(s=>s.spot);
+  if(!stops.length)return false;
+  const base=agentList();if(base.length!==L.agents.length||base.some((a,i)=>a.n!==L.agents[i]?.n))return false;  // the committee changed since: start fresh
+  agents=base.map((a,i)=>{const v=L.agents[i];return {...a,ps:a.wallet||PERS[a.ps]?a.ps:REAL_PERS.includes(v.ps)?v.ps:a.ps,drew:v.drew===true,favs:Array.isArray(v.favs)?v.favs.filter(x=>typeof x==="string").slice(0,3):[]}});  // full profiles from the crew, plus what this run drew
+  transcript=(Array.isArray(L.transcript)?L.transcript:[]).slice(-80).map(m=>({who:str(m?.who,60),text:str(m?.text,600),ai:Number.isInteger(m?.ai)&&agents[m.ai]?m.ai:undefined,via:str(m?.via,40)})).filter(m=>m.text);
+  SL={list:(Array.isArray(L.sl)?L.sl:[]).map(by).filter(Boolean),C:constraints()};if(!SL.list.length)SL=shortlist();
+  round=Number.isInteger(L.round)?L.round:3;DEMO=!MOCK&&!providers().length;
+  $("setup").classList.add("hide");$("composer").classList.remove("off");chatEl.innerHTML="";lastWho=null;renderHead();
+  for(const m of transcript)m.ai==null?addBubble(null,m.text):addBubble(agents[m.ai],m.text,m.via||undefined);
+  lastPlan={title:str(L.p.title,80),drama:L.p.drama,verdict:str(L.p.verdict,200),when:str(L.p.when,60),id:str(L.p.id,12),stops};
+  renderTicket(lastPlan,plan.members.map(m=>m.n),transcript.filter(m=>m.ai!=null).length);setComposer(true);return true}
 async function handleHash(first){
   const h=location.hash.match(/^#([jrpvcfm])=(.+)$/);
-  if(!h){if(first&&MOCK&&params.has("auto"))start();else if(first&&!store.get("onboarded",0)&&isSample(plan))openOnboarding();return}
+  if(!h){if(first&&MOCK&&params.has("auto"))start();else if(first&&!store.get("onboarded",0)&&isSample(plan))openOnboarding();else if(first)try{restoreLast()}catch(e){store.set("last",null);chatEl.innerHTML="";renderSetup();$("setup").classList.remove("hide")}return}  // a broken save never leaves a blank screen
   if(busy)return;
   try{const data=await unpack(h[2]);
     const want=h[1]==="p"?data?.c:"vcm".includes(h[1])?null:data?.city;  // open the link in its own city
