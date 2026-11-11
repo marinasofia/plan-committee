@@ -40,7 +40,7 @@ Open http://localhost:8000/?mock. Mock mode runs scripted agents, so you don't n
 3. **Data only from NYC Open Data, OpenStreetMap and Overture Maps.** Don't scrape Google Maps, Yelp, Resy or The Infatuation.
 4. **Treat every outside input as hostile.** Share links, `spots.json`, OpenStreetMap tags and AI replies all go through `esc()`, links through `safeUrl()`. Users' AI keys live in the browser, so an injection bug can steal them.
 5. **Never put an API key in code, issues or pull requests.** If you leak one, delete it in Google AI Studio or Groq right away.
-6. Keep pull requests small and focused, and say how you tested.
+6. Keep pull requests small and focused, and say how you tested. Changes to the app should pass the browser tests: `node --test tests/browser/app.test.mjs` (Node 22 and Chrome, no packages). They run the demo and check every plan.
 
 ## Security issues
 

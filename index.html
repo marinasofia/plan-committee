@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>The Plan Committee</title>
 <meta name="description" content="Your friends pick what they want. AI agents argue for each of you in a group chat and agree on one plan for a night out in NYC or London.">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-RvjsUYA0/9HXAeWdRjRGUlums8fx0MOZPx16esbAKQE='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https:; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-cM+Je4EfDozPPIr3LO5L0bCF0WAZqNayI2ggcnqWIJY='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https:; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
 <meta name="referrer" content="no-referrer">
 <meta name="theme-color" content="#fbf9f6">
 <link rel="manifest" href="manifest.webmanifest">
@@ -1214,12 +1214,23 @@ Use 3 stops in order: a place whose type is dinner, then one whose type is drink
 const LEG_KM={walk:1.25,transit:6,car:10};  // about 20 min on foot, 25 by transit, 27 by car (see travel())
 const SLOT_KIND=["dinner","drinks","late","late"];
 function tighten(p){const lim=LEG_KM[plan.move]||LEG_KM.walk,base=nightDate(p.when||plan.when),kind=t=>t==="free"?"late":t;
+  const ok=s=>s.p<=SL.C.maxB&&!(plan.needs.includes("wheel")&&s.x.includes("nowheel"));  // places off the shortlist still fit the budget and needs
   for(let i=0;i<p.stops.length;i++){const st=p.stops[i],t=parseTime(st.time,base),m=t.getHours()*60+t.getMinutes()+(t.getDate()!==base.getDate()?1440:0),
       prev=i?p.stops[i-1].spot:null,leg=i?km(prev,st.spot)??0:0,far=leg>lim,closed=shut(st.spot,t,m),want=SLOT_KIND[i],
       wrong=kind(st.spot.t)!==want||!SL.list.includes(st.spot);if(!far&&!closed&&!wrong)continue;
     const keep=p.stops.filter((_,q)=>q!==i).map(x=>x.spot),
       dist=s=>keep.reduce((n,c)=>n+(km(c,s)??9),0),
-      pick=SL.list.filter(s=>kind(s.t)===want&&!p.stops.some(x=>x.spot.n===s.n)&&!shut(s,t,m)&&(!far||(km(prev,s)??99)<leg)).sort((x,y)=>(i&&((km(prev,x)??99)>lim)-((km(prev,y)??99)>lim))||dist(x)-dist(y))[0];  // one within the limit first
+      fits=s=>kind(s.t)===want&&!p.stops.some(x=>x.spot.n===s.n)&&!shut(s,t,m)&&(!far||(km(prev,s)??99)<leg),
+      best=L=>L.filter(fits).sort((x,y)=>(i&&((km(prev,x)??99)>lim)-((km(prev,y)??99)>lim))||dist(x)-dist(y))[0];  // one within the limit first
+    let pick=best(SL.list);
+    if(far&&(!pick||(km(prev,pick)??99)>lim)){  // nothing on the shortlist is close enough: look wider, within budget and needs, and add it to the list
+      const wide=best(SPOTS.filter(s=>(km(prev,s)??99)<=lim&&ok(s)));if(wide){pick=wide;SL.list.push(wide)}
+      else if(i>1&&!closed&&!wrong){  // still nothing near the last stop, which is fine otherwise: move the last stop instead, to somewhere close to both its neighbors
+        const a=p.stops[i-2].spot,b=st.spot,pt=parseTime(p.stops[i-1].time,base),pm=pt.getHours()*60+pt.getMinutes()+(pt.getDate()!==base.getDate()?1440:0),
+          mid=SPOTS.filter(s=>kind(s.t)===SLOT_KIND[i-1]&&!p.stops.some(x=>x.spot.n===s.n)&&!shut(s,pt,pm)&&ok(s)&&(km(a,s)??99)<=lim&&(km(b,s)??99)<=lim)
+            .sort((x,y)=>(km(a,x)+km(b,x))-(km(a,y)+km(b,y)))[0];
+        if(mid){if(!SL.list.includes(mid))SL.list.push(mid);p.stops[i-1]={...p.stops[i-1],spot:mid,name:mid.n,en:"",note:"the planner swapped this in, so every stop is a short hop"};continue}}}
+    if(far&&(!pick||(km(prev,pick)??99)>lim)&&want==="late"&&i===p.stops.length-1&&p.stops.length>2){p.stops.splice(i,1);break}  // nothing open within reach for the last stop: end the night after drinks rather than send people on a long trek
     if(pick)p.stops[i]={...st,spot:pick,name:pick.n,en:"",note:wrong?`the planner swapped this in, a real ${want==="late"?"late night":want} spot`:closed?"the planner swapped this in, sure to be open then":"the planner swapped this in, closer to the last stop"};
     else if((wrong||closed&&want==="late")&&p.stops.length>1){p.stops.splice(i,1);i--}}}  // nothing to swap in: drop a wrong place, or a late stop that may be shut; dinner and drinks that may be shut stay with the "may be closed" note
 function parseJSON(t){t=t.replace(/```json|```/g,"").trim();try{return JSON.parse(t)}catch(e){const m=t.match(/\{[\s\S]*\}/);if(m)return JSON.parse(m[0]);throw new Error("Couldn't read the plan. Try again.")}}
