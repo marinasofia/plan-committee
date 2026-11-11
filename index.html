@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>The Plan Committee</title>
 <meta name="description" content="Your friends pick what they want. AI agents argue for each of you in a group chat and agree on one plan for a night out in NYC or London.">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-/eUgdP1CuFQJA6Q1OrKpZw0NOQVFeTkoNR/c1CX993o='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https:; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-JHBpho36VZsQUrzwseCvxGclo9j5IMy6Sj/L9LugHcw='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https:; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
 <meta name="referrer" content="no-referrer">
 <meta name="theme-color" content="#fbf9f6">
 <link rel="manifest" href="manifest.webmanifest">
@@ -161,6 +161,9 @@ button,input,select,textarea{font:inherit;color:inherit}
 .prov .ph{display:flex;justify-content:space-between;align-items:center;font-weight:600;gap:10px}
 .st{font-family:"DM Mono",monospace;font-size:11px;color:var(--muted);font-weight:400;text-align:right}
 .st.ok{color:var(--ok)}.st.bad{color:#b4413c}
+.tag{display:inline-block;font-size:10.5px;font-weight:600;border-radius:99px;padding:2px 7px;margin-left:6px;vertical-align:1px;letter-spacing:.02em}.tag.free{background:#e3f1e6;color:#1d6436}.tag.paid{background:#f1e9df;color:#77552a}
+.keycard{display:flex;gap:12px;align-items:center;justify-content:space-between;margin:0 0 12px;padding:12px 14px;border-radius:14px;border:1px solid var(--line);background:#fff;font-size:13.5px;line-height:1.4}
+.keycard b{display:block}.keycard button{flex:none;border:0;background:var(--ink);color:#fff;border-radius:99px;padding:9px 13px;font-weight:600;font-size:13px;cursor:pointer}
 .prov input,.prov select{margin-top:8px}
 .prov .small{margin-top:6px}
 .who{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
@@ -235,6 +238,7 @@ button,input,select,textarea{font:inherit;color:inherit}
         <p class="small" style="margin-top:6px"><a href="#" id="newCrewLink">Start a new crew</a> · <a href="#" id="crewDel">Delete this crew</a></p></div>
     </details>
 
+    <div class="keycard" id="keyCard"><div><b>Turn on the real AI agents</b>Free with a Google account, about a minute. Without it you get a scripted demo.</div><button type="button" id="keyCardBtn">Set up</button></div>
     <button class="cta" id="startBtn" type="button">Start the group chat</button>
     <p class="small">Places from hand picks, Overture Maps Foundation, <span id="nycSrc">NYC Open Data </span>and © OpenStreetMap contributors. Weather by Open-Meteo. Check hours before you go.</p>
     <p class="small" id="keyHint">No AI key yet? You'll see a demo first. <a href="#" id="keyLink">Add a free key</a> (1 minute) or one you already have to turn on the real AI.</p>
@@ -270,20 +274,30 @@ button,input,select,textarea{font:inherit;color:inherit}
       <div class="seg" id="poolSeg"><button type="button" data-pool="smart">Smart mix</button><button type="button" data-pool="battle">Model battle</button></div>
       <p class="small" id="poolNote"></p></div>
 
-    <div class="prov"><div class="ph">Gemini <span class="st" id="st-gemini"></span></div>
+    <div class="prov"><div class="ph"><span>Gemini <span class="tag free">free</span></span> <span class="st" id="st-gemini"></span></div>
       <input class="field" id="gKey" type="password" placeholder="Gemini API key" autocomplete="off">
       <select class="field" id="gModel"><option value="">auto (picks free Flash models)</option></select>
       <p class="small">Free at <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a>, no card.</p></div>
 
-    <div class="prov"><div class="ph">Groq <span class="st" id="st-groq"></span></div>
+    <div class="prov"><div class="ph"><span>Groq <span class="tag free">free</span></span> <span class="st" id="st-groq"></span></div>
       <input class="field" id="qKey" type="password" placeholder="Groq API key" autocomplete="off">
       <input class="field" id="qModel" placeholder="model (empty = auto, picks the biggest free one)">
       <p class="small">Free at <a href="https://console.groq.com/keys" target="_blank" rel="noopener">console.groq.com/keys</a>, no card. Runs open models like Meta's Llama, very fast.</p></div>
 
-    <div class="prov"><div class="ph">OpenRouter <span class="st" id="st-openrouter"></span></div>
+    <div class="prov"><div class="ph"><span>OpenRouter <span class="tag free">free models</span></span> <span class="st" id="st-openrouter"></span></div>
       <input class="field" id="oKey" type="password" placeholder="OpenRouter API key" autocomplete="off">
       <input class="field" id="oModel" placeholder="model">
       <p class="small">Free at <a href="https://openrouter.ai/keys" target="_blank" rel="noopener">openrouter.ai/keys</a>. <code>openrouter/free</code> picks a free model. Small daily free limit.</p></div>
+
+    <div class="prov"><div class="ph"><span>Claude by Anthropic <span class="tag paid">paid</span></span> <span class="st" id="st-anthropic"></span></div>
+      <input class="field" id="aKey" type="password" placeholder="Anthropic API key (sk-ant-…)" autocomplete="off">
+      <input class="field" id="aModel" placeholder="model (empty = claude-opus-5-5)">
+      <p class="small">Uses your own API credit, usually well under a dollar per plan. Get a key at <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">console.anthropic.com</a>. A Claude Pro or Max plan doesn't include API credit.</p></div>
+
+    <div class="prov"><div class="ph"><span>OpenAI <span class="tag paid">paid</span></span> <span class="st" id="st-openai"></span></div>
+      <input class="field" id="pKey" type="password" placeholder="OpenAI API key (sk-…)" autocomplete="off">
+      <input class="field" id="pModel" placeholder="model (empty = auto, newest small GPT)">
+      <p class="small">Uses your own API credit, usually well under a dollar per plan. Get a key at <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener">platform.openai.com/api-keys</a>. A ChatGPT Plus plan doesn't include API credit.</p></div>
 
     <div class="prov"><div class="ph">Other API <span class="st" id="st-custom"></span></div>
       <input class="field" id="cBase" placeholder="base URL, e.g. https://api.openai.com/v1">
@@ -340,10 +354,15 @@ button,input,select,textarea{font:inherit;color:inherit}
     <div class="eyebrow" id="qkEyebrow">Step 1 of 3</div>
     <div class="qzbar"><span id="qkBar"></span></div>
     <div class="qks" data-s="1">
-      <h2>Turn on the real AI. It's free.</h2>
-      <p class="lead">One minute, no card. Only you need a key: friends who join by link don't. Which account do you have handy?</p>
-      <button type="button" class="qztile" data-p="gemini"><b>A Google account</b><span>Get a free Gemini key from Google AI Studio</span></button>
-      <button type="button" class="qztile" data-p="groq"><b>An email address</b><span>Get a free Groq key, the fastest replies</span></button>
+      <h2>Turn on the real AI agents</h2>
+      <p class="lead">About a minute. Only you need a key: friends who join by link don't.</p>
+      <button type="button" class="qztile" data-p="gemini"><b>Use my Google account <span class="tag free">free</span></b><span>Get a Gemini key from Google AI Studio. No card needed.</span></button>
+      <details class="more" id="qkOther"><summary><span>Other options</span><span class="sm">free and paid</span></summary>
+        <button type="button" class="qztile" data-p="groq" style="margin-top:10px"><b>Groq <span class="tag free">free</span></b><span>Sign up with any email. The fastest replies.</span></button>
+        <button type="button" class="qztile" data-p="openrouter"><b>OpenRouter <span class="tag free">free models</span></b><span>Free models with a small daily limit.</span></button>
+        <button type="button" class="qztile" data-p="anthropic"><b>Claude by Anthropic <span class="tag paid">paid</span></b><span>Uses credit on your Anthropic account, usually well under a dollar per plan.</span></button>
+        <button type="button" class="qztile" data-p="openai"><b>OpenAI <span class="tag paid">paid</span></b><span>Uses credit on your OpenAI account, usually well under a dollar per plan.</span></button>
+      </details>
       <p class="small" style="text-align:center;margin-top:14px"><a href="#" id="qkHave">I already have a key</a></p>
     </div>
     <div class="qks" data-s="2">
@@ -352,6 +371,12 @@ button,input,select,textarea{font:inherit;color:inherit}
       <a class="cta" id="qkOpen" href="#" target="_blank" rel="noopener">Open</a>
       <p class="small" style="text-align:center">It opens in a new tab. Copy your key there, then come back to this tab.</p>
       <button class="ghost" id="qkCopied" type="button" style="width:100%;margin-top:6px">I copied my key</button>
+      <details class="more"><summary><span>Questions?</span><span class="sm">what a key is, cost, safety</span></summary>
+        <p class="small"><b>What's a key?</b> A password that lets this app use AI on your own account.</p>
+        <p class="small"><b>Will I be charged?</b> Gemini, Groq and OpenRouter's free models have no card attached. Claude and OpenAI keys use the credit you add, usually well under a dollar per plan.</p>
+        <p class="small"><b>Is it safe?</b> The key stays in this browser and goes only to the company that issued it. Friends never see it.</p>
+        <p class="small"><b>Can I undo it?</b> Delete the key on that company's site anytime, and it stops working here.</p>
+      </details>
     </div>
     <div class="qks" data-s="3">
       <h2>Paste your key</h2>
@@ -657,7 +682,7 @@ function importCrew(P,confirmed){if(!P||typeof P!=="object")throw new Error("bad
   stash();plan={id,name:str(P.name,30)||"Shared crew",city:cityOk(P.city)?P.city:"nyc",mode:P.mode==="girls"?"girls":"date",
     when:P.when,start:P.start,needs:P.needs,hood:str(P.hood,30)||"Anywhere",wallet:P.wallet===true,move:P.move,members:cleanMembers(P.members)};
   fixPlan();savePlan();return had}
-let cfg={pool:"smart",gKey:"",gModel:"",qKey:"",qModel:"",oKey:"",oModel:"openrouter/free",cBase:"",cKey:"",cModel:"",...store.get("cfg2",{})};
+let cfg={pool:"smart",gKey:"",gModel:"",qKey:"",qModel:"",oKey:"",oModel:"openrouter/free",aKey:"",aModel:"",pKey:"",pModel:"",cBase:"",cKey:"",cModel:"",...store.get("cfg2",{})};
 delete cfg.ol;delete cfg.olModel;delete cfg.olUrl;  /* Ollama support was removed */
 if(cfg.qModel==="llama-3.3-70b-versatile")cfg.qModel="";  /* retired by Groq */
 {const old=store.get("cfg",null);if(old&&!store.get("cfg2",null)){if(old.key)cfg.gKey=old.key;store.set("cfg2",cfg)}}
@@ -709,7 +734,7 @@ function renderSetup(){
     $("geoRow").style.display="none";if(v===CITY.id)return;hush();await loadCity(v).catch(e=>say(e.message));plan.city=CITY.id;plan.hood="Anywhere";savePlan();renderSetup()});
   $("addForm").style.display=plan.members.length>=6?"none":"";
   $("startBtn").textContent=`Start the chat (${plan.members.length} agent${plan.members.length===1?"":"s"}${plan.wallet?" + The Wallet":""})`;  // short enough for one line on a 360px phone
-  $("keyHint").style.display=providers().length||MOCK?"none":"";
+  $("keyHint").style.display="none";$("keyCard").style.display=providers().length||MOCK?"none":"";
   $("nycSrc").hidden=CITY.id!=="nyc";
   renderHead();
 }
@@ -979,13 +1004,41 @@ const stubSpot=n=>({n:str(n,80),t:"dinner",h:"",b:"",p:2,c:"",f:[],v:"",nw:false
 /* ===================== AI providers: spread across keys, fail over ===================== */
 class PErr extends Error{constructor(kind,msg,wait){super(msg);this.kind=kind;this.wait=wait}}
 const GBASE="https://generativelanguage.googleapis.com/v1beta";
-const GAP={gemini:4300,groq:2300,openrouter:3300,custom:600};
+const GAP={gemini:4300,groq:2300,openrouter:3300,anthropic:600,openai:600,custom:600};
 const last={}, cool={}, dead={};
 let gemModels=null;
 function providers(){const p=[];
-  if(cfg.qKey)p.push("groq");if(cfg.gKey)p.push("gemini");if(cfg.oKey)p.push("openrouter");if(cfg.cKey&&cfg.cBase&&cfg.cModel)p.push("custom");
+  if(cfg.qKey)p.push("groq");if(cfg.gKey)p.push("gemini");if(cfg.oKey)p.push("openrouter");if(cfg.aKey)p.push("anthropic");if(cfg.pKey)p.push("openai");if(cfg.cKey&&cfg.cBase&&cfg.cModel)p.push("custom");
   return p}
 const shortModel=m=>(m||"").split("/").pop().replace(/:free$/,"").replace(/-versatile|-instruct|-latest|-preview.*$/g,"").slice(0,24);
+/* paid keys: the person's own Anthropic or OpenAI account */
+const CLAUDE_DEFAULT="claude-opus-5-5",FALLBACK_OK=/^claude-(opus-5-5|opus-5|sonnet-5-5|fable-5)/;  // server-side refusal fallback only where the API offers it
+async function claudeCall(system,user,json){
+  const model=cfg.aModel||CLAUDE_DEFAULT,fb=FALLBACK_OK.test(model);
+  const r=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",signal:aiSignal(),
+    headers:{"Content-Type":"application/json","x-api-key":cfg.aKey,"anthropic-version":"2026-10-21","anthropic-dangerous-direct-browser-access":"true",...(fb?{"anthropic-beta":"server-side-fallback-2026-07-01"}:{})},
+    body:JSON.stringify({model,max_tokens:16000,system,messages:[{role:"user",content:user}],output_config:{effort:json?"medium":"low"},...(fb?{fallbacks:"default"}:{})})})  // chat lines are short: low effort keeps them quick and cheap
+    .catch(netErr("Can't reach Claude"));
+  if(!r.ok){let m="";try{m=(await r.json()).error?.message||""}catch(e){}
+    if(r.status===401||r.status===403)throw new PErr("auth","Claude key didn't work");
+    if(r.status===402||r.status===400&&/credit balance/i.test(m))throw new PErr("auth","Your Anthropic account has no credit left");
+    if(r.status===429||r.status===529||r.status>=500)throw new PErr("quota","Claude is busy",+r.headers.get("retry-after")*1000||20000);
+    throw new PErr("other",`Claude error ${r.status}: ${m.slice(0,120)}`)}
+  const j=await r.json();
+  if(j.stop_reason==="refusal")throw new PErr("other","Claude declined this one");
+  const txt=(Array.isArray(j.content)?j.content:[]).filter(b=>b?.type==="text").map(b=>String(b.text||"")).join("").trim();
+  if(!txt)throw new PErr("other","Claude sent an empty reply");
+  return {text:txt,model:j.model||model};
+}
+let oaPick=null;
+async function openaiModel(){if(oaPick)return oaPick;  // the newest small GPT model on the account, so nobody has to know model names
+  const r=await fetch("https://api.openai.com/v1/models",{headers:{"Authorization":"Bearer "+cfg.pKey},signal:aiSignal()}).catch(netErr("Can't reach OpenAI"));
+  if(r.status===401||r.status===403)throw new PErr("auth","OpenAI key didn't work");
+  if(!r.ok)throw new PErr("quota","OpenAI is busy",20000);
+  const ids=((await r.json()).data||[]).map(m=>String(m.id||"")).filter(id=>/^gpt-\d+(\.\d+)?(-mini)?$/.test(id)),v=id=>parseFloat(id.slice(4))||0;
+  const pick=ids.filter(id=>id.endsWith("-mini")).sort((a,b)=>v(b)-v(a))[0]||ids.sort((a,b)=>v(b)-v(a))[0];
+  if(!pick)throw new PErr("other","No GPT model found on this OpenAI account");
+  return oaPick=pick}
 async function geminiModels(){
   if(cfg.gModel)return [cfg.gModel];
   if(gemModels&&gemModels.length)return gemModels;
@@ -1010,14 +1063,15 @@ async function groqModel(){
   if(!ids.length)throw new PErr("other","Groq has no chat model available");
   return groqPick=ids[0];
 }
-async function openaiCall(base,key,model,system,user,json,name){
+async function openaiCall(base,key,model,system,user,json,name,noTemp){
   const r=await fetch(`${base}/chat/completions`,{method:"POST",signal:aiSignal(),headers:{"Content-Type":"application/json","Authorization":"Bearer "+key},
-    body:JSON.stringify({model,temperature:json?0.4:1,messages:[{role:"system",content:system},{role:"user",content:user}],...(json?{response_format:{type:"json_object"}}:{})})})
+    body:JSON.stringify({model,...(noTemp?{}:{temperature:json?0.4:1}),messages:[{role:"system",content:system},{role:"user",content:user}],...(json?{response_format:{type:"json_object"}}:{})})})
     .catch(netErr(`Can't reach ${name}`));
-  if(!r.ok){let m="";try{const j=await r.json();m=j.error?.message||""}catch(e){}
+  if(!r.ok){let m="",code="";try{const j=await r.json();m=j.error?.message||"";code=j.error?.code||""}catch(e){}
     if(r.status===401||r.status===403)throw new PErr("auth",`${name} key didn't work`);
+    if(name==="OpenAI"&&code==="insufficient_quota")throw new PErr("auth",`Your ${name} account has no credit left`);  // only OpenAI: Groq and OpenRouter free limits are just "busy"
     if(r.status===429||r.status>=500)throw new PErr("quota",`${name} is busy or out of free quota`,/day/i.test(m)?3600e3:30e3);
-    if(json&&r.status===400&&/response_format|json/i.test(m))return openaiCall(base,key,model,system+"\nReturn ONLY valid JSON.",user,false,name);
+    if(json&&r.status===400&&/response_format|json/i.test(m))return openaiCall(base,key,model,system+"\nReturn ONLY valid JSON.",user,false,name,noTemp);
     throw new PErr("other",`${name} error ${r.status}: ${m.slice(0,120)}`)}
   const j=await r.json();const txt=(j.choices?.[0]?.message?.content||"").replace(/<think>[\s\S]*?<\/think>/g,"").trim();
   if(!txt)throw new PErr("other",`${name} sent an empty reply`);
@@ -1028,6 +1082,8 @@ async function callProvider(p,system,user,json){
   if(p==="groq")return openaiCall("https://api.groq.com/openai/v1",cfg.qKey,cfg.qModel||await groqModel(),system,user,json,"Groq");
   if(p==="openrouter")return openaiCall("https://openrouter.ai/api/v1",cfg.oKey,cfg.oModel||"openrouter/free",system,user,json,"OpenRouter");
   if(p==="custom")return openaiCall(cfg.cBase.replace(/\/$/,""),cfg.cKey,cfg.cModel,system,user,json,"Your API");
+  if(p==="openai")return openaiCall("https://api.openai.com/v1",cfg.pKey,cfg.pModel||await openaiModel(),system,user,json,"OpenAI",true);
+  if(p==="anthropic")return claudeCall(system,user,json);
   // gemini: walk through the free Flash models, dropping any that run out of daily quota
   const models=await geminiModels();
   while(models.length){
@@ -1079,6 +1135,7 @@ function renderSettings(){
   document.querySelectorAll("#poolSeg button").forEach(b=>b.classList.toggle("on",b.dataset.pool===cfg.pool));
   $("poolNote").textContent=cfg.pool==="battle"?"Each agent runs on a different AI from your keys, and its model shows next to its name.":"Agents take turns across your keys to stay under free limits.";
   $("gKey").value=cfg.gKey;$("qKey").value=cfg.qKey;$("qModel").value=cfg.qModel;$("oKey").value=cfg.oKey;$("oModel").value=cfg.oModel;
+  $("aKey").value=cfg.aKey;$("aModel").value=cfg.aModel;$("pKey").value=cfg.pKey;$("pModel").value=cfg.pModel;
   $("cBase").value=cfg.cBase;$("cKey").value=cfg.cKey;$("cModel").value=cfg.cModel;
   const sel=$("gModel");if(cfg.gModel&&![...sel.options].some(o=>o.value===cfg.gModel))sel.insertAdjacentHTML("beforeend",`<option>${esc(cfg.gModel)}</option>`);sel.value=cfg.gModel;
 }
@@ -1087,12 +1144,14 @@ $("gearBtn").onclick=()=>{if(!providers().length&&!MOCK)return openQuickKey();re
 $("closeSettings").onclick=()=>{readSettings();$("settings").classList.add("hide");renderSetup()};
 function readSettings(){
   Object.assign(cfg,{gKey:$("gKey").value.trim(),gModel:$("gModel").value,qKey:$("qKey").value.trim(),qModel:$("qModel").value.trim(),
-    oKey:$("oKey").value.trim(),oModel:$("oModel").value.trim()||"openrouter/free",cBase:$("cBase").value.trim(),cKey:$("cKey").value.trim(),cModel:$("cModel").value.trim()});
-  store.set("cfg2",cfg);if(providers().length)keepStorage();gemModels=null;groqPick=null;for(const k in dead)delete dead[k];for(const k in cool)delete cool[k];
+    oKey:$("oKey").value.trim(),oModel:$("oModel").value.trim()||"openrouter/free",aKey:$("aKey").value.trim(),aModel:$("aModel").value.trim(),pKey:$("pKey").value.trim(),pModel:$("pModel").value.trim(),cBase:$("cBase").value.trim(),cKey:$("cKey").value.trim(),cModel:$("cModel").value.trim()});
+  for(const f of ["gKey","qKey","oKey","aKey","pKey"]){const k=cfg[f].replace(/\s+/g,""),own=KEY_TYPES.find(([re])=>re.test(k));  // a key pasted in the wrong box moves to its own, so it only ever goes to the company that issued it
+    if(own&&own[2]!==f){cfg[own[2]]=k;cfg[f]=""}}
+  store.set("cfg2",cfg);if(providers().length)keepStorage();gemModels=null;groqPick=null;oaPick=null;for(const k in dead)delete dead[k];for(const k in cool)delete cool[k];
 }
 $("testKeys").onclick=async()=>{
   readSettings();const P=providers();
-  ["gemini","groq","openrouter","custom"].forEach(p=>{const el=$("st-"+p);el.textContent=P.includes(p)?"testing…":"";el.className="st"});
+  ["gemini","groq","openrouter","anthropic","openai","custom"].forEach(p=>{const el=$("st-"+p);el.textContent=P.includes(p)?"testing…":"";el.className="st"});
   if(!P.length){$("st-gemini").textContent="add at least one key";return}
   if(cfg.gKey){try{const list=[...await geminiModels()];$("gModel").innerHTML=`<option value="">auto (starts with ${esc(list[0]||"none")})</option>`+list.map(m=>`<option ${m===cfg.gModel?"selected":""}>${esc(m)}</option>`).join("")}catch(e){}}
   await Promise.all(P.map(async p=>{const el=$("st-"+p);
@@ -1102,19 +1161,27 @@ $("testKeys").onclick=async()=>{
 };
 
 /* quick key: paste any key, we work out whose it is */
-/* Google has two key formats (AIza… and the newer AQ.…). Anything unrecognized is tried on each service in turn. */
-const KEY_TYPES=[[/^(AIza[\w-]{30,}|AQ\.[\w.-]{20,})$/,"gemini","gKey","Gemini"],[/^gsk_\w{20,}$/,"groq","qKey","Groq"],[/^sk-or-[\w-]{20,}$/,"openrouter","oKey","OpenRouter"]];
+/* Google has two key formats (AIza… and the newer AQ.…). Order matters: sk-or- and sk-ant- before OpenAI's plain sk-. An unrecognized key is refused, never tried around. */
+const KEY_TYPES=[[/^(AIza[\w-]{30,}|AQ\.[\w.-]{20,})$/,"gemini","gKey","Gemini"],[/^gsk_\w{20,}$/,"groq","qKey","Groq"],[/^sk-or-[\w-]{20,}$/,"openrouter","oKey","OpenRouter"],
+  [/^sk-ant-[\w-]{20,}$/,"anthropic","aKey","Claude"],[/^sk-(?!ant-|or-)(proj-|svcacct-)?[\w-]{20,}$/,"openai","pKey","OpenAI"]]  // a cut-off Claude or OpenRouter key never counts as OpenAI;
+const KEY_NAMES="a Gemini, Groq, OpenRouter, Claude or OpenAI key";
 /* guided key setup: pick an account, open the right page, paste. Every word here is ours (constants) */
 const QK={gemini:{name:"Gemini",who:"Google",url:"https://aistudio.google.com/apikey",open:"Open Google AI Studio",
     steps:["Sign in with your Google account.","Tap <b>Create API key</b>. If it asks for a project, pick any one.","Tap the copy icon next to the key. It starts with <b>AIza</b>."]},
   groq:{name:"Groq",who:"Groq",url:"https://console.groq.com/keys",open:"Open the Groq console",
-    steps:["Sign up with your email (or Google).","Tap <b>Create API Key</b>, type any name, tap <b>Submit</b>.","Copy the key right away, Groq shows it only once. It starts with <b>gsk_</b>."]}};
+    steps:["Sign up with your email (or Google).","Tap <b>Create API Key</b>, type any name, tap <b>Submit</b>.","Copy the key right away, Groq shows it only once. It starts with <b>gsk_</b>."]},
+  openrouter:{name:"OpenRouter",who:"OpenRouter",url:"https://openrouter.ai/keys",open:"Open OpenRouter",
+    steps:["Sign up with Google or your email.","Tap <b>Create API Key</b>, type any name, tap <b>Create</b>.","Copy the key, it starts with <b>sk-or-</b>. Free models have a small daily limit."]},
+  anthropic:{name:"Claude",who:"Anthropic",url:"https://console.anthropic.com/settings/keys",open:"Open the Anthropic Console",paid:true,
+    steps:["Sign in to the Anthropic Console (it's separate from a Claude Pro or Max plan).","Add API credit under <b>Billing</b> if you haven't. A plan usually costs well under a dollar.","Tap <b>Create Key</b> and copy it. It starts with <b>sk-ant-</b>."]},
+  openai:{name:"OpenAI",who:"OpenAI",url:"https://platform.openai.com/api-keys",open:"Open the OpenAI platform",paid:true,
+    steps:["Sign in to the OpenAI platform (it's separate from ChatGPT Plus).","Add API credit under <b>Billing</b> if you haven't. A plan usually costs well under a dollar.","Tap <b>Create new secret key</b> and copy it. It starts with <b>sk-</b>."]}};
 let qkProv=null,qkStep=1,qkOpened=false;
 function qkShow(n){qkStep=n;document.querySelectorAll("#quickKey .qks").forEach(el=>el.classList.toggle("on",+el.dataset.s===n));
   $("qkEyebrow").textContent=`Step ${n} of 3`;$("qkBar").style.width=`${Math.round(n/3*100)}%`;$("qkBackWrap").style.display=n>1?"":"none";
   const q=QK[qkProv];
-  if(n===2&&q){$("qk2Title").textContent=`Get your free ${q.name} key`;$("qkSteps").innerHTML=q.steps.map(t=>`<li>${t}</li>`).join("");$("qkOpen").href=q.url;$("qkOpen").textContent=q.open}
-  if(n===3){$("qk3Lead").textContent=q?`It stays in this browser and is sent only to the company that issued it (${q.who}).`:"A Gemini, Groq or OpenRouter key works. It stays in this browser and is sent only to the company that issued it.";qkSay("")}}
+  if(n===2&&q){$("qk2Title").textContent=q.paid?`Get your ${q.name} key (paid)`:`Get your free ${q.name} key`;$("qkSteps").innerHTML=q.steps.map(t=>`<li>${t}</li>`).join("");$("qkOpen").href=q.url;$("qkOpen").textContent=q.open}
+  if(n===3){$("qk3Lead").textContent=q?`It stays in this browser and is sent only to the company that issued it (${q.who}).`:`${KEY_NAMES.replace(/^a /,"A ")} works. It stays in this browser and is sent only to the company that issued it.`;qkSay("")}}
 document.querySelectorAll("#quickKey [data-p]").forEach(b=>b.onclick=()=>{qkProv=b.dataset.p;qkOpened=false;qkShow(2)});
 $("qkHave").onclick=e=>{e.preventDefault();qkProv=null;qkShow(3);$("qkInput").focus()};
 $("qkOpen").onclick=()=>{qkOpened=true};
@@ -1123,9 +1190,9 @@ $("qkBack").onclick=e=>{e.preventDefault();qkShow(qkStep===3&&qkProv?2:1)};
 // coming back from the key page: go straight to the paste step
 document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible"&&qkOpened&&qkStep===2&&!$("quickKey").classList.contains("hide"))qkShow(3)});
 $("qkPasteBtn").onclick=async()=>{try{const t=(await navigator.clipboard.readText()).trim();if(!t)throw 0;$("qkInput").value=t;
-    if(KEY_TYPES.some(([re])=>re.test(t.replace(/\s+/g,""))))quickKeyGo();else qkSay("That doesn't look like a Gemini, Groq or OpenRouter key. Check it, then tap Use this key.","bad")}
+    if(KEY_TYPES.some(([re])=>re.test(t.replace(/\s+/g,""))))quickKeyGo();else qkSay(`That doesn't look like ${KEY_NAMES}. Check it, then tap Use this key.`,"bad")}
   catch(e){qkSay("Tap the box below, then paste (long press and Paste on a phone).","bad");$("qkInput").focus()}};
-$("keyLink").onclick=e=>{e.preventDefault();openQuickKey()};
+$("keyLink").onclick=e=>{e.preventDefault();openQuickKey()};$("keyCardBtn").onclick=openQuickKey;
 $("keyPill").onclick=openQuickKey;$("keyBar").onclick=openQuickKey;
 function openQuickKey(){qkShow(1);$("qkInput").value="";qkSay("It stays in this browser and is sent only to the provider you chose.");$("quickKey").classList.remove("hide")}
 function qkSay(t,cls){const el=$("qkStatus");el.textContent=t;el.style.color=cls==="bad"?"#b4413c":cls==="ok"?"var(--ok)":""}
@@ -1138,14 +1205,14 @@ async function quickKeyGo(){
   if(!k){qkSay("Paste your key first.","bad");return}
   if(k.length<20||/\s/.test(k)){qkSay("That looks too short to be a key. Copy it again.","bad");return}
   const known=KEY_TYPES.find(([re])=>re.test(k));
-  if(!known){qkSay("That doesn't look like a Gemini, Groq or OpenRouter key. Check it, or paste it in its own box under settings.","bad");return}  // never try an unknown secret on three companies
+  if(!known){qkSay(`That doesn't look like ${KEY_NAMES}. Check it, or paste it in its own box under settings.`,"bad");return}  // never try an unknown secret on three companies
   qkBusy=true;$("qkGo").disabled=true;
   let ok=null,lastMsg="";
   for(const [,p,field,name] of [known]){
     qkSay(`Checking your key with ${name}…`);
-    const prev=cfg[field];cfg[field]=k;gemModels=null;groqPick=null;delete dead[p];delete cool[p];
+    const prev=cfg[field];cfg[field]=k;gemModels=null;groqPick=null;oaPick=null;delete dead[p];delete cool[p];
     try{await callProvider(p,"Reply with the single word: ok","ok?",false);ok=name;break}
-    catch(e){if(e.kind==="quota"){ok=name;break}cfg[field]=prev;lastMsg=e.kind==="auth"?`${name} didn't accept that key. Copy it again.`:e.message}
+    catch(e){if(e.kind==="quota"){ok=name;break}cfg[field]=prev;lastMsg=/credit/.test(e.message)?`${e.message}. Add credit in your ${name} account, then try again.`:e.kind==="auth"?`${name} didn't accept that key. Copy it again.`:e.message}
   }
   qkBusy=false;$("qkGo").disabled=false;
   if(!ok){qkSay(known?lastMsg:"Neither Gemini nor Groq accepted that key. Copy it again.","bad");return}
@@ -1419,7 +1486,7 @@ async function startRun(){const tok=navTok,gone=()=>tok!==navTok;  // the main m
 }
 function keyLine(text,label){const d=document.createElement("div");d.className="sys";d.textContent=text+" ";
   const b=document.createElement("button");b.type="button";b.className="chip";b.textContent=label;b.onclick=openQuickKey;d.appendChild(b);chatEl.appendChild(d);lastWho=null;scroll()}
-const demoNudge=()=>keyLine("That was the demo. With a free key (1 minute, no card) the agents really fight for each person's picks.","Get my free key");
+const demoNudge=()=>keyLine("That was the scripted demo. With a free Google key (about a minute, no card) real AI agents argue for each person's picks, then you can run this same night again.","Turn on the real AI");
 async function go(rounds,startAt){const R=run={off:false,ctl:new AbortController()};
   DEMO=!MOCK&&!providers().length;busy=true;setComposer(false);
   try{demo={said:0,total:rounds*agents.length};await runRounds(rounds,startAt);check(R);const p=await makePlan();check(R);lastPlan=p;renderTicket(lastPlan,plan.members.map(m=>m.n),transcript.filter(m=>m.ai!=null).length);saveLast();if(DEMO)demoNudge()}
