@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>The Plan Committee</title>
 <meta name="description" content="Your friends pick what they want. AI agents argue for each of you in a group chat and agree on one plan for a night out in NYC or London.">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-qAY4fALzaO5V5GVNxqwTgtcexD1F1Ioif9ot5w+hoDY='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https:; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-DOCp2/9+gEABJ7TQnUxfwJqRbbgvnQ13vXHNKGDbXUM='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https:; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
 <meta name="referrer" content="no-referrer">
 <meta name="theme-color" content="#fbf9f6">
 <link rel="manifest" href="manifest.webmanifest">
@@ -920,9 +920,10 @@ async function fetchWeather(date,startMin){WX=null;
     const rain=Math.max(...win.map(k=>+h.precipitation_probability?.[k]||0)),temp=Math.round(+h.temperature_2m?.[i]);
     if(isFinite(rain)&&isFinite(temp))WX={rain:Math.round(rain),temp,bad:rain>=50||temp<40,nice:rain<20&&temp>=62&&temp<=86}}catch(e){}}
 const temp=f=>CITY.units==="c"?`${Math.round((f-32)*5/9)}°C`:`${f}°F`;
-const DAYTIME=/museum|galler|librar|exhibit|book ?(shop|store)|bakery|garden|cemetery|\bzoo\b|botanic|playground|theat(re|er)|\bopera\b|ballet|concert hall|performing arts|lecture|cultural cent|aquarium/i;  // places that close by evening, or whose shows start by 8
-/* closed at that time, or an auto-added spot with no hours that sounds like a museum, theatre or park after 8 pm: we can't be sure it's open */
-const shut=(s,date,m)=>{const o=isOpen(s,date,m%1440);return o===false||o==null&&!s.cur&&m>=1200&&(s.t==="free"||s.t==="late"&&DAYTIME.test(s.n+" "+s.v))};
+const DAYTIME=/museum|galler|librar|exhibit|book ?(shop|store)|bakery|garden|cemetery|\bzoo\b|botanic|playground|theat(re|er)|\bopera\b|ballet|\bconcert\b|performing arts|lecture|cultural cent|aquarium|observatory|planetarium|palace|castle|cathedral|church|temple|shrine|monument|landmark|muse[oeu]|musée|teatro|théâtre|jard[ií]n|jardim|iglesia|igreja|église|castillo|castelo|château|pal[aá]cio|palais|美術館|博物館|神社|劇場/i;
+const NIGHTLIFE=/\b(bar|pub|tavern|club|lounge|karaoke|disco|cocktails?)\b/i;  // "Temple Bar", "Landmark Tavern": a night spot whose name only sounds like a daytime one  // places that close by evening, or whose shows start by 8
+/* closed at that time, closing within the hour, or an auto-added spot with no hours that sounds like a museum, theatre or park after 8 pm: we can't be sure it's open */
+const shut=(s,date,m)=>{const o=isOpen(s,date,m%1440),c=o?closesAt(s,date,m%1440):null;return o===false||c!=null&&c-m%1440<60||o==null&&!s.cur&&m>=1200&&(s.t==="free"||s.t==="late"&&DAYTIME.test(s.n+" "+s.v)&&!NIGHTLIFE.test(s.n))};
 /* closing time at the spot's slot in tonight's plan, so the AI sees it too (null when we don't know) */
 function slotClose(s){const m=plan.start+(SLOT[s.t]||0);return closesAt(s,new Date(nightDate(plan.when).getTime()+Math.floor(m/1440)*864e5),m%1440)}
 const OUTDOOR=s=>s.t==="free"||s.f.includes("rooftop");
