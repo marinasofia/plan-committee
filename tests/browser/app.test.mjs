@@ -226,6 +226,16 @@ test("hostile links and AI replies render as text, never as HTML", async () => {
   assert.ok(await page(`document.body.innerText.includes("onerror=alert(1)")`), "the payload shows up as plain text");
 });
 
+test("each key goes only to the company that issued it", async () => {
+  const kinds = await page(`(()=>{const k=t=>(KEY_TYPES.find(([re])=>re.test(t))||[,"none"])[1];
+    return {gemini:k("AIza"+"x".repeat(35)),groq:k("gsk_"+"a".repeat(30)),openrouter:k("sk-or-v1-"+"a".repeat(40)),anthropic:k("sk-ant-api03-"+"a".repeat(60)),
+      openai:k("sk-proj-"+"a".repeat(40)),cutClaude:k("sk-ant-api03-"+"a".repeat(12)),cutOpenRouter:k("sk-or-v1-"+"a".repeat(15)),junk:k("hello-"+"a".repeat(30))}})()`);
+  assert.deepEqual(kinds, { gemini: "gemini", groq: "groq", openrouter: "openrouter", anthropic: "anthropic", openai: "openai", cutClaude: "none", cutOpenRouter: "none", junk: "none" });
+  // a Claude key pasted in the OpenAI box moves to the Claude box
+  const moved = await page(`(()=>{const keep={...cfg};renderSettings();$("pKey").value="sk-ant-api03-"+"b".repeat(60);readSettings();const r={a:cfg.aKey.slice(0,7),p:cfg.pKey};Object.assign(cfg,keep);store.set("cfg2",cfg);return r})()`);
+  assert.deepEqual(moved, { a: "sk-ant-", p: "" });
+});
+
 test("no errors on the page", () => {
   assert.deepEqual(pageErrors, []);
 });
