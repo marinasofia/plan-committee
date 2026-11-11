@@ -57,6 +57,20 @@ jobs:
       - name: Run the pipeline unit tests
         run: python3 -m unittest -v
 
+  browser:
+    # runs the no key demo in headless Chrome and checks every plan: stop types, open hours, distances, route mode
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "22"
+      - name: Run the browser tests (Chrome comes with the runner, no packages)
+        run: node --test tests/browser/app.test.mjs
+
   dependencies:
     # Dependency review is free on public repos only.
     if: github.event_name == 'pull_request' && !github.event.repository.private
