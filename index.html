@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>The Plan Committee</title>
 <meta name="description" content="Your friends pick what they want. AI agents argue for each of you in a group chat and agree on one plan for a night out in NYC or London.">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-DOCp2/9+gEABJ7TQnUxfwJqRbbgvnQ13vXHNKGDbXUM='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https:; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-D5dUgaZlfzyidLdTuVpamEFpJKGauGKP/E4r3RCfUDo='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https:; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
 <meta name="referrer" content="no-referrer">
 <meta name="theme-color" content="#fbf9f6">
 <link rel="manifest" href="manifest.webmanifest">
@@ -920,7 +920,7 @@ async function fetchWeather(date,startMin){WX=null;
     const rain=Math.max(...win.map(k=>+h.precipitation_probability?.[k]||0)),temp=Math.round(+h.temperature_2m?.[i]);
     if(isFinite(rain)&&isFinite(temp))WX={rain:Math.round(rain),temp,bad:rain>=50||temp<40,nice:rain<20&&temp>=62&&temp<=86}}catch(e){}}
 const temp=f=>CITY.units==="c"?`${Math.round((f-32)*5/9)}°C`:`${f}°F`;
-const DAYTIME=/museum|galler|librar|exhibit|book ?(shop|store)|bakery|garden|cemetery|\bzoo\b|botanic|playground|theat(re|er)|\bopera\b|ballet|\bconcert\b|performing arts|lecture|cultural cent|aquarium|observatory|planetarium|palace|castle|cathedral|church|temple|shrine|monument|landmark|muse[oeu]|musée|teatro|théâtre|jard[ií]n|jardim|iglesia|igreja|église|castillo|castelo|château|pal[aá]cio|palais|美術館|博物館|神社|劇場/i;
+const DAYTIME=/museum|galler|librar|exhibit|book ?(shop|store)|bakery|garden|cemetery|\bzoo\b|botanic|playground|theat(re|er)|\bopera\b|ballet|\bconcert\b|performing arts|lecture|cultural cent|aquarium|observatory|planetarium|palace|castle|cathedral|church|temple|shrine|monument|landmark|muse[oeu]|musée|teatro|théâtre|jard[ií]n|jardim|iglesia|igreja|église|castillo|castelo|château|pal[aá]cio|palais|palazzo|chiesa|basilica|duomo|giardino|美術館|博物館|神社|劇場/i;
 const NIGHTLIFE=/\b(bar|pub|tavern|club|lounge|karaoke|disco|cocktails?)\b/i;  // "Temple Bar", "Landmark Tavern": a night spot whose name only sounds like a daytime one  // places that close by evening, or whose shows start by 8
 /* closed at that time, closing within the hour, or an auto-added spot with no hours that sounds like a museum, theatre or park after 8 pm: we can't be sure it's open */
 const shut=(s,date,m)=>{const o=isOpen(s,date,m%1440),c=o?closesAt(s,date,m%1440):null;return o===false||c!=null&&c-m%1440<60||o==null&&!s.cur&&m>=1200&&(s.t==="free"||s.t==="late"&&DAYTIME.test(s.n+" "+s.v)&&!NIGHTLIFE.test(s.n))};
@@ -1256,6 +1256,7 @@ function renderTicket(p,names,count){
       <div class="chips" data-a="vstops" style="display:none;padding:0 16px 12px">${p.stops.map((s,i)=>`<button type="button" class="chip" data-i="${i}">${esc(s.spot.n)}</button>`).join("")}</div></div>`:""):`<div class="tbtns"><button type="button" class="pri" data-a="send">Send to the group</button><button type="button" data-a="veto">Change something</button></div>
       <div class="chips" data-a="chg" style="display:none;padding:0 16px 12px">${p.stops.map((s,i)=>`<button type="button" class="chip" data-swap="${i}">swap ${esc(s.spot.n)}</button>`).join("")}<button type="button" class="chip" data-c="cheaper">cheaper</button><button type="button" class="chip" data-c="closer">closer together</button>${plan.start<STARTS[STARTS.length-1]?`<button type="button" class="chip" data-c="later">start later</button>`:""}<button type="button" class="chip" data-c="else">something else…</button></div>`}
     <div class="tbtns sub"><button type="button" data-a="route">Route</button><button type="button" data-a="cal">Add to calendar</button></div>
+    ${REPLAY?"":`<div class="tbtns sub"><button type="button" data-a="again">Run again from scratch</button><button type="button" data-a="settings">Change settings</button></div>`}
     <div class="foot">planned by AI agents who argued so you didn't have to</div>`;
   chatEl.appendChild(d);lastWho=null;scroll();
   setTimeout(()=>d.querySelector(".meter span").style.width=drama+"%",400);
@@ -1270,6 +1271,7 @@ function renderTicket(p,names,count){
     d.querySelector('[data-a="nope"]').onclick=()=>{d.querySelector('[data-a="vstops"]').style.display=""};
     d.querySelectorAll('[data-a="vstops"] .chip').forEach(b=>b.onclick=()=>cast("veto",+b.dataset.i,b))}
   if(!REPLAY){d.querySelector('[data-a="send"]').onclick=e=>sharePlan(p,e.target);
+    d.querySelector('[data-a="again"]').onclick=()=>{if(!busy)start()};d.querySelector('[data-a="settings"]').onclick=()=>$("newBtn").click();
     // change something: one tap tells the agents what to fix, then they argue it out and post a new plan
     const box=d.querySelector('[data-a="chg"]');d.querySelector('[data-a="veto"]').onclick=()=>{box.style.display=box.style.display?"":"none";if(!box.style.display)scroll()};
     box.querySelectorAll("[data-swap]").forEach(b=>b.onclick=()=>{const st=p.stops[+b.dataset.swap];if(busy)return;
@@ -1347,7 +1349,10 @@ function pkShow(){const m=plan.members.find(x=>x.id===pkFlow?.queue[0]);
 $("pkAsk").onclick=async()=>{$("picker").classList.add("hide");pkFlow=null;renderSetup();$("setup").classList.remove("hide");await invite();
   say("Invite ready. Each friend taps the link, picks their agent and sends theirs back. Open their replies here and start once everyone's in.")};
 $("closePicker").onclick=()=>{$("picker").classList.add("hide");pkFlow=null};
-async function start(){
+let starting=false;  // a double tap on Start or Run again must not start two runs (busy is only set once the chat begins)
+async function start(){if(starting||busy)return;starting=true;try{await startRun()}finally{starting=false}}
+async function startRun(){
+  if($("geoRow").style.display===""&&$("geoInput").value.trim()){await $("geoForm").onsubmit(new Event("submit"));if($("geoRow").style.display==="")return}  // typed a city but tapped start instead of Find: load it first
   const todo=plan.members.filter(m=>m.n&&!m.pk).map(m=>m.id);
   if(todo.length&&!MOCK)return openPicker(todo,start);  // pick (or invite) first, then the chat runs
   const g=CITY?.id!==plan.city?geoParse(plan.city):null;
