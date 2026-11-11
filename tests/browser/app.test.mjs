@@ -41,7 +41,7 @@ async function open(setup = true) {
 const chip = name => page(`(async()=>{const b=[...$("cityChips").children].find(b=>b.textContent===${JSON.stringify(name)});b.click();await new Promise(r=>setTimeout(r,300))})()`);
 async function city(name) { await chip(name); await until(`CITY.name===${JSON.stringify(name)}&&SPOTS.length>0`, 30); }
 async function runDemo(move) {
-  await page(`(()=>{plan.move="${move}";plan.hood="Anywhere";savePlan();$("newBtn").click()})()`);
+  await page(`(()=>{plan.move="${move}";plan.hood="Anywhere";savePlan();$("newBtn").click();lastPlan=null})()`);  // so we wait for this run's plan, not the last one
   await page(`$("startBtn").click()`);
   await until(`!!lastPlan&&!busy&&!!document.querySelector("#chat .ticket")`);
   return inspect();
@@ -145,9 +145,20 @@ test("switching city clears the notice, and a typed city loads on Start", async 
   assert.equal(await page(`$("notice").style.display`), "none", "notice hidden after switching city");
   assert.equal(await page(`$("notice").textContent`), "", "notice cleared");
   // typed under Somewhere else, then Start without Find: a city pack, so no network lookup is needed
-  await page(`(()=>{$("newBtn").click();$("geoRow").style.display="";$("geoInput").value="New York";$("startBtn").click()})()`);
+  await page(`(()=>{$("newBtn").click();lastPlan=null;$("geoRow").style.display="";$("geoInput").value="New York";$("startBtn").click()})()`);
   await until(`!!lastPlan&&!busy&&!!document.querySelector("#chat .ticket")`);
   assert.equal(await page(`CITY.id`), "nyc", "the typed city is the one that ran");
+});
+
+test("prices and the city chip follow the city, also when Start loads it", async () => {
+  await city("London");
+  assert.match(await page(`$("members").textContent`), /£/, "London setup shows pounds");
+  // pick New York the way onboarding and a typed city do: Start loads it, the setup behind the chat must follow
+  await page(`(()=>{$("newBtn").click();plan.city="nyc";savePlan();lastPlan=null;$("startBtn").click()})()`);
+  await until(`!!lastPlan&&!busy&&!!document.querySelector("#chat .ticket")`);
+  const setup = await page(`({money:$("members").textContent,chip:[...$("cityChips").children].find(b=>b.classList.contains("on"))?.textContent})`);
+  assert.ok(setup.money.includes("$") && !setup.money.includes("£"), `New York setup shows dollars: ${setup.money.slice(0, 80)}`);
+  assert.equal(setup.chip, "New York City");
 });
 
 test("adding a person opens their picks straight away", async () => {
@@ -158,15 +169,61 @@ test("adding a person opens their picks straight away", async () => {
   assert.equal(await page(`$("quiz").classList.contains("hide")`), true, "the close button works");
 });
 
+test("the main menu button works mid chat, even when the AI hangs", async () => {
+  await city("New York City");
+  // an AI call that never answers, like a stuck provider
+  await page(`(()=>{window.__keepLLM=llm;llm=()=>new Promise(()=>{});plan.move="walk";savePlan();$("newBtn").click();lastPlan=null;$("startBtn").click()})()`);
+  await until(`busy`, 10);
+  await page(`$("newBtn").click()`);
+  await sleep(300);
+  assert.equal(await page(`!$("setup").classList.contains("hide")&&!busy`), true, "back on the setup screen, nothing running");
+  assert.equal(await page(`!aiSignal()?.aborted`), true, "key checks after a stop get a live signal");
+  await page(`llm=window.__keepLLM`);
+  await page(`$("startBtn").click()`);
+  await until(`!!lastPlan&&!busy&&!!document.querySelector("#chat .ticket")`);
+  assert.equal(await page(`document.querySelectorAll("#chat .ticket").length`), 1, "a fresh run works right after");
+  // stop during a "change something" round: the old chat must not come back to life behind the menu
+  await page(`(()=>{overrule("veto: too pricey. make it cheaper");$("newBtn").click()})()`);
+  await sleep(2500);
+  assert.equal(await page(`!$("setup").classList.contains("hide")&&!busy&&document.querySelectorAll("#chat .ticket").length===1&&store.get("last",null)===null`), true, "no new round ran after the stop");
+});
+
 test("the last chat and plan survive a reload", async () => {
   await city("London");
   const before = (await runDemo("walk")).stops.map(s => s.n);
+  await sleep(2000);  // Chrome writes localStorage to the browser process in batches; a reload in the same instant can beat it
   await open(false);  // a plain reload
   await until(`!!document.querySelector("#chat .ticket")`, 15).catch(async e => {
     throw new Error(`${e.message}: ${await page(`JSON.stringify((L=>({saved:!!L,crew:L?.crew===plan.id,city:L?.city+" vs "+CITY.id,agents:L?.agents?.map(a=>a.n).join()+" vs "+agentList().map(a=>a.n).join(),age:L&&Date.now()-L.at,setup:!$("setup").classList.contains("hide")}))(store.get("last",null)))`)}`);
   });
   assert.deepEqual(await page(`lastPlan.stops.map(s=>s.spot.n)`), before, "same plan after reload");
   assert.equal(await page(`$("setup").classList.contains("hide")`), true, "lands on the chat, not setup");
+});
+
+test("hostile links and AI replies render as text, never as HTML", async () => {
+  const P = `<img src=x onerror=alert(1)>"'><svg onload=alert(1)></svg><a href="javascript:alert(1)">x</a>`;
+  const injected = () => page(`[...document.querySelectorAll("*")].flatMap(el=>[...el.attributes].filter(a=>/^on/i.test(a.name)||/^(href|src)$/i.test(a.name)&&/^\\s*javascript:/i.test(a.value)).map(a=>el.tagName+" "+a.name))`);
+  const member = n => ({ id: "m" + Math.random().toString(36).slice(2, 8), n, c: [P], v: [P], m: [P], d: [P], ps: P, pk: true, q: P });
+  const links = {
+    p: { v: 2, d: 1, id: "abc123", c: "nyc", w: P, a: [[P, `#000" onmouseover="alert(1)`], ["Alex", "red"]], t: [[0, P, P], [-1, P, ""]], p: { title: P, drama: P, verdict: P, stops: [["7 pm", P, P, P]] } },
+    c: { id: "abc123", city: "nyc", when: P, hood: P, name: P, members: [member(P), member("Alex")] },
+    j: { id: "abc124", city: "nyc", when: P, hood: P, members: [member(P)] },
+    m: { v: 1, m: member(P) },
+  };
+  for (const [kind, data] of Object.entries(links)) {
+    await open();
+    const packed = await page(`pack(${JSON.stringify(data)})`);
+    await send("Page.navigate", { url: `http://127.0.0.1:${PORT}/index.html?mock#${kind}=${packed}` });
+    await sleep(kind === "p" ? 6000 : 2500);
+    assert.deepEqual(await injected(), [], `#${kind}= link put HTML on the page`);
+    if (kind === "p") assert.ok(await page(`document.querySelectorAll("#chat .row").length>=2&&!!document.querySelector("#chat .ticket")`), "the replay still plays: bubbles and the plan show up");
+  }
+  await open();
+  await page(`(async()=>{$("setup").classList.add("hide");SL=shortlist();agents=agentList();const keep=llm;
+    llm=async()=>({text:JSON.stringify({title:${JSON.stringify(P)},verdict:${JSON.stringify(P)},stops:[{time:${JSON.stringify(P)},name:SL.list.find(s=>s.t==="dinner").n,note:${JSON.stringify(P)}}]})});
+    try{lastPlan=await makePlan()}finally{llm=keep}renderTicket(lastPlan,["a"],1);addBubble(agents[0],${JSON.stringify(P)},${JSON.stringify(P)})})()`);
+  assert.deepEqual(await injected(), [], "AI reply put HTML on the page");
+  assert.ok(await page(`document.body.innerText.includes("onerror=alert(1)")`), "the payload shows up as plain text");
 });
 
 test("no errors on the page", () => {

@@ -7,6 +7,30 @@
   Referrer-Policy: no-referrer
   Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), usb=()
   Strict-Transport-Security: max-age=31536000
+  Cross-Origin-Opener-Policy: same-origin
+
+# every other file the repo deploys shares the app's origin (and its saved AI keys): it may never run script.
+# An SVG or HTML file opened directly would otherwise run with full access to localStorage.
+/icons/*
+  Content-Security-Policy: default-src 'none'; style-src 'unsafe-inline'; img-src 'self' data:; sandbox
+/docs/*
+  Content-Security-Policy: default-src 'none'; style-src 'unsafe-inline'; img-src 'self' data:; sandbox
+/cities/*
+  Content-Security-Policy: default-src 'none'; sandbox
+/data/*
+  Content-Security-Policy: default-src 'none'; sandbox
+/places/*
+  Content-Security-Policy: default-src 'none'; sandbox
+/tests/*
+  Content-Security-Policy: default-src 'none'; sandbox
+/tools/*
+  Content-Security-Policy: default-src 'none'; sandbox
+/pipeline/*
+  Content-Security-Policy: default-src 'none'; sandbox
+/worker/*
+  Content-Security-Policy: default-src 'none'; sandbox
+/places-worker/*
+  Content-Security-Policy: default-src 'none'; sandbox
 
 # the service worker must never be stuck in a cache, or fixes can't reach installed apps
 /sw.js

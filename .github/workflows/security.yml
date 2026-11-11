@@ -37,6 +37,12 @@ jobs:
           python-version: "3.12"
       - name: Check the CSP hash matches the inline script
         run: python3 tools/csp.py --check
+      - name: No other file on the app's origin can run script
+        # only index.html may hold script; an SVG or HTML file with script would share the origin and the saved AI keys
+        run: |
+          bad=$(git ls-files -z '*.html' '*.htm' '*.svg' '*.xhtml' '*.xht' '*.xml' '*.xsl' | grep -zv '^index\.html$' | xargs -0 -r grep -liE '<script|javascript:|\son[a-z]+\s*=' || true)
+          extra=$(git ls-files '*.html' '*.htm' '*.xhtml' '*.xht' | grep -v '^index\.html$' || true)
+          if [ -n "$bad$extra" ]; then echo "Remove script or extra HTML files: $bad $extra"; exit 1; fi
       - name: Check every city pack loads
         run: python3 -c "import sys; sys.path.insert(0, 'pipeline'); import build_spots as b; print([c['id'] for c in b.load_cities()])"
       - name: Lint the Python (ruff, pinned)
