@@ -25,7 +25,7 @@ import urllib.parse
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from build_spots import CHAIN_WORDS, norm  # noqa: E402  (shared chain list and name normalizer)
+from build_spots import CHAIN_WORDS  # noqa: E402  (shared chain list)
 
 ROOT = Path(__file__).resolve().parent.parent
 CITIES = ROOT / "places" / "cities.json"
@@ -81,6 +81,16 @@ def clean_url(u: object) -> str:
     return urllib.parse.urlunsplit((p.scheme, p.netloc, p.path, "", ""))[:200] if p.netloc else ""
 
 
+NON_LATIN = re.compile(r"[^\u0000-\u024f\u1e00-\u1eff\u2000-\u206f\u20a0-\u20cf]")  # same test as nonLatin() in index.html
+
+
+def english_name(name: str, en: object) -> str:
+    """Overture's English name for a place whose own name isn't in Latin letters ("鮨 さいとう" -> "Sushi Saito"), so people
+    who can't read the script still know it. Empty when there is none, it's the same, or it isn't Latin either."""
+    e = clean_text(en, 80)
+    return e if NON_LATIN.search(name) and e and not NON_LATIN.search(e) and e.casefold() != name.casefold() else ""
+
+
 def clean_text(s: object, n: int) -> str:
     return CTRL.sub("", str(s or "")).strip()[:n]
 
@@ -120,11 +130,20 @@ def to_spot(row: dict) -> dict | None:
     tags = sorted({v for c in cats for v in VIBES.get(c, [])} | ({"rooftop", "views"} if "rooftop" in name.lower() else set()))
     cuisine = next((c for pat, c in CUISINE if re.search(pat, primary)), "") if t == "dinner" else ""
     web = str(row.get("web") or "")
-    return {"n": name, "t": t, "h": "", "p": 0 if t == "free" else 3 if primary in ("steakhouse", "opera_and_ballet") else 2,
+    ne = english_name(name, row.get("name_en"))
+    return {"n": name, **({"ne": ne} if ne else {}), "t": t, "h": "", "p": 0 if t == "free" else 3 if primary in ("steakhouse", "opera_and_ballet") else 2,
             "c": cuisine, "f": [x for x in tags if x in TAGS], "v": clean_text(primary.replace("_", " "), 40),
             "web": clean_url(web), "lat": round(float(lat), 5), "lon": round(float(lon), 5),
             "_score": float(row.get("confidence") or 0) + (0.3 if web else 0) + (0.4 if t == "free" and "gallery" not in primary else 0),
             "_gallery": "gallery" in primary or primary == "street_art"}
+
+
+def key(name: str) -> str:
+    """Name key for chains and duplicates in any script. The ASCII-only normalizer turned every Japanese, Korean or Thai
+    name into "", so they all counted as one chain and were dropped: "鮨 さいとう" and "Sushi Saito" must stay apart."""
+    s = unicodedata.normalize("NFKC", name).casefold().replace("&", "and")
+    # letters, digits and combining marks: Thai and Indic vowel signs are part of the spelling (ร้าน is not ราน)
+    return "".join(c for c in s if c.isalnum() or unicodedata.category(c)[0] == "M") or name
 
 
 def pick(rows: list[dict]) -> list[dict]:
@@ -132,10 +151,10 @@ def pick(rows: list[dict]) -> list[dict]:
     spots = [s for s in map(to_spot, rows) if s]
     counts: dict[str, int] = {}
     for s in spots:
-        counts[norm(s["n"])] = counts.get(norm(s["n"]), 0) + 1
+        counts[key(s["n"])] = counts.get(key(s["n"]), 0) + 1
     out, seen, per, galleries = [], set(), dict.fromkeys(TYPES, 0), 0
     for s in sorted(spots, key=lambda s: -s["_score"]):
-        k = norm(s["n"])
+        k = key(s["n"])
         if counts[k] >= 3 or k in seen or per[s["t"]] >= CAPS[s["t"]] or (s["_gallery"] and galleries >= GALLERIES):
             continue
         galleries += s["_gallery"]
@@ -163,10 +182,10 @@ def clean_edit(s: object) -> dict | None:
 
 def apply_edits(spots: list[dict], edits: dict) -> list[dict]:
     """places/edits.json for one city: {"remove": ["Closed Bar"], "add": [{spot}]}. Additions win over Overture."""
-    drop = {norm(n) for n in edits.get("remove") or [] if isinstance(n, str)}
+    drop = {key(n) for n in edits.get("remove") or [] if isinstance(n, str)}
     added = [s for s in map(clean_edit, edits.get("add") or []) if s]
-    keep = {norm(s["n"]) for s in added}
-    return added + [s for s in spots if norm(s["n"]) not in drop | keep]
+    keep = {key(s["n"]) for s in added}
+    return added + [s for s in spots if key(s["n"]) not in drop | keep]
 
 
 def slug(name: str) -> str:
@@ -238,7 +257,7 @@ def connect():
 def city_rows(con, src: str, city: dict) -> list[dict]:
     dy = city["km"] / 111
     dx = dy / math.cos(math.radians(city["lat"]))
-    q = f"""SELECT names.primary AS name, confidence, websites[1] AS web, coalesce(brand.wikidata, brand.names.primary) AS brand,
+    q = f"""SELECT names.primary AS name, names.common['en'] AS name_en, confidence, websites[1] AS web, coalesce(brand.wikidata, brand.names.primary) AS brand,
               operating_status AS status, taxonomy.primary AS "primary", taxonomy.hierarchy AS hierarchy, bbox.ymin AS lat, bbox.xmin AS lon
             FROM read_parquet('{src}') WHERE bbox.xmin BETWEEN ? AND ? AND bbox.ymin BETWEEN ? AND ?"""
     cur = con.execute(q, [city["lon"] - dx, city["lon"] + dx, city["lat"] - dy, city["lat"] + dy])

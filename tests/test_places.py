@@ -49,6 +49,16 @@ class ToSpot(unittest.TestCase):
         self.assertEqual(s["web"], "")
 
 
+class EnglishName(unittest.TestCase):
+    def test_kept_only_for_names_people_cant_read(self):
+        self.assertEqual(bp.to_spot(row(name="鮨 さいとう", name_en="Sushi Saito"))["ne"], "Sushi Saito")
+        self.assertEqual(bp.to_spot(row(name="Кафе Пушкинъ", name_en="Cafe Pushkin"))["ne"], "Cafe Pushkin")
+        self.assertNotIn("ne", bp.to_spot(row(name="Bar Alto", name_en="Bar Alto")))  # already readable
+        self.assertNotIn("ne", bp.to_spot(row(name="鮨 さいとう", name_en="すし さいとう")))  # not Latin either
+        self.assertNotIn("ne", bp.to_spot(row(name="鮨 さいとう", name_en=None)))
+        self.assertTrue(len(bp.to_spot(row(name="鮨", name_en="Sushi\x00 " + "x" * 200))["ne"]) <= 80)
+
+
 class CleanUrl(unittest.TestCase):
     def test_drops_query_and_fragment(self):
         self.assertEqual(bp.clean_url("https://rezto.app/reservation/piano?rwg_token=AFd1x&x=1#top"), "https://rezto.app/reservation/piano")
@@ -61,6 +71,19 @@ class Pick(unittest.TestCase):
         rows = [row(name="Taco Spot", lat=38.7 + i / 1000) for i in range(3)] + [row(), row(name="bar alto")]
         names = [s["n"] for s in bp.pick(rows)]
         self.assertEqual(names, ["Bar Alto"])
+
+    def test_local_script_names_are_kept_apart(self):
+        names = ["鮨 さいとう", "居酒屋 とりとん", "서울 포차", "ร้านอาหาร บ้านไทย", "Sushi Saito"]
+        rows = [row(name=n, lat=35.6 + i / 1000, primary="sushi_restaurant", hierarchy=["food_and_drink", "restaurant"]) for i, n in enumerate(names)]
+        self.assertEqual(sorted(s["n"] for s in bp.pick(rows)), sorted(names))
+
+    def test_vowel_signs_tell_names_apart(self):
+        rows = [row(name="ร้าน", lat=13.7), row(name="ราน", lat=13.71), row(name="नमस्ते", lat=13.72), row(name="नमसत", lat=13.73)]
+        self.assertEqual(len(bp.pick(rows)), 4)
+
+    def test_same_local_name_three_times_is_still_a_chain(self):
+        rows = [row(name="すき家", lat=35.6 + i / 1000) for i in range(3)] + [row(name="ＢＡＲ ＡＬＴＯ"), row()]
+        self.assertEqual([s["n"] for s in bp.pick(rows)], ["ＢＡＲ ＡＬＴＯ"])  # full width and plain "Bar Alto" are one place
 
     def test_galleries_are_capped(self):
         rows = [row(name=f"Gallery {i}", primary="art_gallery", hierarchy=["arts_and_entertainment", "art_gallery"]) for i in range(40)]
