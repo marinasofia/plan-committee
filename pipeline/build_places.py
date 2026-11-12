@@ -82,13 +82,16 @@ def clean_url(u: object) -> str:
 
 
 NON_LATIN = re.compile(r"[^\u0000-\u024f\u1e00-\u1eff\u2000-\u206f\u20a0-\u20cf]")  # same test as nonLatin() in index.html
-
-
-def english_name(name: str, en: object) -> str:
-    """Overture's English name for a place whose own name isn't in Latin letters ("鮨 さいとう" -> "Sushi Saito"), so people
-    who can't read the script still know it. Empty when there is none, it's the same, or it isn't Latin either."""
-    e = clean_text(en, 80)
-    return e if NON_LATIN.search(name) and e and not NON_LATIN.search(e) and e.casefold() != name.casefold() else ""
+BRANCH = re.compile(r"店|점|สาขา")  # "branch" in Japanese and Chinese, Korean, Thai
+# foods, places and neighborhoods that start many independent names: never a chain name (compared after key())
+GENERIC = {
+    "居酒屋", "ラーメン", "らーめん", "カフェ", "喫茶", "珈琲", "バー", "寿司", "すし", "焼肉", "焼鳥", "焼き鳥", "そば", "うどん",
+    "食堂", "中華", "公園", "美術館", "博物館", "さくら", "桜", "隠れ家", "たこ焼き", "お好み焼き", "鉄板焼", "鉄板焼き",
+    "もつ鍋", "ホルモン", "銀座", "新宿", "渋谷", "浅草", "梅田", "難波", "心斎橋", "北新地", "餐厅", "咖啡", "酒吧",
+    "카페", "커피", "식당", "치킨", "포차", "고기", "공원", "미술관", "박물관", "인사동", "강남", "홍대", "명동",
+    "ร้าน", "ร้านอาหาร", "คาเฟ่", "กาแฟ", "สวน", "พิพิธภัณฑ์", "โจ๊ก", "ก๋วยเตี๋ยว", "ก๋วยเตี๋ยวเรือ", "เตี๋ยว", "ข้าวแกง",
+    "ข้าวผัด", "ข้าวมันไก่",
+}
 
 
 def clean_text(s: object, n: int) -> str:
@@ -130,8 +133,7 @@ def to_spot(row: dict) -> dict | None:
     tags = sorted({v for c in cats for v in VIBES.get(c, [])} | ({"rooftop", "views"} if "rooftop" in name.lower() else set()))
     cuisine = next((c for pat, c in CUISINE if re.search(pat, primary)), "") if t == "dinner" else ""
     web = str(row.get("web") or "")
-    ne = english_name(name, row.get("name_en"))
-    return {"n": name, **({"ne": ne} if ne else {}), "t": t, "h": "", "p": 0 if t == "free" else 3 if primary in ("steakhouse", "opera_and_ballet") else 2,
+    return {"n": name, "t": t, "h": "", "p": 0 if t == "free" else 3 if primary in ("steakhouse", "opera_and_ballet") else 2,
             "c": cuisine, "f": [x for x in tags if x in TAGS], "v": clean_text(primary.replace("_", " "), 40),
             "web": clean_url(web), "lat": round(float(lat), 5), "lon": round(float(lon), 5),
             "_score": float(row.get("confidence") or 0) + (0.3 if web else 0) + (0.4 if t == "free" and "gallery" not in primary else 0),
@@ -146,16 +148,55 @@ def key(name: str) -> str:
     return "".join(c for c in s if c.isalnum() or unicodedata.category(c)[0] == "M") or name
 
 
-def pick(rows: list[dict]) -> list[dict]:
-    """The city's list: no chains (a name with 3+ places in town is one), one spot per name, best per type first."""
+def words(name: str) -> str:
+    """key() with the spaces kept, so "Roma Antica" starts with the word "Roma" and "Romantica" doesn't."""
+    return " ".join(filter(None, map(key, unicodedata.normalize("NFKC", name).split()))) or key(name)
+
+
+def chain_heads(names: list[str]) -> set[str]:
+    """Chains whose branches add a place name: 丸亀製麺, 丸亀製麺 神田小川町, 丸亀製麺JR有楽町駅 are one chain, though no
+    two names match. A name counts when a place has exactly that name and 2+ others are it plus a branch
+    (店, 점, สาขา). Only for non Latin names, never generic words (居酒屋, 공원)."""
+    full = sorted({words(n) for n in names})
+    heads = set()
+    for i, h in enumerate(full):
+        if len(h.replace(" ", "")) < 3 or h.replace(" ", "") in GENERIC or not NON_LATIN.search(h):
+            continue  # Latin script chains are caught by brand, CHAIN_WORDS and repeated names; "La Taberna X" are not one
+        branches, j = 0, i + 1
+        while j < len(full) and full[j].startswith(h):  # sorted, so the names that start with h come right after it
+            branches += extends(full[j], h) and bool(BRANCH.search(full[j][len(h):]))
+            j += 1
+        if branches >= 2:
+            heads.add(h)
+    return heads
+
+
+def extends(w: str, h: str) -> bool:
+    """w is h plus more. Latin names need a space first; Japanese, Thai and the like write branches without one."""
+    return w.startswith(h) and (len(w) == len(h) or w[len(h)] == " " or bool(NON_LATIN.match(h[-1])))
+
+
+def is_chain(name: str, heads: set[str]) -> bool:
+    """Looks up the name's own prefixes (80 at most), so the time doesn't grow with the number of chains."""
+    w = words(name)
+    return any(w[:i] in heads and extends(w, w[:i]) for i in range(3, len(w) + 1))
+
+
+def pick(rows: list[dict], chains: set[str] | None = None) -> list[dict]:
+    """The city's list: no chains (a name with 3+ places in town is one, and so is a name its branches extend),
+    one spot per name, best per type first."""
     spots = [s for s in map(to_spot, rows) if s]
     counts: dict[str, int] = {}
     for s in spots:
         counts[key(s["n"])] = counts.get(key(s["n"]), 0) + 1
+    heads = chain_heads([s["n"] for s in spots if s["t"] != "free"])  # parks and museums have no branches
+    if chains is not None:
+        chains |= heads
     out, seen, per, galleries = [], set(), dict.fromkeys(TYPES, 0), 0
     for s in sorted(spots, key=lambda s: -s["_score"]):
         k = key(s["n"])
-        if counts[k] >= 3 or k in seen or per[s["t"]] >= CAPS[s["t"]] or (s["_gallery"] and galleries >= GALLERIES):
+        if counts[k] >= 3 or k in seen or per[s["t"]] >= CAPS[s["t"]] or (s["_gallery"] and galleries >= GALLERIES) \
+                or (s["t"] != "free" and is_chain(s["n"], heads)):
             continue
         galleries += s["_gallery"]
         seen.add(k)
@@ -257,7 +298,7 @@ def connect():
 def city_rows(con, src: str, city: dict) -> list[dict]:
     dy = city["km"] / 111
     dx = dy / math.cos(math.radians(city["lat"]))
-    q = f"""SELECT names.primary AS name, names.common['en'] AS name_en, confidence, websites[1] AS web, coalesce(brand.wikidata, brand.names.primary) AS brand,
+    q = f"""SELECT names.primary AS name, confidence, websites[1] AS web, coalesce(brand.wikidata, brand.names.primary) AS brand,
               operating_status AS status, taxonomy.primary AS "primary", taxonomy.hierarchy AS hierarchy, bbox.ymin AS lat, bbox.xmin AS lon
             FROM read_parquet('{src}') WHERE bbox.xmin BETWEEN ? AND ? AND bbox.ymin BETWEEN ? AND ?"""
     cur = con.execute(q, [city["lon"] - dx, city["lon"] + dx, city["lat"] - dy, city["lat"] + dy])
@@ -293,11 +334,13 @@ def build(out: Path, only: str | None) -> None:
         if only and c["id"] != only:
             continue
         t = time.time()
-        spots = apply_edits(pick(city_rows(con, src, c)), edits.get(c["id"]) or {})
+        chains: set[str] = set()
+        spots = apply_edits(pick(city_rows(con, src, c), chains), edits.get(c["id"]) or {})
         (out / f"{c['id']}.json").write_text(json.dumps({"v": 1, "release": release, "spots": spots}, ensure_ascii=False,
                                                         separators=(",", ":"), allow_nan=False), encoding="utf-8")
         index.append({k: c[k] for k in ("id", "name", "cc", "lat", "lon")} | {"n": len(spots)})
-        print(f"{c['id']}: {len(spots)} places in {time.time() - t:.1f}s", flush=True)
+        print(f"{c['id']}: {len(spots)} places in {time.time() - t:.1f}s" + (f", chains dropped: {', '.join(sorted(chains))[:300]}"
+              if chains else ""), flush=True)  # check here when a place goes missing; places/edits.json can add it back
     (out / "index.json").write_text(json.dumps({"v": 1, "release": release, "cities": index}, ensure_ascii=False,
                                                separators=(",", ":")), encoding="utf-8")
     (out / "README.md").write_text(NOTICE, encoding="utf-8")

@@ -49,16 +49,6 @@ class ToSpot(unittest.TestCase):
         self.assertEqual(s["web"], "")
 
 
-class EnglishName(unittest.TestCase):
-    def test_kept_only_for_names_people_cant_read(self):
-        self.assertEqual(bp.to_spot(row(name="鮨 さいとう", name_en="Sushi Saito"))["ne"], "Sushi Saito")
-        self.assertEqual(bp.to_spot(row(name="Кафе Пушкинъ", name_en="Cafe Pushkin"))["ne"], "Cafe Pushkin")
-        self.assertNotIn("ne", bp.to_spot(row(name="Bar Alto", name_en="Bar Alto")))  # already readable
-        self.assertNotIn("ne", bp.to_spot(row(name="鮨 さいとう", name_en="すし さいとう")))  # not Latin either
-        self.assertNotIn("ne", bp.to_spot(row(name="鮨 さいとう", name_en=None)))
-        self.assertTrue(len(bp.to_spot(row(name="鮨", name_en="Sushi\x00 " + "x" * 200))["ne"]) <= 80)
-
-
 class CleanUrl(unittest.TestCase):
     def test_drops_query_and_fragment(self):
         self.assertEqual(bp.clean_url("https://rezto.app/reservation/piano?rwg_token=AFd1x&x=1#top"), "https://rezto.app/reservation/piano")
@@ -84,6 +74,26 @@ class Pick(unittest.TestCase):
     def test_same_local_name_three_times_is_still_a_chain(self):
         rows = [row(name="すき家", lat=35.6 + i / 1000) for i in range(3)] + [row(name="ＢＡＲ ＡＬＴＯ"), row()]
         self.assertEqual([s["n"] for s in bp.pick(rows)], ["ＢＡＲ ＡＬＴＯ"])  # full width and plain "Bar Alto" are one place
+
+    def test_chain_branches_with_place_names_are_dropped(self):
+        names = ["丸亀製麺", "丸亀製麺 神田小川町店", "丸亀製麺御茶ノ水店", "スシロー", "スシロー 上野店", "スシロー新宿東口店", "鮨 さいとう"]
+        rows = [row(name=n, lat=35.6 + i / 1000) for i, n in enumerate(names)]
+        self.assertEqual([s["n"] for s in bp.pick(rows)], ["鮨 さいとう"])
+
+    def test_shared_first_words_alone_are_not_a_chain(self):
+        names = ["居酒屋", "居酒屋 たつみ", "居酒屋かもめ", "Trattoria", "Trattoria Da Enzo", "Trattoria Monti",
+                 "Roma", "Romantica", "Romanesco", "La Taberna", "La Taberna De Paula", "La Taberna Sanlúcar",
+                 "日比谷公園", "日比谷公園 噴水", "日比谷公園 大音楽堂", "丸亀製麺 神田店", "丸亀製麺 両国店"]  # no branch word, no plain 丸亀製麺
+        rows = [row(name=n, lat=35.6 + i / 1000) for i, n in enumerate(names)]
+        self.assertEqual(len(bp.pick(rows)), len(names))
+
+    def test_many_chains_stay_fast(self):
+        import time
+        names = [n for i in range(1000) for n in (f"チェーン{i:04d}", f"チェーン{i:04d} 東店", f"チェーン{i:04d} 西店")]
+        rows = [row(name=n) for n in names] + [row(name=f"店舗{i}") for i in range(20000)]
+        t = time.time()
+        bp.pick(rows)
+        self.assertLess(time.time() - t, 10)
 
     def test_galleries_are_capped(self):
         rows = [row(name=f"Gallery {i}", primary="art_gallery", hierarchy=["arts_and_entertainment", "art_gallery"]) for i in range(40)]
