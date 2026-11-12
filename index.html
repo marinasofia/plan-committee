@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>The Plan Committee</title>
 <meta name="description" content="Your friends pick what they want. AI agents argue for each of you in a group chat and agree on one plan for a night out in NYC or London.">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-/eUgdP1CuFQJA6Q1OrKpZw0NOQVFeTkoNR/c1CX993o='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https:; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-4UH4544Vqlx+6Z32sI57hdakMBZ5nMkT4QCuEXDOGZs='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https:; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
 <meta name="referrer" content="no-referrer">
 <meta name="theme-color" content="#fbf9f6">
 <link rel="manifest" href="manifest.webmanifest">
@@ -414,8 +414,8 @@ function extra(s,src){
   s.rsv=typeof src.rsv==="string"?src.rsv:"";return s}
 async function loadMoreSpots(){
   try{const r=await fetch(`cities/${CITY.id}/spots.json`,{cache:"no-cache"});if(!r.ok)return;const j=await r.json();
-    const have=new Set(SPOTS.map(s=>s.n.toLowerCase().replace(/[^a-z0-9]/g,"")));
-    for(const raw of (Array.isArray(j.spots)?j.spots:[]).slice(0,20000)){const s=cleanSpot(raw,false);if(!s)continue;const k=s.n.toLowerCase().replace(/[^a-z0-9]/g,"");if(have.has(k))continue;have.add(k);SPOTS.push(extra(s,raw))}
+    const have=new Set(SPOTS.map(s=>norm(s.n)||s.n));  // any script: an ASCII-only key made every non-Latin name the same
+    for(const raw of (Array.isArray(j.spots)?j.spots:[]).slice(0,20000)){const s=cleanSpot(raw,false);if(!s)continue;const k=norm(s.n)||s.n;if(have.has(k))continue;have.add(k);SPOTS.push(extra(s,raw))}
     for(const [n,info] of Object.entries(j.curatedInfo||{})){const c=SPOTS.find(s=>s.cur&&s.n===n);if(c)extra(c,info)}
     for(const [n,pop] of Object.entries(j.curatedPop||{})){const c=SPOTS.find(s=>s.cur&&s.n===n);if(c&&typeof pop==="number"&&isFinite(pop))c.pop=Math.max(-3,Math.min(5,pop))}
   }catch(e){}
@@ -971,9 +971,9 @@ function shortlist(){
   for(let i=list.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[list[i],list[j]]=[list[j],list[i]]}
   return {list,C};
 }
-const spotLine=s=>{const c=slotClose(s);return `${s.n} | ${s.t} | ${s.h} | ${PRICE[s.p]} | ${s.v}${c!=null?` | open till ${fmtMin(c)}`:""}${s.x.includes("wheel")?" | wheelchair ok":""}${s.x.includes("vegan")?" | vegan options":""}${s.nw?" | fresh find, nobody has reviewed it yet":""}`};
+const spotLine=s=>{const c=slotClose(s),f=x=>String(x||"").replace(/\|/g,"/");return `${f(s.n)}${s.ne?` (in English: ${f(s.ne)})`:""} | ${s.t} | ${f(s.h)} | ${PRICE[s.p]} | ${f(s.v)}${c!=null?` | open till ${fmtMin(c)}`:""}${s.x.includes("wheel")?" | wheelchair ok":""}${s.x.includes("vegan")?" | vegan options":""}${s.nw?" | fresh find, nobody has reviewed it yet":""}`};
 function norm(s){return String(s||"").normalize("NFKD").replace(/\p{M}/gu,"").toLowerCase().replace(/[^\p{L}\p{N}]/gu,"")}  // keep letters in any script: "生ハムCOMPANY" must not shrink to "company" and match some other place
-function findSpot(n,first){const k=norm(n);if(!k)return null;const by=L=>L.find(s=>norm(s.n)===k)||L.find(s=>{const v=norm(s.n);return v&&(k.includes(v)||v.includes(k)&&k.length>4)});return (first&&by(first))||by(SPOTS)}  // the shortlist first when planning, so a same-named place elsewhere never wins
+function findSpot(n,first){const k=norm(n);if(!k)return null;const by=L=>L.find(s=>norm(s.n)===k)||L.find(s=>s.ne&&norm(s.ne)===k)||L.find(s=>{const v=norm(s.n);return v&&(k.includes(v)||v.includes(k)&&k.length>4)});return (first&&by(first))||by(SPOTS)}  // the shortlist first when planning, so a same-named place elsewhere never wins
 const stubSpot=n=>({n:str(n,80),t:"dinner",h:"",b:"",p:2,c:"",f:[],v:"",nw:false,pop:0,web:"",x:[],cur:false});  // a shared plan's stop that is no longer in the list: still shown, map search only
 
 /* ===================== AI providers: spread across keys, fail over ===================== */
