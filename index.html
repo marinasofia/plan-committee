@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>The Plan Committee</title>
 <meta name="description" content="Your friends pick what they want. AI agents argue for each of you in a group chat and agree on one plan for a night out in NYC or London.">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-4UH4544Vqlx+6Z32sI57hdakMBZ5nMkT4QCuEXDOGZs='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https:; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-T7cEFQNFCOB02bfcR0xVqmp3wbNua9AIX5zwUpd5RzU='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https:; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
 <meta name="referrer" content="no-referrer">
 <meta name="theme-color" content="#fbf9f6">
 <link rel="manifest" href="manifest.webmanifest">
@@ -235,6 +235,7 @@ button,input,select,textarea{font:inherit;color:inherit}
         <p class="small" style="margin-top:6px"><a href="#" id="newCrewLink">Start a new crew</a> · <a href="#" id="crewDel">Delete this crew</a></p></div>
     </details>
 
+    <button class="ghost" id="backChat" type="button" style="display:none;width:100%;margin-bottom:8px">Back to the chat</button>
     <button class="cta" id="startBtn" type="button">Start the group chat</button>
     <p class="small">Places from hand picks, Overture Maps Foundation, <span id="nycSrc">NYC Open Data </span>and © OpenStreetMap contributors. Weather by Open-Meteo. Check hours before you go.</p>
     <p class="small" id="keyHint">No AI key yet? You'll see a demo first. <a href="#" id="keyLink">Add a free key</a> (1 minute) or one you already have to turn on the real AI.</p>
@@ -686,6 +687,10 @@ function renderHead(){const ag=agentList();
   $("title").textContent=plan.mode==="girls"?"friends night committee":"date night committee";
   $("subtitle").textContent=`${ag.length} AI agents · 1 plan · 0 chill`;const nokey=!providers().length&&!MOCK;$("keyPill").style.display=$("keyBar").style.display=nokey?"":"none"}
 const moreSum=()=>$("moreSum").textContent=[plan.when,"starts "+fmtMin(plan.start),plan.hood==="Anywhere"?"":plan.hood,plan.wallet?"Wallet on":""].filter(Boolean).join(" · ");
+/* "Back to the chat" after the main menu: only while the crew and city are the ones it ran with */
+let resumeKey="";
+const chatKey=()=>`${plan.id}|${CITY?.id}|${plan.members.map(m=>m.n).join("|")}`;
+const canResume=()=>!!resumeKey&&resumeKey===chatKey()&&!!lastPlan&&!busy&&!starting;
 function renderSetup(){
   fixPlan();renderCrews();$("crewName").value=plan.name;
   document.querySelectorAll("#modeSeg button").forEach(b=>b.classList.toggle("on",b.dataset.mode===plan.mode));
@@ -708,7 +713,8 @@ function renderSetup(){
     if(v==="+"){const r=$("geoRow");r.style.display=r.style.display?"":"none";if(!r.style.display)$("geoInput").focus();return}
     $("geoRow").style.display="none";if(v===CITY.id)return;hush();await loadCity(v).catch(e=>say(e.message));plan.city=CITY.id;plan.hood="Anywhere";savePlan();renderSetup()});
   $("addForm").style.display=plan.members.length>=6?"none":"";
-  $("startBtn").textContent=`Start the chat (${plan.members.length} agent${plan.members.length===1?"":"s"}${plan.wallet?" + The Wallet":""})`;  // short enough for one line on a 360px phone
+  const back=canResume();$("backChat").style.display=back?"":"none";
+  $("startBtn").textContent=`${back?"Start a new chat":"Start the chat"} (${plan.members.length} agent${plan.members.length===1?"":"s"}${plan.wallet?" + The Wallet":""})`;  // short enough for one line on a 360px phone
   $("keyHint").style.display=providers().length||MOCK?"none":"";
   $("nycSrc").hidden=CITY.id!=="nyc";
   renderHead();
@@ -721,6 +727,8 @@ $("geoForm").onsubmit=async e=>{e.preventDefault();const st=t=>$("geoStatus").te
     await loadCity(id);plan.city=CITY.id;plan.hood="Anywhere";savePlan();$("geoRow").style.display="none";$("geoInput").value="";st("Any city. Places come straight from OpenStreetMap.");renderSetup();
     if(CITY.geo)say(`${SPOTS.length} places around ${CITY.name}, from OpenStreetMap.${providers().length?"":" The demo works here; add your free AI key for the real agents."}`)}
   catch(err){st(err.message)}finally{$("geoGo").disabled=false}};
+$("geoInput").oninput=e=>{const v=$("geoInput").value;  // picked from the dropdown: load it right away, no Find tap
+  if((!e.inputType||e.inputType==="insertReplacementText")&&!$("geoGo").disabled&&[...$("cityNames").options].some(o=>o.value===v))$("geoForm").requestSubmit()};
 $("crewName").oninput=()=>{plan.name=str($("crewName").value,30);savePlan();renderCrews()};
 $("crewBtn").onclick=async()=>{savePlan();const url=baseUrl()+"#c="+await pack({...planPayload(),name:plan.name});
   await shareOut(plan.name,`our crew for planning nights out: tap to save it, then anyone can start the next plan`,url,$("crewBtn"),"Crew link copied")};
@@ -728,7 +736,7 @@ $("crewBtn").onclick=async()=>{savePlan();const url=baseUrl()+"#c="+await pack({
 function hush(){const n=$("notice");n.style.display="none";n.textContent=""}
 function say(t,btn,fn){const n=$("notice");n.style.display="";n.textContent=t;if(btn){const b=document.createElement("button");b.type="button";b.className="chip";b.style.marginLeft="8px";b.textContent=btn;b.onclick=fn;n.appendChild(b)}}
 $("crewDel").onclick=()=>{if(Object.keys(crews).length<=1)return say("You need at least one crew.");
-  say(`Delete "${plan.name}" from this phone?`,"Delete",async()=>{delete crews[plan.id];store.set("crews",crews);plan=Object.values(crews)[0];fixPlan();savePlan();await ownCity();renderSetup();say("Crew deleted.")})};
+  say(`Delete "${plan.name}" from this phone?`,"Delete",async()=>{if(store.get("last",null)?.crew===plan.id)store.set("last",null);delete crews[plan.id];store.set("crews",crews);plan=Object.values(crews)[0];fixPlan();savePlan();await ownCity();renderSetup();say("Crew deleted.")})};
 function renderCrews(){const list=Object.values(crews).sort((a,b)=>String(a.name).localeCompare(String(b.name)));
   $("crewChips").innerHTML=list.map(c=>`<button type="button" class="chip${c.id===plan.id?" on":""}" data-crew="${esc(c.id)}">${esc(c.name||"Crew")}</button>`).join("")+`<button type="button" class="chip" data-crew="+">+ new crew</button>`;
   $("crewChips").querySelectorAll("[data-crew]").forEach(b=>b.onclick=async()=>{const id=b.dataset.crew;if(id===plan.id)return;if(id==="+")newCrew();else useCrew(id);await ownCity();renderSetup()})}
@@ -1268,11 +1276,17 @@ function sys(t,err){const d=document.createElement("div");d.className="sys"+(err
 /* ===================== ticket ===================== */
 const placeQ=s=>[s.n,s.h,CITY.search].filter(Boolean).join(", ");  // "Signal, East Williamsburg, New York, NY": Google can't search a name glued to coordinates
 const at=s=>!s.h&&Number.isFinite(+s.lat)&&Number.isFinite(+s.lon)?`${(+s.lat).toFixed(5)},${(+s.lon).toFixed(5)}`:"";  // no neighborhood (open city lists): "Zion, Tokyo" finds a hair salon 20 km away, so search around the real spot
-const gmapSpot=s=>at(s)?`https://www.google.com/maps/search/${encodeURIComponent(s.n)}/@${at(s)},18z`:"https://www.google.com/maps/search/?api=1&query="+encodeURIComponent(placeQ(s));
+/* Google has no walking or driving directions in South Korea and its search there is weak, so Korean spots open in
+   Kakao Map, pinned at the exact spot with its name. Commas and slashes would split Kakao's name,lat,lng path. */
+const inKR=s=>{const a=+s.lat,o=+s.lon;return a>=33&&a<=38.7&&o>=124.5&&o<=132};
+const kakaoPt=s=>`${encodeURIComponent(String(s.n).replace(/[,/\\]/g," ").trim()||"place")},${(+s.lat).toFixed(6)},${(+s.lon).toFixed(6)}`;
+const gmapSpot=s=>inKR(s)?"https://map.kakao.com/link/map/"+kakaoPt(s):at(s)?`https://www.google.com/maps/search/${encodeURIComponent(s.n)}/@${at(s)},18z`:"https://www.google.com/maps/search/?api=1&query="+encodeURIComponent(placeQ(s));
 /* many places book through Resy, Tock or walk in only, so search instead of guessing OpenTable */
 const BOOKING=/^https:\/\/(www\.)?(resy\.com|opentable\.com|exploretock\.com|sevenrooms\.com)\/[^\s<>"']{1,200}$/i;
 const reserve=s=>BOOKING.test(s.rsv||"")?esc(s.rsv):"https://www.google.com/search?q="+encodeURIComponent(`${s.n} ${s.h||""} ${CITY.name} reservation`.replace(/\s+/g," "));
 function routeUrl(stops){const q=s=>encodeURIComponent(at(s.spot)||placeQ(s.spot));
+  if(plan.move!=="transit"&&stops.every(s=>inKR(s.spot)))  // Kakao: up to 5 stops between, but none for transit, which Google does cover
+    return `https://map.kakao.com/link/by/${plan.move==="car"?"car":"walk"}/`+stops.map(s=>kakaoPt(s.spot)).join("/");
   let u="https://www.google.com/maps/dir/?api=1&origin="+q(stops[0])+"&destination="+q(stops[stops.length-1]);
   if(stops.length>2)u+="&waypoints="+stops.slice(1,-1).map(q).join("%7C");return u+"&travelmode="+({walk:"walking",transit:"transit",car:"driving"})[plan.move]}
 function stopInfo(s,p){const base=nightDate(p.when||plan.when),t=parseTime(s.time,base),m=t.getHours()*60+t.getMinutes();
@@ -1396,12 +1410,12 @@ async function startRun(){const tok=navTok,gone=()=>tok!==navTok;  // the main m
   const todo=plan.members.filter(m=>m.n&&!m.pk).map(m=>m.id);
   if(todo.length&&!MOCK)return openPicker(todo,start);  // pick (or invite) first, then the chat runs
   const g=CITY?.id!==plan.city?geoParse(plan.city):null;
-  if(g){$("setup").classList.add("hide");chatEl.innerHTML="";sys(`Finding places in ${g.name} on OpenStreetMap. The first time can take up to a minute, then it's saved on this phone.`)}
+  if(g){$("setup").classList.add("hide");chatEl.innerHTML="";resumeKey="";sys(`Finding places in ${g.name} on OpenStreetMap. The first time can take up to a minute, then it's saved on this phone.`)}
   if(!await ownCity()&&g){chatEl.innerHTML="";renderSetup();$("setup").classList.remove("hide");return}
   if(gone())return;renderSetup();  // the city may have just changed: prices, chips and labels follow it, even behind the chat
   DEMO=!MOCK&&!providers().length;
   plan.members=plan.members.filter(m=>m.n);savePlan();
-  $("setup").classList.add("hide");$("composer").classList.remove("off");chatEl.innerHTML="";transcript=[];lastPlan=null;lastWho=null;mi=0;
+  $("setup").classList.add("hide");$("composer").classList.remove("off");chatEl.innerHTML="";transcript=[];lastPlan=null;resumeKey="";store.set("last",null);lastWho=null;mi=0;
   fixPlan();await fetchWeather(nightDate(plan.when),plan.start);if(gone())return;
   SL=shortlist();if(!SL.list.length){sys("No spots fit that time and place. Try another neighborhood or time.",true);$("setup").classList.remove("hide");return}
   const taken=new Set(agentList().map(a=>a.ps)),draw=()=>{const left=REAL_PERS.filter(k=>!taken.has(k)),k=rand(left.length?left:REAL_PERS);taken.add(k);return k};  // no two agents draw the same one
@@ -1430,8 +1444,13 @@ async function overrule(t){if(busy||!SL)return;busy=true;setComposer(false);  //
   if(/veto/i.test(t)&&lastPlan)track("veto",lastPlan.stops.map(s=>s.spot.n));transcript.push({who:"The human (has the final say)",text:t});addBubble(null,t);const tok=navTok;await sleep(300);if(tok!==navTok)return;await go(2,round+1)}  // the main menu was tapped meanwhile
 $("composer").onsubmit=e=>{e.preventDefault();const t=$("say").value.trim();if(!t||busy)return;$("say").value="";overrule(t)};
 $("startBtn").onclick=start;
-$("newBtn").onclick=async()=>{if(busy||starting){run.off=true;run.ctl.abort();navTok++;busy=false;starting=false;hideTyping();setComposer(true)}  // works mid-chat too: stops the run
-  store.set("last",null);await ownCity();REPLAY=null;$("app").classList.remove("replay");history.replaceState(null,"",location.pathname+location.search);renderSetup();$("setup").classList.remove("hide")};
+$("backChat").onclick=()=>{if(!canResume())return renderSetup();$("setup").classList.add("hide");$("composer").classList.remove("off");setComposer(true);scroll()};
+/* the main menu keeps the chat: "Back to the chat" returns to it while the crew and city are the same, and starting
+   a new chat replaces it (startRun clears the saved one) */
+$("newBtn").onclick=async()=>{const mid=busy||starting;
+  if(mid){run.off=true;run.ctl.abort();navTok++;busy=false;starting=false;hideTyping();setComposer(true)}  // works mid-chat too: stops the run
+  resumeKey=!mid&&!REPLAY&&lastPlan?chatKey():"";  // a stopped run or someone else's replay has nothing to go back to
+  await ownCity();REPLAY=null;$("app").classList.remove("replay");history.replaceState(null,"",location.pathname+location.search);renderSetup();$("setup").classList.remove("hide")};
 
 /* ===================== scripted agents: the no key demo, and ?mock for testing ===================== */
 let mi=0,speaker=null,demo=null;const mockUsed=new Set();
