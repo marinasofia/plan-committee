@@ -12,8 +12,12 @@ import sys
 from pathlib import Path
 
 INDEX = Path(__file__).resolve().parent.parent / "index.html"
+# Every host the app fetches from. Nothing else can receive a request, so even injected code could not send a key away.
+HOSTS = ["https://generativelanguage.googleapis.com", "https://api.groq.com", "https://openrouter.ai",
+         "https://overpass-api.de", "https://overpass.private.coffee", "https://nominatim.openstreetmap.org",
+         "https://api.open-meteo.com", "https://cdn.jsdelivr.net"]
 POLICY = ("default-src 'none'; script-src '{hash}'; style-src 'unsafe-inline' https://fonts.googleapis.com; "
-          "font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https:; manifest-src 'self'; "
+          "font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' {hosts}; manifest-src 'self'; "
           "worker-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'")
 
 
@@ -23,7 +27,13 @@ def main():
     if len(scripts) != 1 or html.count("<script") != 1:
         sys.exit("index.html must have exactly one inline <script> and no other script tags")
     digest = base64.b64encode(hashlib.sha256(scripts[0].encode("utf-8")).digest()).decode()
-    meta = '<meta http-equiv="Content-Security-Policy" content="%s">' % POLICY.format(hash="sha256-" + digest)
+    # exactly one list, of plain host names only: a second (commented) copy or an odd entry fails closed
+    custom = re.findall(r"CUSTOM_HOSTS=\[([^\]]*)\]", scripts[0])
+    if len(custom) != 1 or not re.fullmatch(r'"[a-z0-9.-]+"(,"[a-z0-9.-]+")*', custom[0].replace(" ", "")):
+        sys.exit('index.html must define exactly one const CUSTOM_HOSTS=["host",...] with plain host names')
+    extra = re.findall(r'"([a-z0-9.-]+)"', custom[0])
+    hosts = " ".join(HOSTS + ["https://" + h for h in extra])
+    meta = '<meta http-equiv="Content-Security-Policy" content="%s">' % POLICY.format(hash="sha256-" + digest, hosts=hosts)
     if html.count('http-equiv="Content-Security-Policy"') != 1:
         sys.exit('index.html must have exactly one <meta http-equiv="Content-Security-Policy" content="..."> tag')
     new, n = re.subn(r'<meta http-equiv="Content-Security-Policy" content="[^"]*">', meta, html, count=1)

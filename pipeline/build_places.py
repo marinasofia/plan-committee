@@ -75,7 +75,7 @@ CTRL = re.compile(r"[\x00-\x1f\x7f​-‏‪-‮⁦-⁩]")  # control and bidi c
 def clean_url(u: object) -> str:
     """A business website, without the query or fragment: those carry booking and tracking tokens, never needed to visit."""
     u = str(u or "")
-    if not re.match(r"^https?://[^\s<>\"']+$", u):
+    if not re.match(r"^https?://[^\s<>\"']+$", u) or not re.match(r"^https?://[^/?#@\\]+([/?#]|$)", u):  # no user@host links
         return ""
     p = urllib.parse.urlsplit(u)
     return urllib.parse.urlunsplit((p.scheme, p.netloc, p.path, "", ""))[:200] if p.netloc else ""

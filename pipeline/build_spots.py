@@ -550,7 +550,7 @@ def clean_tag(item: dict, cand: dict, city: dict) -> dict:
     return {"n": cand["name"], "t": t, "h": (cand.get("hood") or item.get("hood") or "")[:30], "b": boro, "p": price,
             "c": item.get("cuisine") if t == "dinner" and item.get("cuisine") in CUISINES else "", "f": tags,
             "v": (item.get("why") or "")[:70], "lat": round(cand["lat"], 5), "lon": round(cand["lon"], 5),
-            "web": cand.get("website", "")[:120] if re.match(r"https?://", cand.get("website", ""), re.I) else ""}
+            "web": cand.get("website", "")[:120] if re.match(r"https?://[^/?#@\\\s]+([/?#]|$)", cand.get("website", ""), re.I) else ""}
 
 
 RETRY_DAYS = 30
@@ -603,7 +603,7 @@ def fresh_find(cand: dict, city: dict) -> dict | None:
     return {"n": cand["name"], "t": t, "h": (cand.get("hood") or "")[:30], "b": cand.get("boro", "") if city.get("areas") else "",
             "p": 2, "c": cuisine if t == "dinner" else "", "f": tags, "v": "fresh find, not reviewed yet", "nw": 1,
             "lat": round(cand["lat"], 5), "lon": round(cand["lon"], 5),
-            "web": cand.get("website", "")[:120] if re.match(r"https?://", cand.get("website", ""), re.I) else ""}
+            "web": cand.get("website", "")[:120] if re.match(r"https?://[^/?#@\\\s]+([/?#]|$)", cand.get("website", ""), re.I) else ""}
 
 
 def tag_new(cands: dict[str, dict], cache: dict[str, dict], city: dict, max_batches: int) -> None:

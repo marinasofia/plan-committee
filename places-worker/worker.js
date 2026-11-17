@@ -39,7 +39,8 @@ export default {
     const hit = env.PLACES && await env.PLACES.get(key);
     if (hit) return json(hit, 200, { "X-Cache": "hit" });
     // a miss costs an OpenStreetMap query: a few per minute per visitor, so nobody can walk the map through us
-    if (env.MISSES && !(await env.MISSES.limit({ key: req.headers.get("CF-Connecting-IP") || "unknown" })).success) return json('{"error":"slow down"}', 429);
+    if (!env.MISSES) return json('{"error":"rate limit not configured"}', 503);  // fail closed: never an unlimited proxy
+    if (!(await env.MISSES.limit({ key: req.headers.get("CF-Connecting-IP") || "unknown" })).success) return json('{"error":"slow down"}', 429);
     let elements = null;
     for (const host of OVERPASS) {
       try {
