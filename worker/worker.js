@@ -14,6 +14,8 @@ export default {
     const url = new URL(req.url);
     if (req.method === "OPTIONS") return new Response(null, { headers: cors });
     if (req.method === "POST" && url.pathname === "/e") {
+      if (!env.HITS) return json({ ok: false, error: "rate limit not configured" }, 503);  // fail closed: CORS does not stop scripts
+      if (!(await env.HITS.limit({ key: req.headers.get("CF-Connecting-IP") || "unknown" })).success) return json({ ok: false }, 429);
       if (Number(req.headers.get("content-length") || 0) > MAX_BODY) return json({ ok: false }, 413);
       const raw = await req.text();
       if (new TextEncoder().encode(raw).length > MAX_BODY) return json({ ok: false }, 413);

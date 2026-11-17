@@ -41,4 +41,6 @@ jobs:
           git add cities/*/spots.json data/tagged.json
           git diff --cached --quiet && echo "no changes" && exit 0
           git commit -m "Update spots $(date -u +%F)"
-          git push "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" HEAD:${GITHUB_REF_NAME}
+          auth="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)"  # in memory only, never in a URL or on disk
+          echo "::add-mask::${auth#AUTHORIZATION: basic }"
+          git -c http.extraheader="$auth" push "https://github.com/${GITHUB_REPOSITORY}.git" "HEAD:${GITHUB_REF_NAME}"

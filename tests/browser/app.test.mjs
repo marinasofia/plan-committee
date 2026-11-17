@@ -150,6 +150,30 @@ test("switching city clears the notice, and a typed city loads on Start", async 
   assert.equal(await page(`CITY.id`), "nyc", "the typed city is the one that ran");
 });
 
+test("picking a city from the list loads it without tapping Find", async () => {
+  await city("London");
+  await page(`(async()=>{$("newBtn").click();$("geoRow").style.display="";fillCityNames();await new Promise(r=>setTimeout(r,500))})()`);
+  const pick = how => page(`(()=>{const i=$("geoInput");i.value="New York City";i.dispatchEvent(new InputEvent("input",{inputType:${JSON.stringify(how)}}))})()`);
+  await pick("insertText");  // typing a name out in full is not a pick: wait for Find
+  await new Promise(r => setTimeout(r, 1500));
+  assert.equal(await page(`CITY.name`), "London", "typing alone doesn't load");
+  await pick("insertReplacementText");  // what Chrome sends for a dropdown pick
+  await until(`CITY.id==="nyc"&&$("geoRow").style.display==="none"`, 30);
+});
+
+test("Seoul map and route links open Kakao Map at the exact spots", async () => {
+  // Google has no walking or driving directions in South Korea (it says "outside our coverage area")
+  const r = await page(`(()=>{const sp=(n,lat,lon)=>({spot:{n,t:"dinner",lat,lon}}),
+      seoul=[sp("1978테라스",37.55682,126.98532),sp("Rooftop Bar, Floating/2F",37.56129,126.98684),sp("Essere Gelato",37.56325,126.98682)],
+      old=plan.move,url=m=>(plan.move=m,routeUrl(seoul)),out={map:gmapSpot(seoul[1].spot),walk:url("walk"),car:url("car"),transit:url("transit"),
+      paris:(plan.move="walk",routeUrl([sp("A",48.85,2.35),sp("B",48.86,2.36)]))};plan.move=old;return out})()`);
+  assert.equal(r.map, "https://map.kakao.com/link/map/Rooftop%20Bar%20%20Floating%202F,37.561290,126.986840", "pinned by name and exact spot, no comma or slash in the name");
+  assert.match(r.walk, /^https:\/\/map\.kakao\.com\/link\/by\/walk\/[^/]+,37\.556820,126\.985320\/[^/]+,37\.561290,126\.986840\/Essere%20Gelato,37\.563250,126\.986820$/, r.walk);
+  assert.match(r.car, /^https:\/\/map\.kakao\.com\/link\/by\/car\//, r.car);
+  assert.match(r.transit, /^https:\/\/www\.google\.com\/maps\/dir\/.*travelmode=transit$/, "Kakao can't do transit with stops, Google can");
+  assert.match(r.paris, /^https:\/\/www\.google\.com\/maps\/dir\/.*travelmode=walking$/, "other countries keep Google");
+});
+
 test("prices and the city chip follow the city, also when Start loads it", async () => {
   await city("London");
   assert.match(await page(`$("members").textContent`), /£/, "London setup shows pounds");
@@ -183,9 +207,32 @@ test("the main menu button works mid chat, even when the AI hangs", async () => 
   await until(`!!lastPlan&&!busy&&!!document.querySelector("#chat .ticket")`);
   assert.equal(await page(`document.querySelectorAll("#chat .ticket").length`), 1, "a fresh run works right after");
   // stop during a "change something" round: the old chat must not come back to life behind the menu
+  const before = await page(`store.get("last",null)?.p?.id`);
   await page(`(()=>{overrule("veto: too pricey. make it cheaper");$("newBtn").click()})()`);
   await sleep(2500);
-  assert.equal(await page(`!$("setup").classList.contains("hide")&&!busy&&document.querySelectorAll("#chat .ticket").length===1&&store.get("last",null)===null`), true, "no new round ran after the stop");
+  assert.equal(await page(`!$("setup").classList.contains("hide")&&!busy&&document.querySelectorAll("#chat .ticket").length===1`), true, "no new round ran after the stop");
+  assert.equal(await page(`store.get("last",null)?.p?.id`), before, "the saved plan is still the one from before the stop");
+  assert.equal(await page(`$("backChat").style.display`), "none", "a stopped round has no chat to go back to");
+});
+
+test("the main menu keeps the chat to go back to, a new chat replaces it", async () => {
+  await city("New York City");
+  await runDemo("walk");
+  const title = await page(`lastPlan.title`);
+  await page(`$("newBtn").click()`);
+  await until(`!$("setup").classList.contains("hide")`, 10);
+  assert.equal(await page(`$("backChat").style.display`), "", "Back to the chat shows");
+  assert.match(await page(`$("startBtn").textContent`), /^Start a new chat/);
+  assert.equal(await page(`store.get("last",null)?.p?.title`), title, "the saved chat is kept");
+  await page(`$("backChat").click()`);
+  const back = await page(`({setup:$("setup").classList.contains("hide"),ticket:!!document.querySelector("#chat .ticket"),title:lastPlan.title})`);
+  assert.deepEqual(back, { setup: true, ticket: true, title }, "same chat and plan");
+  await page(`$("newBtn").click()`);
+  await city("London");  // another city: the old chat doesn't fit it
+  assert.equal(await page(`$("backChat").style.display`), "none", "no way back after switching city");
+  await page(`(()=>{lastPlan=null;$("startBtn").click()})()`);
+  await until(`!!lastPlan&&!busy&&!!document.querySelector("#chat .ticket")`);
+  assert.equal(await page(`store.get("last",null)?.city`), "london", "the new chat replaced the old one");
 });
 
 test("the last chat and plan survive a reload", async () => {
