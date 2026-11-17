@@ -36,7 +36,3 @@ Act as a senior security engineer and pen test every change before it is committ
 
 * Run `MAX_BATCHES=2 python3 pipeline/build_spots.py` to use little AI quota. It writes `spots.json` and `data/tagged.json`, so run it on a copy if you don't want to commit the result.
 * In the Claude Code sandbox, Python downloads from NYC Open Data get cut off by the proxy while curl works. Overpass often answers 502 when busy; the script retries with backoff.
-
-## Security
-
-Follow [SECURITY-RULES.md](SECURITY-RULES.md) for every change. Before this repo goes public, run the security kit scan and its publish checklist.
