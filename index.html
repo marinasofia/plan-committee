@@ -4,8 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>The Plan Committee</title>
-<meta name="description" content="Your friends pick what they want. AI agents argue for each of you in a group chat and agree on one plan for a night out in NYC or London.">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-H+EI5FXh9mndpAAMv+hg0N5RLeJH7Kqn+mtCQqCkLu0='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://generativelanguage.googleapis.com https://api.groq.com https://openrouter.ai https://overpass-api.de https://overpass.private.coffee https://nominatim.openstreetmap.org https://api.open-meteo.com https://cdn.jsdelivr.net https://api.openai.com https://api.mistral.ai https://api.deepseek.com https://api.together.xyz https://api.x.ai https://api.fireworks.ai; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta name="description" content="Your friends pick what they want. AI agents argue for each of you in a group chat and agree on one real plan for a night out in any city.">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-D9WkslJWd2eHI8tFBUPFEQ5Ip1FrmlEfSrE4Zr2IUx8='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://generativelanguage.googleapis.com https://api.groq.com https://openrouter.ai https://overpass-api.de https://overpass.private.coffee https://nominatim.openstreetmap.org https://api.open-meteo.com https://cdn.jsdelivr.net https://api.openai.com https://api.mistral.ai https://api.deepseek.com https://api.together.xyz https://api.x.ai https://api.fireworks.ai; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
 <meta name="referrer" content="no-referrer">
 <meta name="theme-color" content="#fbf9f6">
 <link rel="manifest" href="manifest.webmanifest">
@@ -16,7 +16,7 @@
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://plan-committee.pages.dev/">
 <meta property="og:title" content="The Plan Committee">
-<meta property="og:description" content="Everyone picks what they want. AI agents argue for each of you and agree on one real plan for a night out in NYC or London.">
+<meta property="og:description" content="Everyone picks what they want. AI agents argue for each of you and agree on one real plan for a night out in any city.">
 <meta property="og:image" content="https://plan-committee.pages.dev/og.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
@@ -343,6 +343,7 @@ button,input,select,textarea{font:inherit;color:inherit}
     <div class="qks" data-s="1">
       <h2>Turn on the real AI. It's free.</h2>
       <p class="lead">One minute, no card. Only you need a key: friends who join by link don't. Which account do you have handy?</p>
+      <p class="small" id="qkInApp" style="display:none;color:#b4413c;margin-top:0"></p>
       <button type="button" class="qztile" data-p="gemini"><b>A Google account</b><span>Get a free Gemini key from Google AI Studio</span></button>
       <button type="button" class="qztile" data-p="groq"><b>An email address</b><span>Get a free Groq key, the fastest replies</span></button>
       <p class="small" style="text-align:center;margin-top:14px"><a href="#" id="qkHave">I already have a key</a></p>
@@ -1606,13 +1607,18 @@ const isIOS=/iPhone|iPad|iPod/.test(navigator.userAgent)||(navigator.platform===
 let installEvt=null;
 addEventListener("beforeinstallprompt",e=>{e.preventDefault();installEvt=e;renderInstall()});
 addEventListener("appinstalled",()=>{installEvt=null;renderInstall()});
-const installKind=()=>standalone()?"":installEvt?"prompt":isIOS?"ios":"";
+/* opened inside Instagram, TikTok and co: Google sign in is often blocked there, it can't be installed, and the app may forget the key */
+const inAppName=(()=>{const u=navigator.userAgent;return /Instagram/.test(u)?"Instagram":/FBAN|FBAV|FB_IAB/.test(u)?"Facebook":/musical_ly|BytedanceWebview|TikTok/i.test(u)?"TikTok":/Snapchat/.test(u)?"Snapchat":/LinkedInApp/.test(u)?"LinkedIn":/ Line\//.test(u)?"LINE":""})();
+const openOut=()=>isIOS?"tap ··· then Open in Safari":"tap ⋮ then Open in Chrome";
+const installKind=()=>standalone()?"":inAppName?"inapp":installEvt?"prompt":isIOS?"ios":"";
 function renderInstall(){const k=installKind();
+  const q=$("qkInApp");q.style.display=k==="inapp"?"":"none";q.textContent=k==="inapp"?`You're in the ${inAppName} browser, where Google sign in often fails. ${openOut()[0].toUpperCase()+openOut().slice(1)} first, or pick the email option.`:"";
+  if(k==="inapp"){$("installHint").style.display="";$("installLink").textContent="Open it in your browser";$("obInstall").textContent=`Opened from ${inAppName}? ${openOut()[0].toUpperCase()+openOut().slice(1)}, so it keeps your key.`;return}
   $("installHint").style.display=k?"":"none";$("installLink").textContent=k==="ios"?"Add it to your Home Screen":"Install the app";
   $("obInstall").textContent=k==="ios"?"Tip: tap Share, then Add to Home Screen. It opens like an app and keeps your key.":k?"Tip: install it as an app so it keeps your key.":""}
 $("installLink").onclick=async e=>{e.preventDefault();
   if(installEvt){installEvt.prompt();try{await installEvt.userChoice}catch(x){}installEvt=null;renderInstall()}
-  else{const n=$("notice");n.style.display="";n.textContent="On iPhone: tap the Share button, then Add to Home Screen."}};
+  else{const n=$("notice");n.style.display="";n.textContent=inAppName?`In ${inAppName}: ${openOut()}. Then you can add it to your home screen.`:"On iPhone: tap the Share button, then Add to Home Screen."}};
 /* ask the browser not to clear our storage (keys, plan) when space runs low or after a week away */
 function keepStorage(){try{navigator.storage?.persist?.().catch(()=>{})}catch(e){}}
 /* first visit: names in, mode guessed from the head count (until tapped), then straight to the chat */

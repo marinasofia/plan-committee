@@ -18,16 +18,28 @@
   <a href="LICENSE"><img alt="MIT license" src="https://img.shields.io/badge/license-MIT-1c1b1a"></a>
 </p>
 
+> **It's open source.** The code is MIT licensed and every place comes from open data. Found a bug, know a spot that belongs in the app, or want your city to get its own pack? You're welcome to help: see [Contributing](#contributing).
+
+## Use it
+
+1. Open [plan-committee.pages.dev](https://plan-committee.pages.dev/) in Safari or Chrome. If you tapped the link inside Instagram or TikTok, open it in your browser first (tap ··· or ⋮, then Open in browser): Google sign in often fails in those in-app browsers, and they may forget your key.
+2. Type your name, your city and who's coming, pick date night or friends night, and tap **Let the agents plan**.
+3. Pick how each person argues (dramatic, food snob, hopeless romantic...). Not sure about a friend? Send them a link and they pick on their own phone.
+4. With no key you get a demo: scripted agents, but real places. For agents that really argue for each person's picks, tap **Free AI key**. It takes about a minute and needs no card: a Gemini key with a Google account, or a Groq key with an email address. Only the planner needs a key; friends who join by link don't.
+5. When the plan is ready: open the map, reserve, get a route, add it to your calendar, or tap **Send to the group** so everyone can vote or ask for a swap.
+
+Tip: add it to your home screen (Share, then Add to Home Screen on iPhone) so it opens like an app and keeps your key.
+
 ## What it does
 
 * **Date night or friends night.** Add your people, or send an invite link to the group chat so everyone picks on their own phone. Friends never need a key or an account.
 * **Your people, saved.** Send friends a profile link: 6 quick taps and their taste and agent personality are saved on your phone. Next time you just tap who's coming.
 * **Agents with personalities.** Dramatic, stubborn, chill, the mediator, chaotic. An optional Wallet agent guards the budget.
-* **Any city.** Pick "Somewhere else" and type any city. 475 cities load instantly from open place lists built every month from [Overture Maps](https://overturemaps.org), and anywhere else comes live from OpenStreetMap. New York and London also have curated packs refreshed daily, and adding yours is one command and one pull request ([how](CONTRIBUTING.md)).
-* **Real places only.** 153 hand picked spots (125 in New York, 28 in London), plus 4,219 more tagged from NYC Open Data and OpenStreetMap, refreshed every day. Closed restaurants drop out on their own.
+* **Any city.** Pick "Somewhere else" and type any city. 504 cities load instantly from open place lists built every month from [Overture Maps](https://overturemaps.org), and anywhere else comes live from OpenStreetMap. New York and London also have curated packs refreshed daily, and adding yours is one command and one pull request ([how](CONTRIBUTING.md)).
+* **Real places only.** 153 hand picked spots (125 in New York, 28 in London), plus 4,917 more tagged from NYC Open Data and OpenStreetMap, refreshed every day. Closed restaurants drop out on their own.
 * **A night that works.** Stops stay close together for how you get around (on foot, transit or car), and every stop is checked to be open at its time. Museums and theatres with unknown hours never show up late at night.
 * **A plan you can use.** Map, website, reserve (straight to Resy or OpenTable when we know the page), a route in your travel mode, add to calendar, share the whole argument as a replay link.
-* **Your AI, your key.** Bring a free Gemini, Groq or OpenRouter key, or point it at any OpenAI compatible API. The key stays in your browser and is sent only to the provider you chose.
+* **Your AI, your key.** Bring a free Gemini, Groq or OpenRouter key, or an OpenAI, Mistral, DeepSeek, Together, xAI or Fireworks key. The key stays in your browser and is sent only to the provider you chose; the page's security policy blocks every other host.
 * **Installable.** Add it to your home screen and it opens like an app.
 
 <p align="center">
@@ -43,9 +55,9 @@ Picking a place for six people takes longer than the dinner itself. I wanted to 
 ## By the numbers
 
 * 2 curated cities: New York and London ([`cities/index.json`](cities/index.json)).
-* 475 more cities ready to plan from the monthly Overture build, out of 651 on the list ([`places/cities.json`](places/cities.json)). The other 176 have under 40 places and use OpenStreetMap live.
+* 504 more cities ready to plan from the monthly Overture build, out of 651 on the list in 151 countries ([`places/cities.json`](places/cities.json)). The other 147 have under 40 places and use OpenStreetMap live.
 * 153 hand picked spots: 125 in New York, 28 in London (`picks` in [`cities/*/city.json`](cities)).
-* 4,219 more spots tagged by the pipeline: 1,839 in New York, 2,380 in London ([`cities/*/spots.json`](cities), built 2026-11-10).
+* 4,917 more spots tagged by the pipeline: 2,397 in New York, 2,520 in London ([`cities/*/spots.json`](cities), built 2026-11-16).
 * 3 open data sources: NYC Open Data, OpenStreetMap and Overture Maps. No scraping.
 * 0 packages in the app and the daily pipeline (Python standard library only). The monthly Overture build uses DuckDB, pinned by hash in its Action.
 * 0 build steps: `index.html` is served as is.
@@ -112,11 +124,18 @@ npx wrangler d1 execute plan-committee --remote --file=schema.sql
 npx wrangler deploy                          # prints your worker URL
 ```
 
-Paste the worker URL into `STATS_URL` near the top of the script in `index.html`, run `python3 tools/csp.py`, and add it as a repo **variable** named `STATS_URL`. Only place names and counts are stored, nothing about people. The worker answers only the app's origin (CORS) and rejects bodies over 1 KB; set `ORIGIN` in `worker.js` to your own address. Rate limiting is left to a Cloudflare rate limiting rule on the worker route, so add one before you point a public site at it.
+Paste the worker URL into `STATS_URL` near the top of the script in `index.html`, add its host to `HOSTS` in `tools/csp.py` (the security policy blocks any host not listed there), run `python3 tools/csp.py`, and add it as a repo **variable** named `STATS_URL`. Only place names and counts are stored, nothing about people. The worker answers only the app's origin (CORS) and rejects bodies over 1 KB; set `ORIGIN` in `worker.js` to your own address. `wrangler.toml` sets a rate limit of 10 events a minute per visitor, and the worker refuses requests if that limit is missing.
 
 ## Contributing
 
-New spots, better agent banter, other cities, bug fixes: all welcome. Start with [CONTRIBUTING.md](CONTRIBUTING.md) and look for issues labeled **good first issue**.
+This is an open source project and help is welcome, whether you code or not:
+
+* **Know a great spot?** Add it to your city's hand picks: one line of JSON, no coding needed.
+* **Want your city?** It already works anywhere, but a curated pack (hand picks and neighborhoods) makes it much better. One command sets it up.
+* **Found a closed place or a bug?** [Open an issue](https://github.com/marinasofia/plan-committee/issues/new/choose).
+* **Like writing?** Make the demo agents funnier.
+
+[CONTRIBUTING.md](CONTRIBUTING.md) has step by step instructions for each. Pull requests run in people's browsers next to their AI keys, so every change is reviewed line by line, and security issues go through [SECURITY.md](SECURITY.md), not public issues.
 
 ## License and data
 
